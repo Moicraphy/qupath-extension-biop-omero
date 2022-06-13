@@ -47,6 +47,7 @@ import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.ProjectData;
+import omero.model.DatasetImageLink;
 import omero.model.IObject;
 import omero.model.ProjectDatasetLink;
 import org.slf4j.Logger;
@@ -178,18 +179,14 @@ public final class OmeroRawTools {
             else if (type == OmeroRawObjectType.DATASET) {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Dataset");
                 Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),Collections.singletonList(parent.getId()));
-                if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() >= 0){
+                if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
                     List<DatasetData> datasets = new ArrayList<>();
                     List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
-                    Iterator var2 = links.iterator();
 
-                    while(var2.hasNext()) {
-                        ProjectDatasetLink link = (ProjectDatasetLink)var2.next();
+                    for (ProjectDatasetLink link : links) {
                         datasets.add(new DatasetData(link.getChild()));
                     }
 
-                    // Collection<DatasetData> dataColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext());
-                    // List<DatasetData> datasets = new ArrayList<>(dataColl);
                     datasets.forEach(e-> {
                         try {
                             list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype,client,parent));
@@ -205,16 +202,25 @@ public final class OmeroRawTools {
             }
             else if (type == OmeroRawObjectType.IMAGE) {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Image");
-                Collection<ImageData> ImageColl = client.getGateway().getFacility(BrowseFacility.class).getImagesForDatasets(client.getContext(), Collections.singletonList((long) parent.getId()));
-                List<ImageData> images = new ArrayList<>(ImageColl);
-                images.forEach(e-> {
-                    try {
-                        list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,client,parent));
-                    } catch (DSOutOfServiceException | ServerError ex) {
-                        throw new RuntimeException(ex);
+                Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(),Collections.singletonList(parent.getId()));
+                System.out.println("OmeroRawTools-readOmeroObjects---->Size of linked images : "+datasetColl.iterator().next().asDataset().sizeOfImageLinks());
+                if(datasetColl.iterator().next().asDataset().sizeOfImageLinks() > 0){
+                    List<ImageData> images = new ArrayList<>();
+                    List<DatasetImageLink> links = datasetColl.iterator().next().asDataset().copyImageLinks();
+
+                    for (DatasetImageLink link : links) {
+                        images.add(new ImageData(link.getChild()));
                     }
-                });
-                System.out.println("OmeroRawTools-readOmeroObjects---->List of images : " +list);
+                    System.out.println("OmeroRawTools-readOmeroObjects---->images list : "+images);
+                    images.forEach(e-> {
+                        try {
+                            list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,client,parent));
+                        } catch (DSOutOfServiceException | ServerError ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    });
+                    System.out.println("OmeroRawTools-readOmeroObjects---->List of images : " +list);
+                }
             }
         } catch (DSOutOfServiceException | DSAccessException e) {
             throw new IOException("Cannot get datasets");//handleServiceOrAccess(e, "Cannot get datasets");
@@ -321,7 +327,6 @@ public final class OmeroRawTools {
             orphanedFolder.setLoading(false);
 
         orphanedFolder.setTotalChildCount(max);
-       // List<OmeroRawObject> omeroObjs = readOmeroObjects(client.getServerURI(), new Server(client.getServerURI()),client);
         map.forEach( e -> {
             executorRequests.submit(() -> {
                 try {

@@ -23,4 +23,13 @@ public class OmeroRawRequests {
 
         return map;
     }
+
+   /* public static Collection<ImageData> getOrphanedDatasets(OmeroRawClient client) throws ExecutionException, DSOutOfServiceException {
+
+        String username = client.getGateway().getLoggedInUser().getUserName();
+        long userID = client.getGateway().getUserDetails(client.getContext(), username).getId();
+        Collection<ImageData> map = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext()).iterator().next().asDataset()
+
+        return map;
+    }*/
 }

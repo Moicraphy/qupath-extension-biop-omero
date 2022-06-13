@@ -304,7 +304,7 @@ final class OmeroRawObjects {
      * contain orphaned images, <b>not</b> orphaned datasets (like the OMERO webclient).
      * <p>
      * It should only be used once per {@code OmeroWebImageServerBrowser}, with its children objects loaded
-     * in an executor (see {@link OmeroTools#populateOrphanedImageList(URI, OrphanedFolder)}). This class keeps track of:
+     * in an executor (see {@link OmeroRawTools#populateOrphanedImageList(URI, OrphanedFolder)}). This class keeps track of:
      * <li>Total child count: total amount of orphaned images on the server.</li>
      * <li>Current child count: what is displayed in the current {@code OmeroWebServerImageBrowser}, which depends on what is loaded and the current Group/Owner.</li>
      * <li>Child count: total amount of orphaned images currently loaded (always smaller than total child count).</li>
@@ -530,15 +530,15 @@ final class OmeroRawObjects {
 
         public Image(String url, ImageData imageData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
-
-            this.acquisitionDate = imageData.getAcquisitionDate().getTime();
+            this.acquisitionDate = imageData.getAcquisitionDate()==null ? -1 : imageData.getAcquisitionDate().getTime();
             PixelsData pixData = imageData.getDefaultPixels();
 
             PixelInfo pixelInfo = new PixelInfo(pixData.getSizeX(), pixData.getSizeY(), pixData.getSizeC(), pixData.getSizeZ(), pixData.getSizeT(),
-                    new PhysicalSize(pixData.asPixels().getPhysicalSizeX().getUnit().toString(),pixData.asPixels().getPhysicalSizeX().getValue()),
-                    new PhysicalSize(pixData.asPixels().getPhysicalSizeY().getUnit().toString(),pixData.asPixels().getPhysicalSizeY().getValue()),
-                    new PhysicalSize(pixData.asPixels().getPhysicalSizeZ().getUnit().toString(),pixData.asPixels().getPhysicalSizeZ().getValue()),
+                    pixData.asPixels().getPhysicalSizeX()==null ? new PhysicalSize("", -1) : new PhysicalSize(pixData.asPixels().getPhysicalSizeX().getUnit().toString(), pixData.asPixels().getPhysicalSizeX().getValue()),
+                    pixData.asPixels().getPhysicalSizeY()==null ? new PhysicalSize("", -1) : new PhysicalSize(pixData.asPixels().getPhysicalSizeY().getUnit().toString(), pixData.asPixels().getPhysicalSizeY().getValue()),
+                    pixData.asPixels().getPhysicalSizeZ()==null ? new PhysicalSize("", -1) : new PhysicalSize(pixData.asPixels().getPhysicalSizeZ().getUnit().toString(), pixData.asPixels().getPhysicalSizeZ().getValue()),
                     new ImageType(pixData.getPixelType()));
+
             this.pixels = pixelInfo;
 
             super.setId(id);

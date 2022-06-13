@@ -767,7 +767,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
             // If omeroObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
             if (omeroObj.getType() == OmeroRawObjectType.SERVER) {
-                // TODO not forget this line to review
+                // TODO create this function to get orphaned datasets
                 children.addAll(OmeroRawTools.readOrphanedDatasets(serverURI, (Server)omeroObj));
                 serverChildrenList = children;
                 System.out.println("OmeroRaw...Command-getChildren-------> going inside server type");
