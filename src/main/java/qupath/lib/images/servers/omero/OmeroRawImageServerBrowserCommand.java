@@ -1003,13 +1003,14 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
      * @param omeroObj
      * @return isSupported
      */
+    // TODO check the different unsuported format or othe rthings that are not supported by Omero Raw Server
     private static boolean isSupported(OmeroRawObject omeroObj) {
         if (omeroObj == null || omeroObj.getType() != OmeroRawObjectType.IMAGE)
             return true;
-        return isUint8((Image)omeroObj) && has3Channels((Image)omeroObj);
+        return true;//isUint8((Image)omeroObj) && has3Channels((Image)omeroObj);
     }
 
-    private static boolean isUint8(Image image) {
+   /* private static boolean isUint8(Image image) {
         if (image == null)
             return false;
         return image.getPixelType().equals("uint8");
@@ -1019,7 +1020,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         if (image == null)
             return false;
         return Integer.parseInt(getObjectInfo(7, image).getValue()) == 3;
-    }
+    }*/
 
     /**
      * Set the specified item and its children to the specified expanded mode
@@ -1110,20 +1111,21 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     notSupportedLabel.setStyle("-fx-text-fill: red;");
 
                     // Clarify to the user WHY it's not supported
+                    // TODO clean this code according to what is supported or not (see the other todo above the isSupported method)
                     Label uint8 = new Label();
-                    if (isUint8((Image)item)) {
-                        uint8.setText("- uint8 " + Character.toString((char)10003));
-                    } else {
+ //                   if (isUint8((Image)item)) {
+ //                       uint8.setText("- uint8 " + Character.toString((char)10003));
+ //                   } else {
                         uint8.setText("- uint8 " + Character.toString((char)10007));
                         uint8.setStyle("-fx-text-fill: red;");
-                    }
+ //                   }
                     Label has3Channels = new Label();
-                    if (has3Channels((Image)item)) {
-                        has3Channels.setText("- 3 channels " + Character.toString((char)10003));
-                    } else {
+ //                   if (has3Channels((Image)item)) {
+  //                      has3Channels.setText("- 3 channels " + Character.toString((char)10003));
+  //                  } else {
                         has3Channels.setText("- 3 channels " + Character.toString((char)10007));
                         has3Channels.setStyle("-fx-text-fill: red;");
-                    }
+  //                  }
                     gp.addRow(1, notSupportedLabel, new HBox(uint8, has3Channels));
                 }
 
