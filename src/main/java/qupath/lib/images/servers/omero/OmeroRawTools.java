@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.google.api.client.json.Json;
+import omero.RLong;
 import omero.ServerError;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
@@ -46,6 +47,8 @@ import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.ProjectData;
+import omero.model.IObject;
+import omero.model.ProjectDatasetLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -165,38 +168,53 @@ public final class OmeroRawTools {
                     try {
                         //System.out.println("project : " +e);
                        // System.out.println("new omeroObject : " +new OmeroRawObjects.Project("",e,e.getId(),finaltype,client));
-                        list.add(new OmeroRawObjects.Project("",e,e.getId(),finaltype,client));
+                        list.add(new OmeroRawObjects.Project("",e,e.getId(),finaltype,client, parent));
                     } catch (DSOutOfServiceException | ServerError ex) {
                         throw new RuntimeException(ex);
                     }
                 });
-                System.out.println("List of projects : " +list);
+                //System.out.println("List of projects : " +list);
             }
             else if (type == OmeroRawObjectType.DATASET) {
-                System.out.println("Type : Dataset");
-                Collection<DatasetData> dataColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext());
-                List<DatasetData> datasets = new ArrayList<>(dataColl);
-                datasets.forEach(e-> {
-                    try {
-                        list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype,client));
-                    } catch (DSOutOfServiceException | ServerError ex) {
-                        throw new RuntimeException(ex);
+                System.out.println("OmeroRawTools-readOmeroObjects---->Type : Dataset");
+                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),Collections.singletonList(parent.getId()));
+                if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() >= 0){
+                    List<DatasetData> datasets = new ArrayList<>();
+                    List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
+                    Iterator var2 = links.iterator();
+
+                    while(var2.hasNext()) {
+                        ProjectDatasetLink link = (ProjectDatasetLink)var2.next();
+                        datasets.add(new DatasetData(link.getChild()));
                     }
-                });
-                System.out.println("List of datasets : " +list);
+
+                    // Collection<DatasetData> dataColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext());
+                    // List<DatasetData> datasets = new ArrayList<>(dataColl);
+                    datasets.forEach(e-> {
+                        try {
+                            list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype,client,parent));
+                        } catch (DSOutOfServiceException | ServerError ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    });
+                    System.out.println("OmeroRawTools-readOmeroObjects---->List of datasets : " +list);
+                }
+
+
+
             }
             else if (type == OmeroRawObjectType.IMAGE) {
-                System.out.println("Type : Image");
+                System.out.println("OmeroRawTools-readOmeroObjects---->Type : Image");
                 Collection<ImageData> ImageColl = client.getGateway().getFacility(BrowseFacility.class).getImagesForDatasets(client.getContext(), Collections.singletonList((long) parent.getId()));
                 List<ImageData> images = new ArrayList<>(ImageColl);
                 images.forEach(e-> {
                     try {
-                        list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,client));
+                        list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,client,parent));
                     } catch (DSOutOfServiceException | ServerError ex) {
                         throw new RuntimeException(ex);
                     }
                 });
-                System.out.println("List of images : " +list);
+                System.out.println("OmeroRawTools-readOmeroObjects---->List of images : " +list);
             }
         } catch (DSOutOfServiceException | DSAccessException e) {
             throw new IOException("Cannot get datasets");//handleServiceOrAccess(e, "Cannot get datasets");
@@ -289,7 +307,7 @@ public final class OmeroRawTools {
      * @param client
      * @param orphanedFolder
      */
-    public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException {
+    public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException, IOException {
         var list = orphanedFolder.getImageList();
         orphanedFolder.setLoading(true);
         list.clear();
@@ -303,7 +321,8 @@ public final class OmeroRawTools {
             orphanedFolder.setLoading(false);
 
         orphanedFolder.setTotalChildCount(max);
-        map.forEach(e -> {
+       // List<OmeroRawObject> omeroObjs = readOmeroObjects(client.getServerURI(), new Server(client.getServerURI()),client);
+        map.forEach( e -> {
             executorRequests.submit(() -> {
                 try {
                     long id = e.getId();
@@ -368,22 +387,27 @@ public final class OmeroRawTools {
     public static OmeroRawObject readOmeroObject(OmeroRawClient client, long id, OmeroRawObjectType type) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         // Request json
         //JsonObject map = null;//OmeroRequests.requestObjectInfo(scheme, host, port, id, type);
+
+        // TODO Only used for orphan images ; find a way to integrate it in the readOmeroObjects method
+        Server parent = new Server(client.getServerURI());
+
         try {
             switch (type) {
                 case IMAGE:
                     ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), id);
-                    OmeroRawObjects.Image objImage = new OmeroRawObjects.Image("",image,id,type,client);
+
+                    OmeroRawObjects.Image objImage = new OmeroRawObjects.Image("",image,id,type,client, parent);
                     return objImage;
-                case DATASET:
+                /*case DATASET:
                     Collection<DatasetData> datasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(), Collections.singletonList(id));
                     DatasetData dataset = datasets.iterator().next();
-                    OmeroRawObjects.Dataset objDataset = new OmeroRawObjects.Dataset("",dataset,id,type,client);
+                    OmeroRawObjects.Dataset objDataset = new OmeroRawObjects.Dataset("",dataset,id,type,client,parent);
                     return objDataset;
                 case PROJECT:
                     Collection<ProjectData> projects = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(), Collections.singletonList(id));
                     ProjectData project = projects.iterator().next();
-                    OmeroRawObjects.Project objProject = new OmeroRawObjects.Project("",project,id,type,client);
-                    return objProject;
+                    OmeroRawObjects.Project objProject = new OmeroRawObjects.Project("",project,id,type,client, parent);
+                    return objProject;*/
                 default:
                     throw new UnsupportedOperationException("Type (" + type + ") not supported");
             }

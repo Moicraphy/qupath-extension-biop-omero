@@ -400,13 +400,14 @@ final class OmeroRawObjects {
             return description;
         }
 
-        public Project(String url, ProjectData projectData, long id, OmeroRawObjectType type, OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        public Project(String url, ProjectData projectData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
             this.description = projectData.getDescription();
             this.childCount = projectData.asProject().sizeOfDatasetLinks();
             super.setId(id);
             super.setName(projectData.getName());
             super.setType(type.toString());
+            super.setParent(parent);
 
             //TODO change the way to extract user info because it is only the one which is logged
             //System.out.println(projectData.asExperimenter().getFirstName());
@@ -476,13 +477,14 @@ final class OmeroRawObjects {
             return description;
         }
 
-        public Dataset(String url, DatasetData datasetData, long id, OmeroRawObjectType type, OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        public Dataset(String url, DatasetData datasetData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
             this.description = datasetData.getDescription();
             this.childCount = datasetData.asDataset().sizeOfImageLinks();
             super.setId(id);
             super.setName(datasetData.getName());
             super.setType(type.toString());
+            super.setParent(parent);
 
             omero.model.Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(datasetData.getOwner().getId());
             super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
@@ -493,16 +495,8 @@ final class OmeroRawObjects {
                     user.getInstitution()==null ? "" : user.getInstitution().getValue(),
                     user.getOmeName()==null ? "" : user.getOmeName().getValue()));
 
-            /*super.setOwner(new Owner(datasetData.getOwner().getId(),
-                                     datasetData.getOwner().getFirstName(),
-                                     datasetData.getOwner().getMiddleName(),
-                                     datasetData.getOwner().getLastName(),
-                                     datasetData.getOwner().getEmail(),
-                                     datasetData.getOwner().getInstitution(),
-                                     datasetData.getOwner().getUserName()));*/
-
             super.setGroup(new Group(datasetData.getGroupId(),
-                    client.getGateway().getAdminService(client.getContext()).getGroup(datasetData.getGroupId()).getName().toString()));
+                    client.getGateway().getAdminService(client.getContext()).getGroup(datasetData.getGroupId()).getName().getValue()));
 
         }
     }
@@ -534,7 +528,7 @@ final class OmeroRawObjects {
             return pixels.getPixelType();
         }
 
-        public Image(String url, ImageData imageData, long id, OmeroRawObjectType type, OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        public Image(String url, ImageData imageData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
 
             this.acquisitionDate = imageData.getAcquisitionDate().getTime();
@@ -550,15 +544,19 @@ final class OmeroRawObjects {
             super.setId(id);
             super.setName(imageData.getName());
             super.setType(type.toString());
-            super.setOwner(new Owner(imageData.getOwner().getId(),
-                    imageData.getOwner().getFirstName(),
-                    imageData.getOwner().getMiddleName(),
-                    imageData.getOwner().getLastName(),
-                    imageData.getOwner().getEmail(),
-                    imageData.getOwner().getInstitution(),
-                    imageData.getOwner().getUserName()));
+            super.setParent(parent);
+
+            omero.model.Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(imageData.getOwner().getId());
+            super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                    user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                    user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                    user.getLastName()==null ? "" : user.getLastName().getValue(),
+                    user.getEmail()==null ? "" : user.getEmail().getValue(),
+                    user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                    user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+
             super.setGroup(new Group(imageData.getGroupId(),
-                    client.getGateway().getAdminService(client.getContext()).getGroup(imageData.getGroupId()).getName().toString()));
+                    client.getGateway().getAdminService(client.getContext()).getGroup(imageData.getGroupId()).getName().getValue()));
         }
     }
 

@@ -726,10 +726,15 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 			if (omeroObj.getType() == OmeroObjectType.SERVER) {
 				children.addAll(OmeroTools.readOrphanedDatasets(serverURI, (Server)omeroObj));
 				serverChildrenList = children;
-			} else if (omeroObj .getType() == OmeroObjectType.PROJECT)
+				System.out.println("OmeroWeb...Command-getChildren-------> going inside server type");
+			} else if (omeroObj .getType() == OmeroObjectType.PROJECT) {
 				projectMap.put(omeroObj, children);
-			else if (omeroObj.getType() == OmeroObjectType.DATASET)
+				System.out.println("OmeroWeb...Command-getChildren-------> going inside project type");
+			}
+			else if (omeroObj.getType() == OmeroObjectType.DATASET) {
 				datasetMap.put(omeroObj, children);
+				System.out.println("OmeroWeb...Command-getChildren-------> going inside project type");
+			}
 		} catch (IOException e) {
 			logger.error("Could not fetch server information: {}", e.getLocalizedMessage());
 			return new ArrayList<>();
