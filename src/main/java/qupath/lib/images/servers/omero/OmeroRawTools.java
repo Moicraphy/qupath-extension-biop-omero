@@ -184,7 +184,10 @@ public final class OmeroRawTools {
                     List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
 
                     for (ProjectDatasetLink link : links) {
-                        datasets.add(new DatasetData(link.getChild()));
+                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(),Collections.singletonList(link.getChild().getId().getValue()));
+                        datasets.add(datasetColl.iterator().next());
+
+                        //datasets.add(new DatasetData(link.getChild()));
                     }
 
                     datasets.forEach(e-> {
