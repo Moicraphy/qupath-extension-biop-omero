@@ -138,6 +138,7 @@ public final class OmeroTools {
 
 		var gson = new GsonBuilder().registerTypeAdapter(OmeroObject.class, new OmeroObjects.GsonOmeroObjectDeserializer()).setLenient().create();
 		List<JsonElement> data = OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(),uri.getPort(), type, parent);
+		//System.out.println(data);
 		for (var d: data) {
 			gson = new GsonBuilder().registerTypeAdapter(OmeroObject.class, new OmeroObjects.GsonOmeroObjectDeserializer()).setLenient().create();
 			try {
@@ -230,6 +231,7 @@ public final class OmeroTools {
 		
 		try {
 			var map = OmeroRequests.requestWebClientObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroObjectType.IMAGE);
+			System.out.println(map);
     		ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
     		
     		// Get the total amount of orphaned images to load

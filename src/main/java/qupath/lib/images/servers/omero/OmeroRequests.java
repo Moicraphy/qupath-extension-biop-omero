@@ -254,6 +254,7 @@ public final class OmeroRequests {
 		else										// All OmeroObjects of type 'objectType' with parent
 			url = new URL(scheme, host, port, String.format(JSON_API_FILTERED_LIST, parentType.toURLString(), parentId, objectType.toURLString(), query));
 
+		System.out.println(url);
 		// Return json
 		return OmeroTools.readPaginated(url);
 		
@@ -280,6 +281,7 @@ public final class OmeroRequests {
         		return GsonTools.getInstance().fromJson(reader, JsonObject.class);
         	}
         }
+
 		throw new IOException(String.format("Error %d while connecting to OMERO Webclient: %s", connection.getResponseCode(), connection.getResponseMessage()));
 	}
 	
@@ -340,7 +342,7 @@ public final class OmeroRequests {
 				"\"new_and_deleted\":[],\n" +
 				"\"deleted\":{},\n" +
 				"\"new\":[%s],\"modified\":[]}}", id, roiJsonList.size(), String.join(", ", roiJsonList));
-		
+
 		// Create request
 		URL url = new URL(scheme, host, port, "/iviewer/persist_rois/");
 		var conn = url.openConnection();

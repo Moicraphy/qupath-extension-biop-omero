@@ -59,7 +59,12 @@ public class OmeroExtension implements QuPathExtension, GitHubProject {
 	 * To handle the different stages of browsers (only allow one per OMERO server)
 	 */
 	private static Map<OmeroWebClient, OmeroWebImageServerBrowserCommand> browsers = new HashMap<>();
-	
+
+	/**
+	 * To handle the different stages of browsers (only allow one per OMERO server)
+	 */
+	private static Map<OmeroRawClient, OmeroRawImageServerBrowserCommand> rawBrowsers = new HashMap<>();
+
 	private static boolean alreadyInstalled = false;
 	
 	@Override
@@ -86,7 +91,26 @@ public class OmeroExtension implements QuPathExtension, GitHubProject {
     	                actionSendObjects
     	                )
 				);
+
+		// for OMERO raw extension
+		var actionRawClients = ActionTools.createAction(new OmeroRawClientsCommand(qupath), "Manage server connections");
+		var actionRawSendObjects = ActionTools.createAction(new OmeroRawWritePathObjectsCommand(qupath), "Send annotations to OMERO");
+		Menu browseRawServerMenu = new Menu("Browse server...");
+
+//		actionClients.disabledProperty().bind(qupath.projectProperty().isNull());
+//		browseServerMenu.disableProperty().bind(qupath.projectProperty().isNull());
+		actionSendObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		MenuTools.addMenuItems(qupath.getMenu("Extensions", false),
+				MenuTools.createMenu("OMERO-RAW",
+						browseRawServerMenu,
+						actionRawClients,
+						null,
+						actionRawSendObjects
+				)
+		);
+
 		createServerListMenu(qupath, browseServerMenu);
+		createRawServerListMenu(qupath, browseRawServerMenu);
 	}
 	
 
@@ -184,7 +208,95 @@ public class OmeroExtension implements QuPathExtension, GitHubProject {
 		browseServerMenu.getParentMenu().setOnShowing(validationHandler);	
 		return browseServerMenu;
 	}
-	
+
+
+	private static Menu createRawServerListMenu(QuPathGUI qupath, Menu browseServerMenu) {
+		EventHandler<Event> validationHandler = e -> {
+			browseServerMenu.getItems().clear();
+
+			// Get all active servers
+			var activeServers = OmeroRawClients.getAllClients();
+
+			// Populate the menu with each unique active servers
+			for (var client: activeServers) {
+				if (client == null)
+					continue;
+				MenuItem item = new MenuItem(client.getServerURI() + "...");
+				item.setOnAction(e2 -> {
+					var browser = rawBrowsers.get(client);
+					if (browser == null || browser.getStage() == null) {
+						browser = new OmeroRawImageServerBrowserCommand(qupath, client);
+						rawBrowsers.put(client, browser);
+						browser.run();
+					} else
+						browser.getStage().requestFocus();
+				});
+				browseServerMenu.getItems().add(item);
+			}
+
+			// Create 'New server...' MenuItem
+			MenuItem customServerItem = new MenuItem("New server...");
+			customServerItem.setOnAction(e2 -> {
+				GridPane gp = new GridPane();
+				gp.setVgap(5.0);
+				TextField tf = new TextField();
+				tf.setPrefWidth(400);
+				PaneTools.addGridRow(gp, 0, 0, "Enter OMERO URL", new Label("Enter an OMERO server URL to browse (e.g. http://idr.openmicroscopy.org/):"));
+				PaneTools.addGridRow(gp, 1, 0, "Enter OMERO URL", tf, tf);
+				var confirm = Dialogs.showConfirmDialog("Enter OMERO URL", gp);
+				if (!confirm)
+					return;
+
+				var path = tf.getText();
+				if (path == null || path.isEmpty())
+					return;
+				try {
+					if (!path.startsWith("http:") && !path.startsWith("https:"))
+						throw new IOException("The input URL must contain a scheme (e.g. \"https://\")!");
+
+					// Make the path a URI
+					URI uri = new URI(path);
+
+					// Clean the URI (in case it's a full path)
+					URI uriServer = OmeroRawTools.getServerURI(uri);
+
+					if (uriServer == null)
+						throw new MalformedURLException("Could not parse server from " + uri.toString());
+
+					// Check if client exist and if browser is already opened
+					var client = OmeroRawClients.getClientFromServerURI(uriServer);
+					if (client == null)
+						client = OmeroRawClients.createClientAndLogin(uriServer);
+
+					if (client == null)
+						throw new IOException("Could not parse server from " + uri.toString());
+
+					var browser = rawBrowsers.get(client);
+					if (browser == null || browser.getStage() == null) {
+						// Create new browser
+						browser = new OmeroRawImageServerBrowserCommand(qupath, client);
+						rawBrowsers.put(client, browser);
+						browser.run();
+					} else	// Request focus for already-existing browser
+						browser.getStage().requestFocus();
+
+				} catch (FileNotFoundException ex) {
+					Dialogs.showErrorMessage("OMERO-RAW server", String.format("An error occured when trying to reach %s: %s\"", path, ex.getLocalizedMessage()));
+				} catch (IOException | URISyntaxException ex) {
+					Dialogs.showErrorMessage("OMERO-RAW server", ex.getLocalizedMessage());
+					return;
+				}
+			});
+			MenuTools.addMenuItems(browseServerMenu, null, customServerItem);
+		};
+
+		// Ensure the menu is populated (every time the parent menu is opened)
+		browseServerMenu.getParentMenu().setOnShowing(validationHandler);
+		return browseServerMenu;
+	}
+
+
+
 	/**
 	 * Return map of currently opened browsers.
 	 * 
@@ -194,6 +306,14 @@ public class OmeroExtension implements QuPathExtension, GitHubProject {
 		return browsers;
 	}
 
+	/**
+	 * Return map of currently opened browsers.
+	 *
+	 * @return rawBrowsers
+	 */
+	static Map<OmeroRawClient, OmeroRawImageServerBrowserCommand> getOpenedRawBrowsers() {
+		return rawBrowsers;
+	}
 
 	@Override
 	public GitHubRepo getRepository() {
