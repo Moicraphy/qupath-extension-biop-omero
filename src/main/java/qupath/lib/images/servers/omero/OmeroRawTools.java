@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import com.google.api.client.json.Json;
 import omero.RLong;
 import omero.ServerError;
+import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
@@ -47,9 +48,7 @@ import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.ProjectData;
-import omero.model.DatasetImageLink;
-import omero.model.IObject;
-import omero.model.ProjectDatasetLink;
+import omero.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,15 +159,33 @@ public final class OmeroRawTools {
 
         try {
             if (type == OmeroRawObjectType.PROJECT) {
-                //System.out.println("Type : Project");
-                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext());
-                //System.out.println("projectColl : " +projectColl);
-                List<ProjectData> projects = new ArrayList<>(projectColl);
-                //System.out.println("projects : " +projects);
+                System.out.println("OmeroRawTools-readOmeroObjects---->Type : Project");
+
+                List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
+                System.out.println("nb groups : "+groups.size());
+                Collection<ProjectData> projects = new ArrayList<>();
+                groups.forEach(group-> {
+                            // new security context to access data from other groups
+                            SecurityContext ctx = new SecurityContext(group.getId().getValue());
+                            List<GroupExperimenterMap> experimentersByGroup = group.copyGroupExperimenterMap();
+                    System.out.println("group name : "+group.getName().getValue());
+                            for (GroupExperimenterMap experimenter : experimentersByGroup) {
+                                long userId = experimenter.getChild().getId().getValue();
+                                System.out.println("User ID: "+userId);
+                                try {
+                                    //client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ctx, userId).forEach(e->System.out.println(e.getName()));
+                                    projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ ctx, userId));
+                                } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        });
+                // get the current projects for the group belonging to the current user.
+                //Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext());
+               // List<ProjectData> projects = new ArrayList<>(projectColl);
+
                 projects.forEach(e-> {
                     try {
-                        //System.out.println("project : " +e);
-                       // System.out.println("new omeroObject : " +new OmeroRawObjects.Project("",e,e.getId(),finaltype,client));
                         list.add(new OmeroRawObjects.Project("",e,e.getId(),finaltype,client, parent));
                     } catch (DSOutOfServiceException | ServerError ex) {
                         throw new RuntimeException(ex);
@@ -178,16 +195,20 @@ public final class OmeroRawTools {
             }
             else if (type == OmeroRawObjectType.DATASET) {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Dataset");
-                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),Collections.singletonList(parent.getId()));
+                // get the current project to have access to the child datasets
+                SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
+                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ctx,Collections.singletonList(parent.getId()));
                 if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
                     List<DatasetData> datasets = new ArrayList<>();
                     List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
 
+                    // get child datasets
                     for (ProjectDatasetLink link : links) {
-                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(),Collections.singletonList(link.getChild().getId().getValue()));
+                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(/*client.getContext()*/ctx,Collections.singletonList(link.getChild().getId().getValue()));
                         datasets.add(datasetColl.iterator().next());
                     }
 
+                    // create OmeroRawObjects from child datasets
                     datasets.forEach(e-> {
                         try {
                             list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype,client,parent));
@@ -203,15 +224,21 @@ public final class OmeroRawTools {
             }
             else if (type == OmeroRawObjectType.IMAGE) {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Image");
-                Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(),Collections.singletonList(parent.getId()));
+                SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
+
+                // get the current dataset to have access to the child images
+                Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(/*client.getContext()*/ ctx,Collections.singletonList(parent.getId()));
                 System.out.println("OmeroRawTools-readOmeroObjects---->Size of linked images : "+datasetColl.iterator().next().asDataset().sizeOfImageLinks());
                 if(datasetColl.iterator().next().asDataset().sizeOfImageLinks() > 0){
                     List<ImageData> images = new ArrayList<>();
                     List<DatasetImageLink> links = datasetColl.iterator().next().asDataset().copyImageLinks();
 
+                    // get child images
                     for (DatasetImageLink link : links) {
                         images.add(new ImageData(link.getChild()));
                     }
+
+                    // create OmeroRawObjects from child images
                     System.out.println("OmeroRawTools-readOmeroObjects---->images list : "+images);
                     images.forEach(e-> {
                         try {
@@ -225,22 +252,9 @@ public final class OmeroRawTools {
             }
         } catch (DSOutOfServiceException | DSAccessException e) {
             throw new IOException("Cannot get datasets");//handleServiceOrAccess(e, "Cannot get datasets");
+        } catch (ServerError e) {
+            throw new RuntimeException(e);
         }
-
-        /*var gson = new GsonBuilder().registerTypeAdapter(OmeroObject.class, new OmeroObjects.GsonOmeroObjectDeserializer()).setLenient().create();
-        List<JsonElement> data = OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(),uri.getPort(), type, parent);
-        for (var d: data) {
-            gson = new GsonBuilder().registerTypeAdapter(OmeroObject.class, new OmeroObjects.GsonOmeroObjectDeserializer()).setLenient().create();
-            try {
-                var omeroObj = gson.fromJson(d, OmeroObject.class);
-                if (omeroObj != null) {
-                    omeroObj.setParent(parent);
-                    list.add(omeroObj);
-                }
-            } catch (Exception e) {
-                logger.error("Error parsing OMERO object: " + e.getLocalizedMessage(), e);
-            }
-        }*/
 
         return list;
     }

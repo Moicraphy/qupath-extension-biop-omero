@@ -251,15 +251,6 @@ final class OmeroRawObjects {
             return 0;
         }
 
-        /*abstract void init(long id, OmeroRawObjectType type, String name, OmeroRawClient client, DataObject data);{
-            this.parent = null;
-            this.group = client.getGateway().getAdminService(client.getContext()).getGroup(data.getGroupId()).getName().toString();
-            this.id = id;
-            this.name = name;
-            this.owner = data.getOwner().getn
-        }*/
-
-
         @Override
         public int hashCode() {
             return Objects.hash(id);
