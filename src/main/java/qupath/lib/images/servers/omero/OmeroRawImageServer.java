@@ -732,6 +732,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 	/**
 	 * Retrieve any ROIs stored with this image as annotation objects.
+	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
+	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
 	 *
 	 * *********************** BE CAREFUL *****************************
 	 * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
@@ -739,76 +741,73 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * ****************************************************************
 	 *
 	 * @return list of path objects
-	 * @throws IOException
 	 */
 	@Override
-	public Collection<PathObject> readPathObjects() throws IOException {
+	public Collection<PathObject> readPathObjects() {
 		List<PathObject> list = new ArrayList<>();
+		// get ROIs from OMERO.web
+		List<ROIResult> roiList = null;
+
 		try {
-			// get ROIs from OMERO.web
-			List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
+			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
+		} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+			throw new RuntimeException(e);
+		}
 
-			// Convert them into ROIData
-			for(int i = 0; i < roiList.size(); i++){
-				List<ROIData> roiData = roiList.get(i).getROIs().stream().collect(Collectors.toList());
+		// Convert them into ROIData
+		for (ROIResult roiResult : roiList) {
+			List<ROIData> roiData = new ArrayList<>(roiResult.getROIs());
 
-				// Convert OMERO ROIs into QuPath ROIs
-				for(int j = 0; j < roiData.size(); j++){
-					List<ROI> roi = convertOmeroROIsToQuPathROIs(roiData.get(j));
+			// Convert OMERO ROIs into QuPath ROIs
+			for (ROIData roiDatum : roiData) {
+				List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
 
-					if(!roi.isEmpty()) {
-						// get the number of ROI "Point" in all shapes attached the current ROI
-						long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
-						ROI finalROI = roi.get(0);
+				if (!roi.isEmpty()) {
+					// get the number of ROI "Point" in all shapes attached the current ROI
+					// Points are not supported during the XOR operation ; they are processed differently.
+					long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
+					ROI finalROI = roi.get(0);
 
-						// process ROIs with multiple points only
-						if(nbPoints == roi.size() && roi.size() > 1) {
-							// create a pointsROI instance with multiple points
-							finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
-															roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
-															ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
-						}
-
-						// Process ROIs with multiple shapes, containing one or more points
-						else if(nbPoints > 0 && roi.size() > 1) {
-							List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
-							List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
-
-							// create a pointsROI instance with multiple points
-							ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
-																 pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
-																 ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
-
-							// make a complex roi by applying XOR operation between shapes
-							finalROI = notPointsList.get(0);
-							for (int k = 1; k < notPointsList.size(); k++) {
-								finalROI = linkShapes(finalROI, notPointsList.get(k));
-							}
-
-							// make the union between points and complex ROI
-							finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
-						}
-
-						// Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
-						else {
-							for (int k = 1; k < roi.size(); k++) {
-								// make a complex roi by applying XOR operation between shapes
-								finalROI = linkShapes(finalROI, roi.get(k));
-							}
-						}
-
-						// Convert QuPath ROI to QuPath PathObject
-						list.add(PathObjects.createAnnotationObject(finalROI));
+					// process ROIs with multiple points only
+					if (nbPoints == roi.size() && roi.size() > 1) {
+						// create a pointsROI instance with multiple points
+						finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
+								roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
+								ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
 					}
+
+					// Process ROIs with multiple shapes, containing one or more points
+					else if (nbPoints > 0 && roi.size() > 1) {
+						List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
+						List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
+
+						// create a pointsROI instance with multiple points
+						ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
+								pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
+								ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
+
+						// make a complex roi by applying XOR operation between shapes
+						finalROI = notPointsList.get(0);
+						for (int k = 1; k < notPointsList.size(); k++) {
+							finalROI = linkShapes(finalROI, notPointsList.get(k));
+						}
+
+						// make the union between points and complex ROI
+						finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
+					}
+
+					// Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
+					else {
+						for (int k = 1; k < roi.size(); k++) {
+							// make a complex roi by applying XOR operation between shapes
+							finalROI = linkShapes(finalROI, roi.get(k));
+						}
+					}
+
+					// Convert QuPath ROI to QuPath PathObject
+					list.add(PathObjects.createAnnotationObject(finalROI));
 				}
 			}
-
-		} catch (DSOutOfServiceException e) {
-			throw new RuntimeException(e);
-		} catch (DSAccessException e) {
-			throw new RuntimeException(e);
-		} catch (ExecutionException e) {
-			throw new RuntimeException(e);
 		}
 
 		return list;
@@ -835,50 +834,45 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		List<ROI> list = new ArrayList<>();
 
 		// Iterate on shapes, select the correct instance and create the corresponding QuPath ROI
-		if (shapes != null) {
-			Iterator<Shape> it = shapes.iterator();
+		for (Shape shape:shapes) {
 
-			while (it.hasNext()){
-				Shape shape = (Shape)it.next();
+			if(shape instanceof Rectangle){
+				RectangleData s = new RectangleData(shape);
+				list.add(ROIs.createRectangleROI(s.getX(),s.getY(),s.getWidth(),s.getHeight(),ImagePlane.getPlaneWithChannel(s.getC(), Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-				if(shape instanceof Rectangle){
-					RectangleData s = new RectangleData(shape);
-					list.add(ROIs.createRectangleROI(s.getX(),s.getY(),s.getWidth(),s.getHeight(),ImagePlane.getPlaneWithChannel(s.getC(), Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+			}else if(shape instanceof Ellipse){
+				EllipseData s = new EllipseData(shape);
+				list.add(ROIs.createEllipseROI(s.getX(),s.getY(),s.getRadiusX(), s.getRadiusY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-				}else if(shape instanceof Ellipse){
-					EllipseData s = new EllipseData(shape);
-					list.add(ROIs.createEllipseROI(s.getX(),s.getY(),s.getRadiusX(), s.getRadiusY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+			}else if(shape instanceof Point){
+				PointData s = new PointData(shape);
+				list.add(ROIs.createPointsROI(s.getX(),s.getY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-				}else if(shape instanceof Point){
-					PointData s = new PointData(shape);
-					list.add(ROIs.createPointsROI(s.getX(),s.getY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+			}else if(shape instanceof Polyline){
+				PolylineData s = new PolylineData(shape);
+				list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
+												s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
+												ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-				}else if(shape instanceof Polyline){
-					PolylineData s = new PolylineData(shape);
-					list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
-													s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
-													ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+			}else if(shape instanceof Polygon){
+				PolygonData s = new PolygonData(shape);
+				list.add(ROIs.createPolygonROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
+											   s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
+											   ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-				}else if(shape instanceof Polygon){
-					PolygonData s = new PolygonData(shape);
-					list.add(ROIs.createPolygonROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
-							 					   s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
-												   ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+			}else if(shape instanceof Label){
+				logger.warn("No ROIs created (requested label shape is unsupported)");
+				//s=new TextData(shape);
 
-				}else if(shape instanceof Label){
-					logger.warn("No ROIs created (requested label shape is unsupported)");
-					//s=new TextData(shape);
+			}else if(shape instanceof Line){
+				LineData s = new LineData(shape);
+				list.add(ROIs.createLineROI(s.getX1(),s.getY1(),s.getX2(),s.getY2(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-				}else if(shape instanceof Line){
-					LineData s = new LineData(shape);
-					list.add(ROIs.createLineROI(s.getX1(),s.getY1(),s.getX2(),s.getY2(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-				}else if(shape instanceof Mask){
-					logger.warn("No ROIs created (requested Mask shape is not supported yet)");
-					//s=new MaskData(shape);
-				}else{
-					logger.warn("Unsupported shape ");
-				}
+			}else if(shape instanceof Mask){
+				logger.warn("No ROIs created (requested Mask shape is not supported yet)");
+				//s=new MaskData(shape);
+			}else{
+				logger.warn("Unsupported shape ");
 			}
 		}
 
@@ -889,30 +883,32 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	/**
 	 * Output the ROI result of the XOR operation between the 2 input ROIs
 	 *
+	 * 	 * *********************** BE CAREFUL *****************************
+	 * 	 * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
+	 * 	 * the new composite ROI are set on the lowest c/z/t plane
+	 * 	 * ****************************************************************
+	 *
 	 * @param roi1
 	 * @param roi2
 	 * @return ROI resulting of the XOR operation
 	 */
 	public ROI linkShapes(ROI roi1, ROI roi2){
 		// get the area of the first roi
-		java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
-		at.translate(0, 0);
-		Area a1 = new Area(at.createTransformedShape(roi1.getShape()));
+		Area a1 = new Area(roi1.getShape());
 
 		// get the area of the second roi
-		at = new java.awt.geom.AffineTransform();
-		at.translate(0, 0);
-		Area a2 = new Area(at.createTransformedShape(roi2.getShape()));
+		Area a2 = new Area(roi2.getShape());
 
 		// Apply a xor operation on both area to combine them (ex. make a hole)
 		a1.exclusiveOr(a2);
 
 		// get the area of the newly created area
 		java.awt.Rectangle r = a1.getBounds();
-		at = new java.awt.geom.AffineTransform();
-		at.translate(0, 0);
 
-		return (GeometryROI) ROIs.createAreaROI(at.createTransformedShape(a1), ImagePlane.getDefaultPlane());
+		// Assign the new ROI to the lowest valid plan of the stack
+		return ROIs.createAreaROI(a1, ImagePlane.getPlaneWithChannel(Math.min(roi1.getC(), roi2.getC()),
+																	 Math.min(roi1.getZ(), roi2.getZ()),
+																	 Math.min(roi1.getT(), roi2.getT())));
 	}
 
 
