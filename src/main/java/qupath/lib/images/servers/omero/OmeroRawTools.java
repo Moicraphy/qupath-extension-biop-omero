@@ -162,16 +162,16 @@ public final class OmeroRawTools {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Project");
 
                 List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
-                System.out.println("nb groups : "+groups.size());
+               // System.out.println("nb groups : "+groups.size());
                 Collection<ProjectData> projects = new ArrayList<>();
                 groups.forEach(group-> {
                             // new security context to access data from other groups
                             SecurityContext ctx = new SecurityContext(group.getId().getValue());
                             List<GroupExperimenterMap> experimentersByGroup = group.copyGroupExperimenterMap();
-                    System.out.println("group name : "+group.getName().getValue());
+                   // System.out.println("group name : "+group.getName().getValue());
                             for (GroupExperimenterMap experimenter : experimentersByGroup) {
                                 long userId = experimenter.getChild().getId().getValue();
-                                System.out.println("User ID: "+userId);
+                                //System.out.println("User ID: "+userId);
                                 try {
                                     //client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ctx, userId).forEach(e->System.out.println(e.getName()));
                                     projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ ctx, userId));
@@ -195,8 +195,10 @@ public final class OmeroRawTools {
             }
             else if (type == OmeroRawObjectType.DATASET) {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Dataset");
-                // get the current project to have access to the child datasets
+
+                // new security context to access data from other groups
                 SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
+                // get the current project to have access to the child datasets
                 Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ctx,Collections.singletonList(parent.getId()));
                 if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
                     List<DatasetData> datasets = new ArrayList<>();
@@ -224,6 +226,7 @@ public final class OmeroRawTools {
             }
             else if (type == OmeroRawObjectType.IMAGE) {
                 System.out.println("OmeroRawTools-readOmeroObjects---->Type : Image");
+                // new security context to access data from other groups
                 SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
 
                 // get the current dataset to have access to the child images
@@ -328,12 +331,13 @@ public final class OmeroRawTools {
      * @param client
      * @param orphanedFolder
      */
-    public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException, IOException {
+    public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException, IOException, ServerError {
         var list = orphanedFolder.getImageList();
         orphanedFolder.setLoading(true);
         list.clear();
 
         Collection<ImageData> map = OmeroRawRequests.getOrphanedImages(client);
+
         ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
 
         // Get the total amount of orphaned images to load
@@ -346,7 +350,8 @@ public final class OmeroRawTools {
             executorRequests.submit(() -> {
                 try {
                     long id = e.getId();
-                    OmeroRawObject omeroObj = readOmeroObject(client, id, OmeroRawObjectType.IMAGE);
+                    long groupID = e.getGroupId();
+                    OmeroRawObject omeroObj = readOmeroObject(client, id, OmeroRawObjectType.IMAGE, groupID);
                     Platform.runLater(() -> {
                         list.add(omeroObj);
 
@@ -404,17 +409,16 @@ public final class OmeroRawTools {
      * @return OmeroObject
      * @throws IOException
      */
-    public static OmeroRawObject readOmeroObject(OmeroRawClient client, long id, OmeroRawObjectType type) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
-        // Request json
-        //JsonObject map = null;//OmeroRequests.requestObjectInfo(scheme, host, port, id, type);
+    public static OmeroRawObject readOmeroObject(OmeroRawClient client, long id, OmeroRawObjectType type, long groupID) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
 
         // TODO Only used for orphan images ; find a way to integrate it in the readOmeroObjects method
         Server parent = new Server(client.getServerURI());
+        SecurityContext ctx = new SecurityContext(groupID);
 
         try {
             switch (type) {
                 case IMAGE:
-                    ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), id);
+                    ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(/*client.getContext()*/ctx, id);
 
                     OmeroRawObjects.Image objImage = new OmeroRawObjects.Image("",image,id,type,client, parent);
                     return objImage;
@@ -434,11 +438,6 @@ public final class OmeroRawTools {
         }catch(Exception e){
             throw new IOException(String.format("Cannot have access to %s with id %d.", type, id));
         }
-
-
-        // Create OmeroObject
-        //var gson = new GsonBuilder().registerTypeAdapter(OmeroRawObject.class, new OmeroObjects.GsonOmeroObjectDeserializer()).setLenient().create();
-        //gson.fromJson(map.get("data").getAsJsonObject(), OmeroRawObject.class);
     }
 
     /**

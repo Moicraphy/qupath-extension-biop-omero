@@ -352,7 +352,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         try {
             OmeroRawTools.populateOrphanedImageList(client, orphanedFolder);
 
-        } catch (DSOutOfServiceException | ExecutionException | DSAccessException | IOException e) {
+        } catch (DSOutOfServiceException | ExecutionException | DSAccessException | IOException | ServerError e) {
             throw new RuntimeException(e);
         }
         currentOrphanedCount.bind(Bindings.createIntegerBinding(() -> Math.toIntExact(filterList(orphanedImageList,
@@ -793,19 +793,15 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
         try {
             // Load project icon
-           // map.put(OmeroRawObjectType.PROJECT, ImageIO.read(new File("D:\\Remy\\Github-projects\\qupath\\qupath-extension-omero\\resources\\folder16.png")));
             map.put(OmeroRawObjectType.PROJECT, ImageIO.read(getClass().getClassLoader().getResource("images/folder16.png")));
 
             // Load dataset icon
-           // String pathToFolderImage = "images/folder_image16.png";
-           // map.put(OmeroRawObjectType.DATASET, ImageIO.read(new File("D:\\Remy\\Github-projects\\qupath\\qupath-extension-omero\\resources\\folder_image16.png")));
             map.put(OmeroRawObjectType.DATASET, ImageIO.read(getClass().getClassLoader().getResource("images/folder_image16.png")));
+
             // Load image icon
-            //map.put(OmeroRawObjectType.IMAGE, ImageIO.read(new File("D:\\Remy\\Github-projects\\qupath\\qupath-extension-omero\\resources\\image16.png")));
             map.put(OmeroRawObjectType.IMAGE, ImageIO.read(getClass().getClassLoader().getResource("images/image16.png")));
 
             // Load orphaned folder icon
-            //map.put(OmeroRawObjectType.ORPHANED_FOLDER, ImageIO.read(new File("D:\\Remy\\Github-projects\\qupath\\qupath-extension-omero\\resources\\folder_yellow16.png")));
             map.put(OmeroRawObjectType.ORPHANED_FOLDER, ImageIO.read(getClass().getClassLoader().getResource("images/folder_yellow16.png")));
 
         } catch (IOException e) {
