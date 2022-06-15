@@ -1,14 +1,18 @@
 package qupath.lib.images.servers.omero;
 
 import com.google.gson.JsonObject;
+import loci.common.services.ServiceException;
 import omero.ServerError;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
+import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
+import omero.model.Dataset;
 import omero.model.ExperimenterGroup;
 import omero.model.GroupExperimenterMap;
+import omero.model.IObject;
 import qupath.lib.io.GsonTools;
 
 import java.io.IOException;
@@ -37,26 +41,50 @@ public class OmeroRawRequests {
                 long userId = experimenter.getChild().getId().getValue();
 
                 try {
-                    map.addAll(client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(/*client.getContext()*/ ctx, userId));
+                    map.addAll(client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(ctx, userId));
+
                 } catch (ExecutionException e) {
                     throw new RuntimeException(e);
                 }
             }
         });
 
-        //String username = client.getGateway().getLoggedInUser().getUserName();
-        //long userID = client.getGateway().getUserDetails(client.getContext(), username).getId();
-        //Collection<ImageData> map = client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(client.getContext(), userID);
-
         return map;
     }
 
-   /* public static Collection<ImageData> getOrphanedDatasets(OmeroRawClient client) throws ExecutionException, DSOutOfServiceException {
+    public static Collection<DatasetData> getOrphanedDatasets(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
+        Collection<DatasetData> map = new ArrayList<>();
 
-        String username = client.getGateway().getLoggedInUser().getUserName();
-        long userID = client.getGateway().getUserDetails(client.getContext(), username).getId();
-        Collection<ImageData> map = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext()).iterator().next().asDataset()
+        groups.forEach(group-> {
+            // new security context to access data from other groups
+            SecurityContext ctx = new SecurityContext(group.getId().getValue());
+
+            try {
+                Collection<DatasetData> datasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(ctx);
+                datasets.forEach(dataset-> {
+                    try {
+                        if (client.getGateway().getQueryService(ctx).findAllByQuery("select link.parent from ProjectDatasetLink as link " +
+                                "where link.child=" + dataset.getId(), null).isEmpty()) {
+                            map.add(dataset);
+                        }
+                    } catch (ServerError | DSOutOfServiceException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                /*
+                for(DatasetData dataset : datasets) {
+                    List<IObject> os = client.getGateway().getQueryService(ctx).findAllByQuery("select link.parent from ProjectDatasetLink as link " +
+                            "where link.child=" + dataset.getId(), null);
+                    if(os.stream().filter(e->e.))*/
+              //  System.out.println(map);
+
+            } catch (DSOutOfServiceException | ExecutionException | DSAccessException e) {
+                throw new RuntimeException(e);
+            }
+
+        });
 
         return map;
-    }*/
+    }
 }

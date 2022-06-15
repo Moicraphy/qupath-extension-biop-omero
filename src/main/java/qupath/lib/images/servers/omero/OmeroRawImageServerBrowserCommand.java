@@ -350,7 +350,9 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
         // Populate orphaned image list
         try {
+            long time = System.currentTimeMillis();
             OmeroRawTools.populateOrphanedImageList(client, orphanedFolder);
+            System.out.println("OmeroRaw...Command-Run around PopulatedOrphanedImages time : "+(System.currentTimeMillis()-time));
 
         } catch (DSOutOfServiceException | ExecutionException | DSAccessException | IOException | ServerError e) {
             throw new RuntimeException(e);
@@ -371,9 +373,9 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         loadingOrphanedLabel.opacityProperty().bind(Bindings.createDoubleBinding(() -> orphanedFolder.getLoadingProperty().get() ? 1.0 : 0, orphanedFolder.getLoadingProperty()));
         //System.out.println("b");
         // TODO find a way to remove serverURI
+        long time = System.currentTimeMillis();
         OmeroRawObjectTreeItem root = new OmeroRawObjectTreeItem(new OmeroRawObjects.Server(serverURI));
-        //System.out.println("root for the tree" +root);
-        //System.out.println("I want to know what is in groups : " +groups);
+        System.out.println("OmeroRaw...Command->Run time : 0"+(System.currentTimeMillis()-time));
 
         tree.setRoot(root);
         tree.setShowRoot(false);
@@ -759,18 +761,23 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 return orphanedImageList;
 
             // Read children and populate maps
-            System.out.println("Parent object given to have the children: "+omeroObj);
-            children = OmeroRawTools.readOmeroObjects(serverURI, omeroObj, this.client);
-            System.out.println("children in getChildren(): "+children);
-            children.forEach(e-> System.out.println("chlid name : "+e.getName()));
-            children.forEach(e-> System.out.println("child parent : " +e.getParent().getName()));
+            //System.out.println("Parent object given to have the children: "+omeroObj);
+            long time = System.currentTimeMillis();
+            children = OmeroRawTools.readOmeroObjects(omeroObj, this.client);
+            System.out.println("OmeroRaw...Command-GetChildren around readOmeroObjects time : " +(System.currentTimeMillis()-time));
+            //System.out.println("children in getChildren(): "+children);
+            //children.forEach(e-> System.out.println("chlid name : "+e.getName()));
+            //children.forEach(e-> System.out.println("child parent : " +e.getParent().getName()));
 
             // If omeroObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
             if (omeroObj.getType() == OmeroRawObjectType.SERVER) {
                 // TODO create this function to get orphaned datasets
-                children.addAll(OmeroRawTools.readOrphanedDatasets(serverURI, (Server)omeroObj));
+                time = System.currentTimeMillis();
+                children.addAll(OmeroRawTools.readOrphanedDatasets(serverURI, client));
+                System.out.println("OmeroRaw...Command-GetChildren around readOrphanedDatasets time : " +(System.currentTimeMillis()-time));
                 serverChildrenList = children;
-                System.out.println("OmeroRaw...Command-getChildren-------> going inside server type");
+                //System.out.println("OmeroRaw...Command-getChildren-------> going inside server type");
+                //System.out.println("OmeroRaw...Command-getChildren-------> children : +" +children);
             } else if (omeroObj .getType() == OmeroRawObjectType.PROJECT) {
                 projectMap.put(omeroObj, children);
                 System.out.println("OmeroRaw...Command-getChildren-------> going inside project type");
@@ -781,7 +788,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         } catch (IOException e) {
             logger.error("Could not fetch server information: {}", e.getLocalizedMessage());
             return new ArrayList<>();
-        } catch (DSOutOfServiceException | ExecutionException | DSAccessException e) {
+        } catch (DSOutOfServiceException | ExecutionException | DSAccessException | ServerError e) {
             throw new RuntimeException(e);
         }
 
@@ -1212,7 +1219,9 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     var omeroObj = this.getValue();
 
                     // Get children and populate maps if necessary
+                    long time = System.currentTimeMillis();
                     List<OmeroRawObject> children = OmeroRawImageServerBrowserCommand.this.getChildren(omeroObj);
+                    System.out.println("OmeroRaw...Command->GetChildren time : "+(System.currentTimeMillis()-time));
 
                    // System.out.println("childrens : " +children);
 

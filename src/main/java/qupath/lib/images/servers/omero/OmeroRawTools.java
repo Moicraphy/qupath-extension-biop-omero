@@ -140,7 +140,7 @@ public final class OmeroRawTools {
      * @return list of OmeroObjects
      * @throws IOException
      */
-    public static List<OmeroRawObject> readOmeroObjects(URI uri, OmeroRawObject parent, OmeroRawClient client) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static List<OmeroRawObject> readOmeroObjects(OmeroRawObject parent, OmeroRawClient client) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         List<OmeroRawObject> list = new ArrayList<>();
         if (parent == null)
             return list;
@@ -199,14 +199,14 @@ public final class OmeroRawTools {
                 // new security context to access data from other groups
                 SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
                 // get the current project to have access to the child datasets
-                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ctx,Collections.singletonList(parent.getId()));
+                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(ctx,Collections.singletonList(parent.getId()));
                 if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
                     List<DatasetData> datasets = new ArrayList<>();
                     List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
 
                     // get child datasets
                     for (ProjectDatasetLink link : links) {
-                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(/*client.getContext()*/ctx,Collections.singletonList(link.getChild().getId().getValue()));
+                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(ctx,Collections.singletonList(link.getChild().getId().getValue()));
                         datasets.add(datasetColl.iterator().next());
                     }
 
@@ -349,9 +349,7 @@ public final class OmeroRawTools {
         map.forEach( e -> {
             executorRequests.submit(() -> {
                 try {
-                    long id = e.getId();
-                    long groupID = e.getGroupId();
-                    OmeroRawObject omeroObj = readOmeroObject(client, id, OmeroRawObjectType.IMAGE, groupID);
+                    OmeroRawObject omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjectType.IMAGE, client, new Server(client.getServerURI()));
                     Platform.runLater(() -> {
                         list.add(omeroObj);
 
@@ -359,9 +357,7 @@ public final class OmeroRawTools {
                         if (orphanedFolder.incrementAndGetLoadedCount() >= max)
                             orphanedFolder.setLoading(false);
                     });
-                } catch (IOException ex) {
-                    logger.error("Could not fetch information for image id: " + e.getId(), ex);
-                } catch (DSOutOfServiceException | ExecutionException | DSAccessException ex) {
+                } catch (DSOutOfServiceException | ServerError ex) {
                     throw new RuntimeException(ex);
                 }
             });
@@ -373,27 +369,26 @@ public final class OmeroRawTools {
      * Get all the orphaned {@code OmeroObject}s of type {@code type} from the server.
      *
      * @param uri
-     * @param server the parent {@code Server} object
+     * @param client the client {@code OmeroRawClient} object
      * @return list of orphaned datasets
      * @throws IOException
      */
-    public static List<OmeroRawObject> readOrphanedDatasets(URI uri, Server server) throws IOException {
+    public static List<OmeroRawObject> readOrphanedDatasets(URI uri, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException {
         List<OmeroRawObject> list = new ArrayList<>();
+        Collection<DatasetData> orphanedDatasets = OmeroRawRequests.getOrphanedDatasets(client);
 
-        /*var gson = new GsonBuilder().registerTypeAdapter(OmeroRawObject.class, new OmeroObjects.GsonOmeroObjectDeserializer()).setLenient().create();
-
-        List<JsonElement> orphanedDatasets = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.DATASET, true);
-        for (var d: orphanedDatasets) {
+        orphanedDatasets.forEach( e -> {
+            OmeroRawObject omeroObj;
             try {
-                OmeroRawObject omeroObj = gson.fromJson(d, OmeroRawObject.class);
-                if (omeroObj != null) {
-                    omeroObj.setParent(server);
-                    list.add(omeroObj);
-                }
-            } catch (Exception e) {
-                logger.error("Error parsing OMERO object: {}", e.getLocalizedMessage());
+                omeroObj = new OmeroRawObjects.Dataset("", e, e.getId(), OmeroRawObjectType.DATASET, client, new Server(client.getServerURI()));
+                list.add(omeroObj);
+            } catch (DSOutOfServiceException | ServerError ex) {
+                throw new RuntimeException(ex);
             }
-        }*/
+
+        });
+
+        System.out.println("List of orphaned Datasets : "+ list);
         return list;
     }
 
@@ -404,41 +399,38 @@ public final class OmeroRawTools {
      * N.B: this method does not set the parent object.
      *
      * @param client
-     * @param id
+     * @param obj
      * @param type
      * @return OmeroObject
      * @throws IOException
      */
-    public static OmeroRawObject readOmeroObject(OmeroRawClient client, long id, OmeroRawObjectType type, long groupID) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+   /* public static OmeroRawObject readOmeroObject(OmeroRawClient client, OmeroRawObject obj, OmeroRawObjectType type) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
 
         // TODO Only used for orphan images ; find a way to integrate it in the readOmeroObjects method
         Server parent = new Server(client.getServerURI());
-        SecurityContext ctx = new SecurityContext(groupID);
+        SecurityContext ctx = new SecurityContext(obj.getGroup().getId());
+        int id = 0; // To remove-> just to conpile
 
         try {
             switch (type) {
                 case IMAGE:
-                    ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(/*client.getContext()*/ctx, id);
-
-                    OmeroRawObjects.Image objImage = new OmeroRawObjects.Image("",image,id,type,client, parent);
-                    return objImage;
-                /*case DATASET:
-                    Collection<DatasetData> datasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(), Collections.singletonList(id));
-                    DatasetData dataset = datasets.iterator().next();
-                    OmeroRawObjects.Dataset objDataset = new OmeroRawObjects.Dataset("",dataset,id,type,client,parent);
-                    return objDataset;
+                   // ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(ctx, id);
+                   // return new OmeroRawObjects.Image("",image,id,type,client, parent);
+                case DATASET:
+                    //Collection<DatasetData> datasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(ctx, Collections.singletonList(id));
+                   // return new OmeroRawObjects.Dataset("",datasets.iterator().next(),id,type,client,parent);
                 case PROJECT:
                     Collection<ProjectData> projects = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(), Collections.singletonList(id));
                     ProjectData project = projects.iterator().next();
                     OmeroRawObjects.Project objProject = new OmeroRawObjects.Project("",project,id,type,client, parent);
-                    return objProject;*/
+                    return objProject;
                 default:
                     throw new UnsupportedOperationException("Type (" + type + ") not supported");
             }
         }catch(Exception e){
             throw new IOException(String.format("Cannot have access to %s with id %d.", type, id));
         }
-    }
+    }*/
 
     /**
      * Return the Id associated with the {@code URI} provided.
