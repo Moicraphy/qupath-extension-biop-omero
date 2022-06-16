@@ -69,6 +69,8 @@ import qupath.lib.images.servers.omero.OmeroAnnotations.OmeroAnnotationType;
 //import qupath.lib.images.servers.omero.OmeroObjects.Server;
 import qupath.lib.images.servers.omero.OmeroRawObjects.OmeroRawObject;
 import qupath.lib.images.servers.omero.OmeroRawObjects.Server;
+import qupath.lib.images.servers.omero.OmeroRawObjects.Owner;
+import qupath.lib.images.servers.omero.OmeroRawObjects.Group;
 import qupath.lib.images.servers.omero.OmeroRawObjects.OrphanedFolder;
 import qupath.lib.images.servers.omero.OmeroRawObjects.OmeroRawObjectType;
 import qupath.lib.io.GsonTools;
@@ -135,12 +137,12 @@ public final class OmeroRawTools {
      * <p>
      * No orphaned {@code OmeroObject} will be fetched.
      *
-     * @param uri
+     * @param client
      * @param parent
      * @return list of OmeroObjects
      * @throws IOException
      */
-    public static List<OmeroRawObject> readOmeroObjects(OmeroRawObject parent, OmeroRawClient client) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static List<OmeroRawObject> readOmeroObjects(OmeroRawObject parent, OmeroRawClient client, SecurityContext groupCtx, Group group) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         List<OmeroRawObject> list = new ArrayList<>();
         if (parent == null)
             return list;
@@ -155,34 +157,21 @@ public final class OmeroRawTools {
             type = OmeroRawObjectType.IMAGE;
 
         final OmeroRawObjectType finaltype = type;
-        //System.out.println("Final type : " +type);
 
         try {
             if (type == OmeroRawObjectType.PROJECT) {
-                System.out.println("OmeroRawTools-readOmeroObjects---->Type : Project");
+                //System.out.println("OmeroRawTools-readOmeroObjects---->Type : Project");
 
-                List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
-               // System.out.println("nb groups : "+groups.size());
                 Collection<ProjectData> projects = new ArrayList<>();
-                groups.forEach(group-> {
-                            // new security context to access data from other groups
-                            SecurityContext ctx = new SecurityContext(group.getId().getValue());
-                            List<GroupExperimenterMap> experimentersByGroup = group.copyGroupExperimenterMap();
-                   // System.out.println("group name : "+group.getName().getValue());
-                            for (GroupExperimenterMap experimenter : experimentersByGroup) {
-                                long userId = experimenter.getChild().getId().getValue();
-                                //System.out.println("User ID: "+userId);
-                                try {
-                                    //client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ctx, userId).forEach(e->System.out.println(e.getName()));
-                                    projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(/*client.getContext()*/ ctx, userId));
-                                } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            }
-                        });
-                // get the current projects for the group belonging to the current user.
-                //Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext());
-               // List<ProjectData> projects = new ArrayList<>(projectColl);
+                List<GroupExperimenterMap> owners = client.getGateway().getAdminService(client.getContext()).lookupGroup(group.getName()).copyGroupExperimenterMap();
+
+                owners.forEach(owner ->{
+                    try {
+                        projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx, owner.getChild().getId().getValue()));
+                    } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
 
                 projects.forEach(e-> {
                     try {
@@ -191,22 +180,20 @@ public final class OmeroRawTools {
                         throw new RuntimeException(ex);
                     }
                 });
-                //System.out.println("List of projects : " +list);
+               // System.out.println("Size of projects : " +list.size());
             }
             else if (type == OmeroRawObjectType.DATASET) {
-                System.out.println("OmeroRawTools-readOmeroObjects---->Type : Dataset");
+               // System.out.println("OmeroRawTools-readOmeroObjects---->Type : Dataset");
 
-                // new security context to access data from other groups
-                SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
                 // get the current project to have access to the child datasets
-                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(ctx,Collections.singletonList(parent.getId()));
+                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx,Collections.singletonList(parent.getId()));
                 if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
                     List<DatasetData> datasets = new ArrayList<>();
                     List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
 
                     // get child datasets
                     for (ProjectDatasetLink link : links) {
-                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(ctx,Collections.singletonList(link.getChild().getId().getValue()));
+                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx,Collections.singletonList(link.getChild().getId().getValue()));
                         datasets.add(datasetColl.iterator().next());
                     }
 
@@ -218,20 +205,18 @@ public final class OmeroRawTools {
                             throw new RuntimeException(ex);
                         }
                     });
-                    System.out.println("OmeroRawTools-readOmeroObjects---->List of datasets : " +list);
+                    //System.out.println("OmeroRawTools-readOmeroObjects---->List of datasets : " +list);
                 }
 
 
 
             }
             else if (type == OmeroRawObjectType.IMAGE) {
-                System.out.println("OmeroRawTools-readOmeroObjects---->Type : Image");
-                // new security context to access data from other groups
-                SecurityContext ctx = new SecurityContext(parent.getGroup().getId());
+               // System.out.println("OmeroRawTools-readOmeroObjects---->Type : Image");
 
                 // get the current dataset to have access to the child images
-                Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(/*client.getContext()*/ ctx,Collections.singletonList(parent.getId()));
-                System.out.println("OmeroRawTools-readOmeroObjects---->Size of linked images : "+datasetColl.iterator().next().asDataset().sizeOfImageLinks());
+                Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx,Collections.singletonList(parent.getId()));
+                //System.out.println("OmeroRawTools-readOmeroObjects---->Size of linked images : "+datasetColl.iterator().next().asDataset().sizeOfImageLinks());
                 if(datasetColl.iterator().next().asDataset().sizeOfImageLinks() > 0){
                     List<ImageData> images = new ArrayList<>();
                     List<DatasetImageLink> links = datasetColl.iterator().next().asDataset().copyImageLinks();
@@ -242,7 +227,7 @@ public final class OmeroRawTools {
                     }
 
                     // create OmeroRawObjects from child images
-                    System.out.println("OmeroRawTools-readOmeroObjects---->images list : "+images);
+                    //System.out.println("OmeroRawTools-readOmeroObjects---->images list : "+images);
                     images.forEach(e-> {
                         try {
                             list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,client,parent));
@@ -250,7 +235,7 @@ public final class OmeroRawTools {
                             throw new RuntimeException(ex);
                         }
                     });
-                    System.out.println("OmeroRawTools-readOmeroObjects---->List of images : " +list);
+                    //System.out.println("OmeroRawTools-readOmeroObjects---->List of images : " +list);
                 }
             }
         } catch (DSOutOfServiceException | DSAccessException e) {
@@ -323,6 +308,80 @@ public final class OmeroRawTools {
 //	}
 
     /**
+     * return the Owner object corresponding to the logged in user
+     * @param client
+     * @return
+     * @throws DSOutOfServiceException
+     * @throws ServerError
+     */
+    public static Owner getDefaultOwner(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(client.getGateway().getLoggedInUser().getId());
+        return new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                user.getLastName()==null ? "" : user.getLastName().getValue(),
+                user.getEmail()==null ? "" : user.getEmail().getValue(),
+                user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                user.getOmeName()==null ? "" : user.getOmeName().getValue());
+    }
+
+    /**
+     * return the group object corresponding to the default group attributed to the logged in user
+     * @param client
+     * @return
+     * @throws DSOutOfServiceException
+     * @throws ServerError
+     */
+    public static Group getDefaultGroup(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        ExperimenterGroup userGroup = client.getGateway().getAdminService(client.getContext()).getDefaultGroup(client.getGateway().getLoggedInUser().getId());
+        return new Group(userGroup.getId().getValue(), userGroup.getName().getValue());
+    }
+
+    /**
+     * return a map of available groups with its attached users.
+     * @param client
+     * @return
+     * @throws DSOutOfServiceException
+     * @throws ServerError
+     */
+    // TODO find only groups that are attached to the user (and not all the groups) if it is not already the case
+    public static Map<Group,List<Owner>> getAvailableGroups(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        Map<Group,List<Owner>> map = new HashMap<>();
+        // get all available groups for the current user
+        List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).containedGroups(client.getGateway().getLoggedInUser().getId());
+
+        groups.forEach(group-> {
+            // get all available users for the current group
+            List<Experimenter> users;
+            try {
+                users = client.getGateway().getAdminService(client.getContext()).containedExperimenters(group.getId().getValue());
+            } catch (ServerError | DSOutOfServiceException e) {
+                throw new RuntimeException(e);
+            }
+
+            List<Owner> owners = new ArrayList<>();
+            Group userGroup = new Group(group.getId().getValue(), group.getName().getValue());
+
+            for (Experimenter user : users) {
+
+                owners.add(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                        user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                        user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                        user.getLastName()==null ? "" : user.getLastName().getValue(),
+                        user.getEmail()==null ? "" : user.getEmail().getValue(),
+                        user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                        user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+
+            }
+            map.put(userGroup, owners);
+
+        });
+
+        return map;
+    }
+
+
+    /**
      * Populate the specified {@code orphanedFolder}'s image list with all orphaned images in the server.
      * <p>
      * As soon as all the objects have been loaded in the list, the {@code isLoading} property of the
@@ -333,10 +392,13 @@ public final class OmeroRawTools {
      */
     public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException, IOException, ServerError {
         var list = orphanedFolder.getImageList();
-        orphanedFolder.setLoading(true);
+        orphanedFolder.setLoading(false);
         list.clear();
 
+       /* System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getOrphanedImages");
+        long time = System.currentTimeMillis();
         Collection<ImageData> map = OmeroRawRequests.getOrphanedImages(client);
+        System.out.println("OmeroRawToools - populateOrphanedImageList - End getOrphanedImages : "+(System.currentTimeMillis()-time));
 
         ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
 
@@ -346,21 +408,44 @@ public final class OmeroRawTools {
             orphanedFolder.setLoading(false);
 
         orphanedFolder.setTotalChildCount(max);
-        map.forEach( e -> {
-            executorRequests.submit(() -> {
-                try {
-                    OmeroRawObject omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjectType.IMAGE, client, new Server(client.getServerURI()));
-                    Platform.runLater(() -> {
-                        list.add(omeroObj);
+        map.forEach( e -> {*/
+        ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
 
-                        // Check if all orphaned images were loaded
-                        if (orphanedFolder.incrementAndGetLoadedCount() >= max)
-                            orphanedFolder.setLoading(false);
+        executorRequests.submit(() -> {
+                try {
+                    System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getOrphanedImages");
+                    long time = System.currentTimeMillis();
+                    Collection<ImageData> map = OmeroRawRequests.getOrphanedImages(client, null);
+                    System.out.println("OmeroRawToools - populateOrphanedImageList - End getOrphanedImages : "+(System.currentTimeMillis()-time));
+
+
+                    // Get the total amount of orphaned images to load
+                    int max = map.size();
+                    if (max == 0)
+                        orphanedFolder.setLoading(false);
+
+                    orphanedFolder.setTotalChildCount(max);
+                    Platform.runLater(() -> {
+                        map.forEach( e -> {
+
+                        OmeroRawObject omeroObj = null;
+                        try {
+                            omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjectType.IMAGE, client, new Server(client.getServerURI()));
+                        } catch (DSOutOfServiceException | ServerError ex) {
+                            throw new RuntimeException(ex);
+                        }
+
+                            list.add(omeroObj);
+
+                            // Check if all orphaned images were loaded
+                            if (orphanedFolder.incrementAndGetLoadedCount() >= max)
+                                orphanedFolder.setLoading(false);
+                        });
                     });
                 } catch (DSOutOfServiceException | ServerError ex) {
                     throw new RuntimeException(ex);
                 }
-            });
+
         });
         executorRequests.shutdown();
     }
@@ -368,14 +453,13 @@ public final class OmeroRawTools {
     /**
      * Get all the orphaned {@code OmeroObject}s of type {@code type} from the server.
      *
-     * @param uri
      * @param client the client {@code OmeroRawClient} object
      * @return list of orphaned datasets
      * @throws IOException
      */
-    public static List<OmeroRawObject> readOrphanedDatasets(URI uri, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException {
+    public static List<OmeroRawObject> readOrphanedDatasets(OmeroRawClient client, SecurityContext groupCtx) throws IOException, ServerError, DSOutOfServiceException {
         List<OmeroRawObject> list = new ArrayList<>();
-        Collection<DatasetData> orphanedDatasets = OmeroRawRequests.getOrphanedDatasets(client);
+        Collection<DatasetData> orphanedDatasets = OmeroRawRequests.getOrphanedDatasets(client,groupCtx);
 
         orphanedDatasets.forEach( e -> {
             OmeroRawObject omeroObj;
@@ -388,7 +472,26 @@ public final class OmeroRawTools {
 
         });
 
-        System.out.println("List of orphaned Datasets : "+ list);
+       //System.out.println("List of orphaned Datasets : "+ list);
+        return list;
+    }
+
+    public static List<OmeroRawObject> readOrphanedImages(OmeroRawClient client, SecurityContext groupCtx) throws IOException, ServerError, DSOutOfServiceException {
+        List<OmeroRawObject> list = new ArrayList<>();
+        Collection<ImageData> orphanedImages = OmeroRawRequests.getOrphanedImages(client,groupCtx);
+
+        orphanedImages.forEach( e -> {
+            OmeroRawObject omeroObj;
+            try {
+                omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjectType.IMAGE, client, new Server(client.getServerURI()));
+                list.add(omeroObj);
+            } catch (DSOutOfServiceException | ServerError ex) {
+                throw new RuntimeException(ex);
+            }
+
+        });
+
+        //System.out.println("List of orphaned Datasets : "+ list);
         return list;
     }
 

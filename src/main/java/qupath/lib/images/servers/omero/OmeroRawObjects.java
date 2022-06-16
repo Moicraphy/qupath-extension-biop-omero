@@ -22,10 +22,7 @@
 package qupath.lib.images.servers.omero;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import omero.ServerError;

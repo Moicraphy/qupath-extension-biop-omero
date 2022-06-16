@@ -325,7 +325,9 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 		};
 		
 		// Populate orphaned image list
+		long time = System.currentTimeMillis();
 		OmeroTools.populateOrphanedImageList(serverURI, orphanedFolder);
+		System.out.println("OmeroRaw...Command-Run around PopulatedOrphanedImages time : "+(System.currentTimeMillis()-time));
 		currentOrphanedCount.bind(Bindings.createIntegerBinding(() -> Math.toIntExact(filterList(orphanedImageList, 
 				comboGroup.getSelectionModel().getSelectedItem(), 
 				comboOwner.getSelectionModel().getSelectedItem(),
@@ -340,7 +342,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 				.concat("/"+ orphanedFolder.getTotalChildCount() + ")")).otherwise(Bindings.concat("")));
 		loadingOrphanedLabel.opacityProperty().bind(Bindings.createDoubleBinding(() -> orphanedFolder.getLoadingProperty().get() ? 1.0 : 0, orphanedFolder.getLoadingProperty()));
 
-		System.out.println("I want to know what is in groups : " +comboGroup.getSelectionModel().isEmpty());
+
 
 		OmeroObjectTreeItem root = new OmeroObjectTreeItem(new OmeroObjects.Server(serverURI));
 		tree.setRoot(root);
@@ -427,7 +429,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 		// If the currently opened image belongs to the server that we are browsing, switch combo to the relevant group
 
 		var imageData = qupath.getImageData();
-		System.out.println("imageDaTA from qupath : "+imageData);
+
 		if (imageData != null && (imageData.getServer() instanceof OmeroWebImageServer)) {
 			var server = (OmeroWebImageServer)imageData.getServer();
 			
@@ -443,7 +445,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 										.get("omero:details")
 										.getAsJsonObject()
 										.get("group"), OmeroObjects.Group.class);
-						System.out.println(group);
+
 						groups.add(group);
 						comboGroup.getItems().setAll(groups);
 						comboGroup.getSelectionModel().select(group);
@@ -460,7 +462,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 				logger.info("Will not fetch the current OMERO group.");
 			}
 		}
-		System.out.println("I want to know what is in groups : " +comboGroup.getSelectionModel().isEmpty());
+
 		// If nothing is selected (i.e. currently opened image is not from the same server/an error occurred), select first item
 		if (comboGroup.getSelectionModel().isEmpty())
 			comboGroup.getSelectionModel().selectFirst();
@@ -508,7 +510,6 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 	            }
 			}
 		});
-		System.out.println("I want to know what is in groups (3) : " +comboGroup.getSelectionModel().isEmpty());
 
 		tree.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
 			clearCanvas();
@@ -550,7 +551,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 				}
 			}
 		});
-		System.out.println("I want to know what is in groups (4) : " +comboGroup.getSelectionModel().isEmpty());
+
 		filter.setPromptText("Filter project names");
 		filter.textProperty().addListener((v, o, n) -> {
 			refreshTree();
@@ -566,7 +567,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 		PaneTools.addGridRow(searchAndAdvancedPane, 0, 0, null, filter, advancedSearchBtn);
 		
 		importBtn = new Button("Import image");
-		System.out.println("I want to know what is in groups (5) : " +comboGroup.getSelectionModel().isEmpty());
+
 		// Text on button will change according to OMERO object selected
 		importBtn.textProperty().bind(Bindings.createStringBinding(() -> {
 			var selected = tree.getSelectionModel().getSelectedItems();
@@ -585,7 +586,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 								tree.getSelectionModel().selectedItemProperty())
 						)
 				);
-		System.out.println("I want to know what is in groups (6) : " +comboGroup.getSelectionModel().isEmpty());
+
 		// Import button will fetch all the images in the selected object(s) and check their validity
 		importBtn.setOnMouseClicked(e -> {
 			var selected = tree.getSelectionModel().getSelectedItems();
@@ -621,7 +622,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 			}
 			promptToImportOmeroImages(validUris);
 		});
-		System.out.println("I want to know what is in groups (7) : " +comboGroup.getSelectionModel().isEmpty());
+
 		PaneTools.addGridRow(browseLeftPane, 0, 0, "Filter by", comboGroup, comboOwner);
 		PaneTools.addGridRow(browseLeftPane, 1, 0, null, tree, tree);
 		PaneTools.addGridRow(browseLeftPane, 2, 0, null, searchAndAdvancedPane, searchAndAdvancedPane);
@@ -685,7 +686,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 			dialog = null;
 			OmeroExtension.getOpenedBrowsers().remove(client);
 		});
-		System.out.println("I want to know what is in groups (89) : " +comboGroup.getSelectionModel().isEmpty());
+
 		dialog.showAndWait();
     }
     
@@ -719,22 +720,20 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 				return orphanedImageList;
 			
 			// Read children and populate maps
+			long time = System.currentTimeMillis();
 			children = OmeroTools.readOmeroObjects(serverURI, omeroObj);
-			System.out.println("children : "+children);
+			System.out.println("OmeroWeb...Command-GetChildren around readOmeroObjects time : " +(System.currentTimeMillis()-time));
 			
 			// If omeroObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
 			if (omeroObj.getType() == OmeroObjectType.SERVER) {
+				time = System.currentTimeMillis();
 				children.addAll(OmeroTools.readOrphanedDatasets(serverURI, (Server)omeroObj));
+				System.out.println("OmeroWeb...Command-GetChildren around readOrphanedDatasets time : " +(System.currentTimeMillis()-time));
 				serverChildrenList = children;
-				System.out.println("OmeroWeb...Command-getChildren-------> going inside server type");
-			} else if (omeroObj .getType() == OmeroObjectType.PROJECT) {
+			} else if (omeroObj .getType() == OmeroObjectType.PROJECT)
 				projectMap.put(omeroObj, children);
-				System.out.println("OmeroWeb...Command-getChildren-------> going inside project type");
-			}
-			else if (omeroObj.getType() == OmeroObjectType.DATASET) {
+			else if (omeroObj.getType() == OmeroObjectType.DATASET)
 				datasetMap.put(omeroObj, children);
-				System.out.println("OmeroWeb...Command-getChildren-------> going inside project type");
-			}
 		} catch (IOException e) {
 			logger.error("Could not fetch server information: {}", e.getLocalizedMessage());
 			return new ArrayList<>();
@@ -838,7 +837,9 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 	private void refreshTree() {
 		tree.setRoot(null);
 		tree.refresh();
+		System.out.println("Refresh the tree");
 		tree.setRoot(new OmeroObjectTreeItem(new OmeroObjects.Server(serverURI)));
+		System.out.println("END Refresh the tree");
 		tree.refresh();
 	}
 
@@ -1161,14 +1162,18 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 					var omeroObj = this.getValue();
 					
 					// Get children and populate maps if necessary
+					long time = System.currentTimeMillis();
 					List<OmeroObject> children = OmeroWebImageServerBrowserCommand.this.getChildren(omeroObj);
-					System.out.println("childrenssssssssss : " +children);
+					System.out.println("OmeroWeb...Command->GetChildren time : "+(System.currentTimeMillis()-time));
+					System.out.println("OmeroObject Parent : "+omeroObj.getType().toString());
+					System.out.println("OmeroObject Chilidren : "+children.get(0).getType().toString());
+					System.out.println("OmeroObject Chilidren size: "+children.size());
+
 					Group currentGroup = comboGroup.getSelectionModel().getSelectedItem();
-					System.out.println("Group : " +currentGroup);
 					Owner currentOwner = comboOwner.getSelectionModel().getSelectedItem();
-					System.out.println("Owner : " +currentOwner);
+
 					// If server, update list of groups/owners (and comboBoxes)
-					System.out.println("parent> : " +omeroObj.getType());
+
 					if (omeroObj.getType() == OmeroObjectType.SERVER) {
 						// Fetch ALL Groups and ALL Owners
 						var tempGroups = children.stream()
@@ -1180,8 +1185,7 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 								.map(e -> e.getOwner())
 								.filter(distinctByName(Owner::getName))
 								.collect(Collectors.toList());
-						System.out.println("tempCVroups : " +tempGroups);
-						System.out.println("tempOwners> : " +tempOwners);
+
 						// If we suddenly found more Groups, update the set (shoudn't happen)
 						if (tempGroups.size() > groups.size()) {
 							groups.clear();

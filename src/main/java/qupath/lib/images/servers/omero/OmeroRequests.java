@@ -281,7 +281,6 @@ public final class OmeroRequests {
         		return GsonTools.getInstance().fromJson(reader, JsonObject.class);
         	}
         }
-
 		throw new IOException(String.format("Error %d while connecting to OMERO Webclient: %s", connection.getResponseCode(), connection.getResponseMessage()));
 	}
 	
