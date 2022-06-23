@@ -469,7 +469,7 @@ final class OmeroRawObjects {
             this.url = url;
             this.description = datasetData.getDescription();
             this.childCount = datasetData.asDataset().sizeOfImageLinks();
-            System.out.println("nb of datasets in dataset object : "+this.childCount);
+          //  System.out.println("nb of datasets in dataset object : "+this.childCount);
             super.setId(id);
             super.setName(datasetData.getName());
             super.setType(type.toString());

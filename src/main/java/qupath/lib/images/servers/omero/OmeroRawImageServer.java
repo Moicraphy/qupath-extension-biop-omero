@@ -851,10 +851,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer {
 			 * @throws IOException
 			 */
 			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws DependencyException, ServiceException, FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
-				for (LocalReaderWrapper wrapper : primaryReaders) {
+				/*for (LocalReaderWrapper wrapper : primaryReaders) {
 					if (pixelsID.equals(wrapper.getReader().getPixelsId()))
 						return wrapper;
-				}
+				}*/
 				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client );
 				primaryReaders.add(reader);
 				return reader;

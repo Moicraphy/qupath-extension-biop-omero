@@ -325,9 +325,8 @@ public class OmeroWebImageServerBrowserCommand implements Runnable {
 		};
 		
 		// Populate orphaned image list
-		long time = System.currentTimeMillis();
 		OmeroTools.populateOrphanedImageList(serverURI, orphanedFolder);
-		System.out.println("OmeroRaw...Command-Run around PopulatedOrphanedImages time : "+(System.currentTimeMillis()-time));
+
 		currentOrphanedCount.bind(Bindings.createIntegerBinding(() -> Math.toIntExact(filterList(orphanedImageList, 
 				comboGroup.getSelectionModel().getSelectedItem(), 
 				comboOwner.getSelectionModel().getSelectedItem(),

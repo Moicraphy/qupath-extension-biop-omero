@@ -230,10 +230,8 @@ public final class OmeroTools {
 		list.clear();
 		
 		try {
-			//System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getJson");
-			//long time = System.currentTimeMillis();
 			var map = OmeroRequests.requestWebClientObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroObjectType.IMAGE);
-			//System.out.println("OmeroRawToools - populateOrphanedImageList - End getJson : "+(System.currentTimeMillis()-time));
+
     		ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
     		
     		// Get the total amount of orphaned images to load
@@ -245,11 +243,8 @@ public final class OmeroTools {
     		map.get("images").getAsJsonArray().forEach(e -> {
     			executorRequests.submit(() -> {
     				try {
-						//System.out.println("OmeroRawToools - populateOrphanedImageList - Begin create OMEROObejcts");
-						//long time1 = System.currentTimeMillis();
     					var id = Integer.parseInt(e.getAsJsonObject().get("id").toString());
     					OmeroObject omeroObj = readOmeroObject(uri.getScheme(), uri.getHost(), uri.getPort(), id, OmeroObjectType.IMAGE);
-						//System.out.println("OmeroRawToools - populateOrphanedImageList - End create OMEROObejcts : "+(System.currentTimeMillis()-time1));
 
 						Platform.runLater(() -> {
         					list.add(omeroObj);

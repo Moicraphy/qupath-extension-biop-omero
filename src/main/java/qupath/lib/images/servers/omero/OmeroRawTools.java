@@ -344,11 +344,11 @@ public final class OmeroRawTools {
      * @throws DSOutOfServiceException
      * @throws ServerError
      */
-    // TODO find only groups that are attached to the user (and not all the groups) if it is not already the case
+
     public static Map<Group,List<Owner>> getAvailableGroups(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
         Map<Group,List<Owner>> map = new HashMap<>();
         // get all available groups for the current user
-        List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).containedGroups(client.getGateway().getLoggedInUser().getId());
+        List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();//.containedGroups(client.getGateway().getLoggedInUser().getId());
 
         groups.forEach(group-> {
             // get all available users for the current group
@@ -413,10 +413,10 @@ public final class OmeroRawTools {
 
         executorRequests.submit(() -> {
                 try {
-                    System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getOrphanedImages");
-                    long time = System.currentTimeMillis();
+                   // System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getOrphanedImages");
+                    //long time = System.currentTimeMillis();
                     Collection<ImageData> map = OmeroRawRequests.getOrphanedImages(client, null);
-                    System.out.println("OmeroRawToools - populateOrphanedImageList - End getOrphanedImages : "+(System.currentTimeMillis()-time));
+                   // System.out.println("OmeroRawToools - populateOrphanedImageList - End getOrphanedImages : "+(System.currentTimeMillis()-time));
 
 
                     // Get the total amount of orphaned images to load
@@ -701,13 +701,14 @@ public final class OmeroRawTools {
      * @param prefSize
      * @return thumbnail
      */
-    public static BufferedImage getThumbnail(URI uri, long id, int prefSize) {
+    public static BufferedImage getThumbnail(URI uri, OmeroRawClient client, long id, int prefSize) {
         /*try {
             return OmeroRequests.requestThumbnail(uri.getScheme(), uri.getHost(), uri.getPort(), id, prefSize);
         } catch (IOException ex) {
             logger.warn("Error requesting the thumbnail: {}", ex.getLocalizedMessage());
             return null;
         }*/
+
         return null;
     }
 

@@ -66,12 +66,14 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
     static boolean canConnectToOmero(URI uri, String... args) {
         try {
 
+           // System.out.println(Thread.currentThread()+"\t supportLevel :"+supportLevel(uri));
             if (supportLevel(uri) <= 0) {
                 logger.debug("OMERO raw server does not support {}", uri);
                 return false;
             }
 
             var serverUri = OmeroTools.getServerURI(uri);
+           // System.out.println("serverURI" + serverUri);
             if (serverUri == null)
                 return false;
 
@@ -80,18 +82,20 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
                 client = OmeroRawClient.create(serverUri);
                 client.logIn(args);
             }
+           // System.out.println("client.isLoggedIn()" + client.isLoggedIn());
             if (!client.isLoggedIn())
                 return false;
 
             // Add the client to the list (but not URI yet!)
             OmeroRawClients.addClient(client);
-
+           // System.out.println("client is added");
             return true;
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (URISyntaxException e) {
             e.printStackTrace();
         }
+       // System.out.println("Something went wrong ");
         return false;
 
     }
@@ -128,9 +132,13 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
     @Override
     public ImageServer<BufferedImage> buildServer(URI uri, String... args) {
         if (canConnectToOmero(uri, args)) {
+            //logger.debug(Thread.currentThread()+"\t CanConnectToOmero");
+           // System.out.println(Thread.currentThread()+"\t CanConnectToOmero");
             try {
                 URI serverUri = OmeroTools.getServerURI(uri);
+              //  System.out.println("URI in buildServer fonction : "+ serverUri);
                 OmeroRawClient client = OmeroRawClients.getClientFromServerURI(serverUri);
+               // System.out.println("Client in buildServer fonction : "+ client);
                 return new OmeroRawImageServer(uri, client, args);
             } catch (IOException e) {
                 Dialogs.showErrorNotification("OMERO raw server", uri.toString() + " - " + e.getLocalizedMessage());
@@ -138,6 +146,7 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
                 e.printStackTrace();
             }
         }
+       // System.out.println(Thread.currentThread()+"\t !!!!!!CashToConnectToOmero!!!!!!!!");
         return null;
     }
 
