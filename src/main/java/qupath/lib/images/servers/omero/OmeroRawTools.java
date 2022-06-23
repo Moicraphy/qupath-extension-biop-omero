@@ -347,8 +347,13 @@ public final class OmeroRawTools {
 
     public static Map<Group,List<Owner>> getAvailableGroups(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
         Map<Group,List<Owner>> map = new HashMap<>();
-        // get all available groups for the current user
-        List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();//.containedGroups(client.getGateway().getLoggedInUser().getId());
+
+        // get all available groups for the current user according to his admin rights
+        List<ExperimenterGroup> groups;
+        if(client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty())
+            groups = client.getGateway().getAdminService(client.getContext()).containedGroups(client.getGateway().getLoggedInUser().getId());
+        else
+            groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
 
         groups.forEach(group-> {
             // get all available users for the current group
