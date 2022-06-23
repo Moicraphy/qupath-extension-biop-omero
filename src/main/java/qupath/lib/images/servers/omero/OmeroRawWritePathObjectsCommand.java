@@ -116,7 +116,7 @@ public class OmeroRawWritePathObjectsCommand implements Runnable {
 
         // Write path object(s)
         try {
-            // TODO change the writePathObject function to fit with omeroTools.writePathObjects with OmeroRawImageServer and not with the web
+            //TODO change the writePathObject function to fit with omeroTools.writePathObjects with OmeroRawImageServer and not with the web
             OmeroRawTools.writePathObjects(objs, omeroServer);
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),

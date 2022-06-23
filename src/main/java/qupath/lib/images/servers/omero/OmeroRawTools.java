@@ -818,7 +818,8 @@ public final class OmeroRawTools {
      * @return list
      * @throws IOException
      */
-    static List<URI> getURIs(URI uri) throws IOException {
+
+    static List<URI> getURIs(URI uri, OmeroRawClient client) throws IOException, DSOutOfServiceException, ExecutionException, DSAccessException {
         List<URI> list = new ArrayList<>();
         URI cleanServerUri = URI.create(uri.toString().replace("show%3Dimage-", "show=image-"));
         String elemId = "image-";
@@ -844,7 +845,7 @@ public final class OmeroRawTools {
 
         // If no simple pattern was matched, check for the last possible one: /webclient/?show=
         if (shortPath.startsWith("/webclient/show")) {
-            URI newURI = getStandardURI(uri);
+            URI newURI = getStandardURI(uri, client);
             var patternElem = Pattern.compile("image-(\\d+)");
             var matcherElem = patternElem.matcher(newURI.toString());
             while (matcherElem.find()) {
@@ -863,7 +864,7 @@ public final class OmeroRawTools {
         throw new IOException("URI not recognized: " + uri.toString());
     }
 
-    static URI getStandardURI(URI uri) throws IOException {
+    static URI getStandardURI(URI uri, OmeroRawClient client) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         List<String> ids = new ArrayList<>();
         String vertBarSign = "%7C";
 
@@ -905,10 +906,13 @@ public final class OmeroRawTools {
                 break;
             case PROJECT:
                 for (String id: ids) {
-                    List<JsonElement> data = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.DATASET, Integer.parseInt(id));
+                    tempIds.add(client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),Collections.singletonList(Long.parseLong(id))).iterator().next().getDatasets()
+                                    .stream().map(DatasetData::asDataset).map(Dataset::getId).map(RLong::getValue).toString());
+
+                   /* List<JsonElement> data = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.DATASET, Integer.parseInt(id));
                     for (int i = 0; i < data.size(); i++) {
                         tempIds.add(data.get(i).getAsJsonObject().get("@id").getAsString());
-                    }
+                    }*/
                 }
                 ids =  new ArrayList<>(tempIds);
                 tempIds.clear();
@@ -916,10 +920,16 @@ public final class OmeroRawTools {
 
             case DATASET:
                 for (String id: ids) {
-                    List<JsonElement> data = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.IMAGE, Integer.parseInt(id));
+                    tempIds.add(client.getGateway().getFacility(BrowseFacility.class).getImagesForDatasets(client.getContext(),Collections.singletonList(Long.parseLong(id)))
+                            .stream()
+                            .map(ImageData::asImage)
+                            .map(Image::getId)
+                            .map(RLong::getValue)
+                            .toString());
+                    /*List<JsonElement> data = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.IMAGE, Integer.parseInt(id));
                     for (int i = 0; i < data.size(); i++) {
                         tempIds.add(data.get(i).getAsJsonObject().get("@id").getAsString());
-                    }
+                    }*/
                 }
                 ids = new ArrayList<>(tempIds);
                 tempIds.clear();

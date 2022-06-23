@@ -716,7 +716,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         QuPathGUI qupath = QuPathGUI.getInstance();
         if (qupath != null)
             dialog.initOwner(QuPathGUI.getInstance().getStage());
-        dialog.setTitle("OMERO web server");
+        dialog.setTitle("OMERO raw server");
         dialog.setScene(new Scene(mainPane));
         dialog.setOnCloseRequest(e -> {
             shutdownPools();
@@ -834,7 +834,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
      *
      * @param list of OmeroObjects
      * @return list of constructed Strings
-     * @see OmeroRawTools#getURIs(URI)
+     * @see OmeroRawTools#getURIs(URI,OmeroRawClient)
      */
     private List<String> getObjectsURI(OmeroRawObject... list) {
         List<String> URIs = new ArrayList<>();
@@ -844,9 +844,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 URIs.addAll(filteredList.stream().map(sub -> createObjectURI(sub)).collect(Collectors.toList()));
             } else {
                 try {
-                    URIs.addAll(OmeroRawTools.getURIs(URI.create(createObjectURI(obj))).stream().map(e -> e.toString()).collect(Collectors.toList()));
+                    URIs.addAll(OmeroRawTools.getURIs(URI.create(createObjectURI(obj)), client).stream().map(e -> e.toString()).collect(Collectors.toList()));
                 } catch (IOException ex) {
                     logger.error("Could not get URI for " + obj.getName() + ": {}", ex.getLocalizedMessage());
+                } catch (DSOutOfServiceException | ExecutionException | DSAccessException e) {
+                    throw new RuntimeException(e);
                 }
             }
         }
@@ -1243,19 +1245,10 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     // If server, update list of groups/owners (and comboBoxes)
                    // System.out.println("parent : "+omeroObj.getType());
                     if (omeroObj.getType() == OmeroRawObjectType.SERVER) {
+                        // Fetch ALL Groups and ALL Owners
                         Map<Group, List<Owner>> tempMap = OmeroRawTools.getAvailableGroups(client);
                         var tempGroups = new ArrayList<>(tempMap.keySet());
                         var tempOwners = new ArrayList<>(tempMap.get(currentGroup));
-                        // Fetch ALL Groups and ALL Owners
-                       /* var tempGroups = children.stream()
-                                .map(e -> e.getGroup())
-                                .filter(distinctByName(Group::getName))
-                                .collect(Collectors.toList());
-                        var tempOwners = children.stream()
-                                .filter(e -> e.getGroup().equals(currentGroup))
-                                .map(e -> e.getOwner())
-                                .filter(distinctByName(Owner::getName))
-                                .collect(Collectors.toList());*/
 
                         // If we suddenly found more Groups, update the set (shoudn't happen)
                         if (tempGroups.size() > groups.size()) {
@@ -1724,9 +1717,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 String[] URIs = resultsTableView.getSelectionModel().getSelectedItems().stream()
                         .flatMap(item -> {
                             try {
-                                return OmeroRawTools.getURIs(item.link.toURI()).stream();
+                                return OmeroRawTools.getURIs(item.link.toURI(), client).stream();
                             } catch (URISyntaxException | IOException ex) {
                                 logger.error("Error while opening " + item.name + ": {}", ex.getLocalizedMessage());
+                            } catch (DSOutOfServiceException | ExecutionException | DSAccessException ex) {
+                                throw new RuntimeException(ex);
                             }
                             return null;
                         }).map(item -> item.toString())
@@ -1847,7 +1842,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     var selectedItem = resultsTableView.getSelectionModel().getSelectedItem();
                     if (selectedItem != null) {
                         try {
-                            List<URI> URIs = OmeroRawTools.getURIs(selectedItem.link.toURI());
+                            List<URI> URIs = OmeroRawTools.getURIs(selectedItem.link.toURI(), client);
                             var uriStrings = URIs.parallelStream().map(uriTemp -> uriTemp.toString()).toArray(String[]::new);
                             if (URIs.size() > 0)
                                 promptToImportOmeroImages(uriStrings);
@@ -1855,6 +1850,8 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                                 Dialogs.showErrorMessage("No image found", "No image found in OMERO object.");
                         } catch (IOException | URISyntaxException ex) {
                             logger.error("Error while importing " + selectedItem.name + ": {}", ex.getLocalizedMessage());
+                        } catch (DSOutOfServiceException | ExecutionException | DSAccessException ex) {
+                            throw new RuntimeException(ex);
                         }
                     }
                 }
