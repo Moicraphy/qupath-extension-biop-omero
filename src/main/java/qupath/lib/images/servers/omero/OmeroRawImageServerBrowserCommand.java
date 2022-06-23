@@ -120,12 +120,12 @@ import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.images.servers.ImageServerProvider;
-import qupath.lib.images.servers.omero.OmeroAnnotations.CommentAnnotation;
-import qupath.lib.images.servers.omero.OmeroAnnotations.FileAnnotation;
-import qupath.lib.images.servers.omero.OmeroAnnotations.LongAnnotation;
-import qupath.lib.images.servers.omero.OmeroAnnotations.MapAnnotation;
-import qupath.lib.images.servers.omero.OmeroAnnotations.OmeroAnnotationType;
-import qupath.lib.images.servers.omero.OmeroAnnotations.TagAnnotation;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.CommentAnnotation;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.FileAnnotation;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.LongAnnotation;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.MapAnnotation;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.OmeroRawAnnotationType;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.TagAnnotation;
 /*import qupath.lib.images.servers.omero.OmeroObjects.Dataset;
 import qupath.lib.images.servers.omero.OmeroObjects.Group;
 import qupath.lib.images.servers.omero.OmeroObjects.Image;
@@ -427,7 +427,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     Dialogs.showPlainMessage("Requesting orphaned folder", "Link to orphaned folder does not exist!");
                     return;
                 }
-                QuPathGUI.launchBrowserWindow(createObjectURI(selected.get(0).getValue()));
+                QuPathGUI.launchBrowserWindow(createObjectURI(selected.get(0).getValue()).replace("-server",""));
             }
         });
         openBrowserItem.disableProperty().bind(tree.getSelectionModel().selectedItemProperty().isNull()
@@ -1331,22 +1331,22 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
     private class AdvancedObjectInfo {
 
         private final OmeroRawObject obj;
-        private final OmeroAnnotations tags;
-        private final OmeroAnnotations keyValuePairs;
+        private final OmeroRawAnnotations tags;
+        private final OmeroRawAnnotations keyValuePairs;
         //		private final OmeroAnnotations tables;
-        private final OmeroAnnotations attachments;
-        private final OmeroAnnotations comments;
-        private final OmeroAnnotations ratings;
+        private final OmeroRawAnnotations attachments;
+        private final OmeroRawAnnotations comments;
+        private final OmeroRawAnnotations ratings;
 //		private final OmeroAnnotations others;
 
         private AdvancedObjectInfo(OmeroRawObject obj) {
             this.obj = obj;
-            this.tags = OmeroRawTools.readOmeroAnnotations(serverURI, obj, OmeroAnnotationType.TAG);
-            this.keyValuePairs = OmeroRawTools.readOmeroAnnotations(serverURI, obj, OmeroAnnotationType.MAP);
+            this.tags = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.TAG);
+            this.keyValuePairs = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.MAP);
 //			this.tables = OmeroRawTools.getOmeroAnnotations(serverURI, obj, OmeroAnnotationType.TABLE);
-            this.attachments = OmeroRawTools.readOmeroAnnotations(serverURI, obj, OmeroAnnotationType.ATTACHMENT);
-            this.comments = OmeroRawTools.readOmeroAnnotations(serverURI, obj, OmeroAnnotationType.COMMENT);
-            this.ratings = OmeroRawTools.readOmeroAnnotations(serverURI, obj, OmeroAnnotationType.RATING);
+            this.attachments = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.ATTACHMENT);
+            this.comments = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.COMMENT);
+            this.ratings = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.RATING);
 //			this.others = OmeroRawTools.getOmeroAnnotations(serverURI, obj, OmeroAnnotationType.CUSTOM);
 
             showOmeroObjectInfo();
@@ -1404,14 +1404,14 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         /*
          * Create a ScrollPane in which each row is an annotation value
          */
-        private Node createAnnotationsPane(String title, OmeroAnnotations omeroAnnotations) {
+        private Node createAnnotationsPane(String title, OmeroRawAnnotations omeroRawAnnotations) {
             TitledPane tp = new TitledPane();
             tp.setText(title);
 
-            if (omeroAnnotations == null ||
-                    omeroAnnotations.getAnnotations() == null ||
-                    omeroAnnotations.getAnnotations().isEmpty() ||
-                    omeroAnnotations.getType() == null)
+            if (omeroRawAnnotations == null ||
+                    omeroRawAnnotations.getAnnotations() == null ||
+                    omeroRawAnnotations.getAnnotations().isEmpty() ||
+                    omeroRawAnnotations.getType() == null)
                 return tp;
 
             ScrollPane sp = new ScrollPane();
@@ -1424,17 +1424,17 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             sp.setMinWidth(50.0);
             sp.setPadding(new Insets(5.0, 5.0, 5.0, 5.0));
 
-            var anns = omeroAnnotations.getAnnotations();
+            var anns = omeroRawAnnotations.getAnnotations();
             String tooltip;
-            switch (omeroAnnotations.getType()) {
+            switch (omeroRawAnnotations.getType()) {
                 case TAG:
                     for (var ann: anns) {
                         var ann2 = (TagAnnotation)ann;
-                        var addedBy = omeroAnnotations.getExperimenters().parallelStream()
+                        var addedBy = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.addedBy().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
-                        var creator = omeroAnnotations.getExperimenters().parallelStream()
+                        var creator = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.getOwner().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
@@ -1445,11 +1445,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 case MAP:
                     for (var ann: anns) {
                         var ann2 = (MapAnnotation)ann;
-                        var addedBy = omeroAnnotations.getExperimenters().parallelStream()
+                        var addedBy = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.addedBy().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
-                        var creator = omeroAnnotations.getExperimenters().parallelStream()
+                        var creator = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.getOwner().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
@@ -1460,11 +1460,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 case ATTACHMENT:
                     for (var ann: anns) {
                         var ann2 = (FileAnnotation)ann;
-                        var addedBy = omeroAnnotations.getExperimenters().parallelStream()
+                        var addedBy = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.addedBy().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
-                        var creator = omeroAnnotations.getExperimenters().parallelStream()
+                        var creator = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.getOwner().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
@@ -1475,7 +1475,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 case COMMENT:
                     for (var ann: anns) {
                         var ann2 = (CommentAnnotation)ann;
-                        var addedBy = omeroAnnotations.getExperimenters().parallelStream()
+                        var addedBy = omeroRawAnnotations.getExperimenters().parallelStream()
                                 .filter(e -> e .getId() == ann2.addedBy().getId())
                                 .map(e -> e.getFullName())
                                 .findAny().get();
@@ -1494,7 +1494,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     gp.setHgap(10.0);
                     break;
                 default:
-                    logger.error("OMERO annotation not supported: {}", omeroAnnotations.getType());
+                    logger.error("OMERO annotation not supported: {}", omeroRawAnnotations.getType());
             }
 
             sp.setContent(gp);

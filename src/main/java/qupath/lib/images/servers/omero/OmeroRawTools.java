@@ -44,10 +44,8 @@ import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
-import omero.gateway.model.DataObject;
-import omero.gateway.model.DatasetData;
-import omero.gateway.model.ImageData;
-import omero.gateway.model.ProjectData;
+import omero.gateway.facility.MetadataFacility;
+import omero.gateway.model.*;
 import omero.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +60,7 @@ import javafx.scene.Node;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.IconFactory;
-import qupath.lib.images.servers.omero.OmeroAnnotations.OmeroAnnotationType;
+import qupath.lib.images.servers.omero.OmeroRawAnnotations.OmeroRawAnnotationType;
 //import qupath.lib.images.servers.omero.OmeroObjects.OmeroObject;
 //import qupath.lib.images.servers.omero.OmeroObjects.OmeroObjectType;
 //import qupath.lib.images.servers.omero.OmeroObjects.OrphanedFolder;
@@ -608,15 +606,17 @@ public final class OmeroRawTools {
      * Request the {@code OmeroAnnotations} object of type {@code category} associated with
      * the {@code OmeroObject} specified.
      *
-     * @param uri
+     * @param client
      * @param obj
      * @param category
      * @return omeroAnnotations object
      */
-    public static OmeroAnnotations readOmeroAnnotations(URI uri, OmeroRawObject obj, OmeroAnnotationType category) {
+    public static OmeroRawAnnotations readOmeroAnnotations(OmeroRawClient client, OmeroRawObject obj, OmeroRawAnnotationType category) {
         try {
-            JsonElement json = null;//OmeroRequests.requestOMEROAnnotations(uri.getScheme(), uri.getHost(), uri.getPort(), obj.getId(), obj.getType(), category);
-            return OmeroAnnotations.getOmeroAnnotations(json.getAsJsonObject());
+
+            List<?> annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), obj.getData());
+            System.out.println(annotations);
+            return OmeroRawAnnotations.getOmeroAnnotations(client, obj, category, annotations);
         } catch (Exception ex) {
             logger.warn("Could not fetch {} information: {}", category, ex.getLocalizedMessage());
             return null;

@@ -137,6 +137,8 @@ final class OmeroRawObjects {
         private Group group;
         private OmeroRawObject parent;
 
+        private DataObject data;
+
         /**
          * Return the OMERO ID associated with this object.
          * @return id
@@ -151,6 +153,22 @@ final class OmeroRawObjects {
          */
         void setId(long id) {
             this.id = id;
+        }
+
+        /**
+         * Return the OMERO data associated with this object.
+         * @return id
+         */
+        DataObject getData() {
+            return data;
+        }
+
+        /**
+         * Set the data of this object
+         * @param obj
+         */
+        void setData(DataObject obj) {
+            this.data = obj;
         }
 
         /**
@@ -388,10 +406,12 @@ final class OmeroRawObjects {
             return description;
         }
 
+
         public Project(String url, ProjectData projectData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
             this.description = projectData.getDescription();
             this.childCount = projectData.asProject().sizeOfDatasetLinks();
+            super.data = projectData;
             super.setId(id);
             super.setName(projectData.getName());
             super.setType(type.toString());
@@ -465,10 +485,12 @@ final class OmeroRawObjects {
             return description;
         }
 
+
         public Dataset(String url, DatasetData datasetData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
             this.description = datasetData.getDescription();
             this.childCount = datasetData.asDataset().sizeOfImageLinks();
+            super.data = datasetData;
           //  System.out.println("nb of datasets in dataset object : "+this.childCount);
             super.setId(id);
             super.setName(datasetData.getName());
@@ -517,9 +539,11 @@ final class OmeroRawObjects {
             return pixels.getPixelType();
         }
 
+
         public Image(String url, ImageData imageData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
             this.url = url;
             this.acquisitionDate = imageData.getAcquisitionDate()==null ? -1 : imageData.getAcquisitionDate().getTime();
+            super.data = imageData;
             PixelsData pixData = imageData.getDefaultPixels();
 
             PixelInfo pixelInfo = new PixelInfo(pixData.getSizeX(), pixData.getSizeY(), pixData.getSizeC(), pixData.getSizeZ(), pixData.getSizeT(),
@@ -740,52 +764,57 @@ final class OmeroRawObjects {
      */
     static class Permission {
 
-        @SerializedName(value = "canDelete")
         private boolean canDelete;
 
-        @SerializedName(value = "canAnnotate")
         private boolean canAnnotate;
 
-        @SerializedName(value = "canLink")
         private boolean canLink;
 
-        @SerializedName(value = "canEdit")
         private boolean canEdit;
 
         // Only in OmeroObjects
-        @SerializedName(value = "isUserWrite")
         private boolean isUserWrite;
 
-        @SerializedName(value = "isUserRead")
         private boolean isUserRead;
 
-        @SerializedName(value = "isWorldWrite")
         private boolean isWorldWrite;
 
-        @SerializedName(value = "isWorldRead")
         private boolean isWorldRead;
 
-        @SerializedName(value = "isGroupWrite")
         private boolean isGroupWrite;
 
-        @SerializedName(value = "isGroupRead")
         private boolean isGroupRead;
 
-        @SerializedName(value = "isGroupAnnotate")
         private boolean isGroupAnnotate;
 
-        @SerializedName(value = "perm")
         private String perm;
+
+        public Permission(PermissionData permissions, OmeroRawClient client){
+            this.isGroupAnnotate = permissions.isGroupAnnotate();
+            this.isGroupRead = permissions.isGroupRead();
+            this.isGroupWrite = permissions.isGroupWrite();
+            this.isUserRead = permissions.isUserRead();
+            this.isUserWrite = permissions.isUserWrite();
+            this.isWorldRead = permissions.isWorldRead();
+            this.isWorldWrite = permissions.isWorldWrite();
+
+            this.canAnnotate = client.getGateway().getLoggedInUser().canAnnotate();
+            this.canDelete = client.getGateway().getLoggedInUser().canDelete();
+            this.canEdit = client.getGateway().getLoggedInUser().canEdit();
+            this.canLink = client.getGateway().getLoggedInUser().canLink();
+        }
     }
 
 
     static class Link {
 
-        @SerializedName(value = "id")
         private int id;
 
-        @SerializedName(value = "owner")
         private Owner owner;
+
+        public Link(Owner owner){
+            this.owner = owner;
+        }
 
         Owner getOwner() {
             return owner;
@@ -795,16 +824,9 @@ final class OmeroRawObjects {
 
     static class Experimenter {
 
-        @SerializedName(value = "id")
         private int id;
-
-        @SerializedName(value = "omeName")
         private String omeName;
-
-        @SerializedName(value = "firstName")
         private String firstName;
-
-        @SerializedName(value = "lastName")
         private String lastName;
 
         /**
@@ -821,6 +843,14 @@ final class OmeroRawObjects {
          */
         String getFullName() {
             return firstName + " " + lastName;
+        }
+
+        public Experimenter(omero.model.Experimenter experimenter){
+            this.id = experimenter.getId()==null ? -1 : (int)experimenter.getId().getValue();
+            this.omeName = experimenter.getId()==null ? "" : experimenter.getOmeName().getValue();
+            this.firstName = experimenter.getId()==null ? "" : experimenter.getFirstName().getValue();
+            this.lastName = experimenter.getId()==null ? "" : experimenter.getLastName().getValue();
+
         }
     }
 }
