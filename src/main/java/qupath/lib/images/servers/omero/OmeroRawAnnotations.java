@@ -136,6 +136,14 @@ final class OmeroRawAnnotations {
                     experimenters.add(new Experimenter(rating.getOwner().asExperimenter()));
                 });
                 break;
+            case COMMENT:
+                List<TextualAnnotationData> comments = (List<TextualAnnotationData>)annotations.stream().filter(comment-> comment instanceof TextualAnnotationData).collect(Collectors.toList());
+                comments.forEach(comment-> {
+                    omeroAnnotations.add(new CommentAnnotation(client, comment));
+                    experimenters.add(new Experimenter(comment.getOwner().asExperimenter()));
+                });
+                break;
+
             default:
 
         }
@@ -391,6 +399,30 @@ final class OmeroRawAnnotations {
         protected String getValue() {
             return value;
         }
+
+        public CommentAnnotation(OmeroRawClient client, TextualAnnotationData comment){
+
+            this.value = comment.getText();
+
+            super.setId(comment.getId());
+            super.setType(OmeroRawAnnotationType.COMMENT.toString());
+
+            omero.model.Experimenter user = comment.getOwner().asExperimenter();
+            Owner owner = new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                    user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                    user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                    user.getLastName()==null ? "" : user.getLastName().getValue(),
+                    user.getEmail()==null ? "" : user.getEmail().getValue(),
+                    user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                    user.getOmeName()==null ? "" : user.getOmeName().getValue());
+            super.setOwner(owner);
+
+            PermissionData permissions = comment.getPermissions();
+            super.setPermissions(new Permission(permissions, client));
+            super.setLink(new Link(owner));
+        }
+
+
     }
 
 
