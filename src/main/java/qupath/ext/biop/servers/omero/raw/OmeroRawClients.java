@@ -19,7 +19,7 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import com.google.gson.JsonSyntaxException;
 import javafx.collections.FXCollections;

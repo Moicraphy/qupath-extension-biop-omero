@@ -19,7 +19,7 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -37,7 +37,6 @@ import omero.gateway.LoginCredentials;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.model.ExperimenterData;
-import omero.log.NullLogger;
 import omero.log.SimpleLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +73,7 @@ public class OmeroRawClient {
     private ObservableList<URI> uris = FXCollections.observableArrayList();
 
     /**
-     * 'Clean' URI representing the server's URI (<b>not</b> its images). <p> See {@link OmeroTools#getServerURI(URI)}.
+     * 'Clean' URI representing the server's URI (<b>not</b> its images). <p> See {@link OmeroRawTools#getServerURI(URI)}.
      */
     private URI serverURI;
 
@@ -95,7 +94,7 @@ public class OmeroRawClient {
         // Clean server URI (filter out wrong URIs and get rid of unnecessary characters)
         var cleanServerURI = new URL(serverURI.getScheme(), serverURI.getHost(), serverURI.getPort(), "").toURI();
 
-        // Create OmeroWebClient with the serverURI
+        // Create OmeroRawClient with the serverURI
         OmeroRawClient client = new OmeroRawClient(cleanServerURI);
 
         return client;
@@ -119,10 +118,10 @@ public class OmeroRawClient {
      * @throws IllegalArgumentException
      * @throws ConnectException
      */
-    static boolean canBeAccessed(URI uri, OmeroObjects.OmeroObjectType type) throws IllegalArgumentException, ConnectException {
+    static boolean canBeAccessed(URI uri, OmeroRawObjects.OmeroRawObjectType type) throws IllegalArgumentException, ConnectException {
         try {
             logger.debug("Attempting to access {}...", type.toString().toLowerCase());
-            int id = OmeroTools.parseOmeroObjectId(uri, type);
+            int id = OmeroRawTools.parseOmeroRawObjectId(uri, type);
             if (id == -1)
                 throw new NullPointerException("No object ID found in: " + uri);
 
@@ -196,6 +195,10 @@ public class OmeroRawClient {
         return username;
     }
 
+    BooleanProperty logProperty() {
+        return loggedIn;
+    }
+
     String getUsername() {
         return username.get();
     }
@@ -205,16 +208,16 @@ public class OmeroRawClient {
     }
 
     /**
-     * Return the server URI ('clean' URI) of this {@code OmeroWebClient}.
+     * Return the server URI ('clean' URI) of this {@code OmeroRawClient}.
      * @return serverUri
-     * @see OmeroTools#getServerURI(URI)
+     * @see OmeroRawTools#getServerURI(URI)
      */
     URI getServerURI() {
         return serverURI;
     }
 
     /**
-     * Return an unmodifiable list of all URIs using this {@code OmeroWebClient}.
+     * Return an unmodifiable list of all URIs using this {@code OmeroRawClient}.
      * @return list of uris
      * @see #addURI(URI)
      */
@@ -293,10 +296,10 @@ public class OmeroRawClient {
                 Dialogs.showInfoNotification("OMERO login", String.format("Login successful: %s(\"%s\")", serverURI, authentication.getUserName()));
 
             // If a browser was currently opened with this client, close it
-            if (OmeroExtension.getOpenedBrowsers().containsKey(this)) {
-                var oldBrowser = OmeroExtension.getOpenedBrowsers().get(this);
+            if (OmeroRawExtension.getOpenedRawBrowsers().containsKey(this)) {
+                var oldBrowser = OmeroRawExtension.getOpenedRawBrowsers().get(this);
                 oldBrowser.requestClose();
-                OmeroExtension.getOpenedBrowsers().remove(this);
+                OmeroRawExtension.getOpenedRawBrowsers().remove(this);
             }
 
             // If this method is called from 'project-import' thread (i.e. 'Open URI..'), 'Not on FX Appl. thread' IllegalStateException is thrown
@@ -349,6 +352,8 @@ public class OmeroRawClient {
     }
 
     public boolean checkIfLoggedIn() {
+        if(this.gateway == null) // if we invoke the method "createClientAndLogin" in OmeroRawExtension->createRawServerListMenu, the gateway is null
+            return false;
         try {
             return this.gateway.isAlive(this.securityContext);
 

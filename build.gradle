@@ -5,15 +5,15 @@ plugins {
   // Reduce JavaCPP dependencies
 }
 
-ext.moduleName = 'qupath.extension.omero'
-archivesBaseName = 'qupath-extension-omero'
-description = "QuPath extension to support image reading using OMERO's web API."
-version = "0.3.0"
+ext.moduleName = 'qupath.extension.biop.omero'
+archivesBaseName = 'qupath-extension-biop-omero'
+description = "QuPath extension to support image reading using OMERO's Java API."
+version = "0.1.0-SNAPSHOT"
 
 repositories {
 //  mavenLocal()
   mavenCentral()
-  
+
   maven {
     url "https://maven.scijava.org/content/repositories/releases"
   }
@@ -22,6 +22,7 @@ repositories {
     url "https://maven.scijava.org/content/repositories/snapshots"
   }
 
+
   maven{
         url "https://maven.scijava.org/content/groups/public"
     }
@@ -29,6 +30,7 @@ repositories {
 
 configurations {
     implementation.extendsFrom bioformats
+
 }
 
 dependencies {
@@ -39,7 +41,7 @@ dependencies {
     implementation "io.github.qupath:qupath-core:$qupathVersion"
     shadow "io.github.qupath:qupath-gui-fx:$qupathVersion"
 
-    shadow "org.slf4j:slf4j-api:1.7.30"
+    //shadow "org.slf4j:slf4j-api:1.7.30"
     implementation "commons-io:commons-io:2.11.0"
 
     testImplementation "io.github.qupath:qupath-gui-fx:$qupathVersion"
@@ -53,7 +55,6 @@ dependencies {
     implementation "org.openmicroscopy:omero-gateway:5.6.5"
     implementation "org.openmicroscopy:omero-model:5.6.0"
     implementation "info.picocli:picocli:4.3.2"
-
 }
 
 processResources {
@@ -81,5 +82,20 @@ java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(version)
         }
+    }
+}
+
+
+jar {
+    // Important to set version so this can be queried within QuPath
+    manifest {
+        def manifestAttributes = [
+                "Implementation-Vendor": "QuPath developers",
+                "Implementation-Version": project.version,
+                //               'Automatic-Module-Name': "io.github." + moduleName,
+                "QuPath-build-time": new Date().format("yyyy-MM-dd, HH:mm")
+        ]
+
+        attributes(manifestAttributes)
     }
 }

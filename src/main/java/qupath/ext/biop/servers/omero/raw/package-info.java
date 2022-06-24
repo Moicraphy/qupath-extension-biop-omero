@@ -1,4 +1,4 @@
 /**
  * Read images from OMERO (https://www.openmicroscopy.org/omero/).
  */
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;

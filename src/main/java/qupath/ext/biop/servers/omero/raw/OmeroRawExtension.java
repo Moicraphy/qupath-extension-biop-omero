@@ -19,7 +19,7 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -51,15 +51,15 @@ import qupath.lib.gui.tools.PaneTools;
 /**
  * Extension to access images hosted on OMERO.
  */
-public class OmeroExtension implements QuPathExtension, GitHubProject {
+public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 	
-	private final static Logger logger = LoggerFactory.getLogger(OmeroExtension.class);
-	
+	private final static Logger logger = LoggerFactory.getLogger(OmeroRawExtension.class);
+
 	/**
 	 * To handle the different stages of browsers (only allow one per OMERO server)
 	 */
-	private static Map<OmeroWebClient, OmeroWebImageServerBrowserCommand> browsers = new HashMap<>();
-	
+	private static Map<OmeroRawClient, OmeroRawImageServerBrowserCommand> rawBrowsers = new HashMap<>();
+
 	private static boolean alreadyInstalled = false;
 	
 	@Override
@@ -70,74 +70,77 @@ public class OmeroExtension implements QuPathExtension, GitHubProject {
 		logger.debug("Installing OMERO extension");
 		
 		alreadyInstalled = true;
-		var actionClients = ActionTools.createAction(new OmeroWebClientsCommand(qupath), "Manage server connections");
-		var actionSendObjects = ActionTools.createAction(new OmeroWritePathObjectsCommand(qupath), "Send annotations to OMERO");
-		Menu browseServerMenu = new Menu("Browse server...");
-		
-//		actionClients.disabledProperty().bind(qupath.projectProperty().isNull());
-//		browseServerMenu.disableProperty().bind(qupath.projectProperty().isNull());
-		actionSendObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
-		
-		MenuTools.addMenuItems(qupath.getMenu("Extensions", false), 
-				MenuTools.createMenu("OMERO", 
-                		browseServerMenu,
-    	                actionClients,
-    	                null,
-    	                actionSendObjects
-    	                )
-				);
-		createServerListMenu(qupath, browseServerMenu);
+
+		// for OMERO raw extension
+		var actionRawClients = ActionTools.createAction(new OmeroRawClientsCommand(qupath), "Manage server connections");
+		var actionRawSendObjects = ActionTools.createAction(new OmeroRawWritePathObjectsCommand(qupath), "Send annotations to OMERO");
+		Menu browseRawServerMenu = new Menu("Browse server...");
+
+//		actionRawClients.disabledProperty().bind(qupath.projectProperty().isNull());
+//		browseRawServerMenu.disableProperty().bind(qupath.projectProperty().isNull());
+		actionRawSendObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		MenuTools.addMenuItems(qupath.getMenu("Extensions", false),
+				MenuTools.createMenu("OMERO-RAW",
+						browseRawServerMenu,
+						actionRawClients,
+						null,
+						actionRawSendObjects
+				)
+		);
+
+		createRawServerListMenu(qupath, browseRawServerMenu);
 	}
 	
 
 	@Override
 	public String getName() {
-		return "OMERO extension";
+		return "OMERO BIOP extension";
 	}
 
 	@Override
 	public String getDescription() {
 		return "Adds the ability to browse OMERO servers and open images hosted on OMERO servers.";
 	}
-	
-	private static Menu createServerListMenu(QuPathGUI qupath, Menu browseServerMenu) {
+
+
+	private static Menu createRawServerListMenu(QuPathGUI qupath, Menu browseServerMenu) {
 		EventHandler<Event> validationHandler = e -> {
 			browseServerMenu.getItems().clear();
-			
+
 			// Get all active servers
-			var activeServers = OmeroWebClients.getAllClients();
-			
+			var activeServers = OmeroRawClients.getAllClients();
+
 			// Populate the menu with each unique active servers
 			for (var client: activeServers) {
 				if (client == null)
 					continue;
 				MenuItem item = new MenuItem(client.getServerURI() + "...");
 				item.setOnAction(e2 -> {
-					var browser = browsers.get(client);
+					var browser = rawBrowsers.get(client);
 					if (browser == null || browser.getStage() == null) {
-						browser = new OmeroWebImageServerBrowserCommand(qupath, client);
-						browsers.put(client, browser);
+						browser = new OmeroRawImageServerBrowserCommand(qupath, client);
+						rawBrowsers.put(client, browser);
 						browser.run();
 					} else
 						browser.getStage().requestFocus();
 				});
 				browseServerMenu.getItems().add(item);
 			}
-			
+
 			// Create 'New server...' MenuItem
 			MenuItem customServerItem = new MenuItem("New server...");
 			customServerItem.setOnAction(e2 -> {
 				GridPane gp = new GridPane();
 				gp.setVgap(5.0);
-		        TextField tf = new TextField();
-		        tf.setPrefWidth(400);
-		        PaneTools.addGridRow(gp, 0, 0, "Enter OMERO URL", new Label("Enter an OMERO server URL to browse (e.g. http://idr.openmicroscopy.org/):"));
-		        PaneTools.addGridRow(gp, 1, 0, "Enter OMERO URL", tf, tf);
-		        var confirm = Dialogs.showConfirmDialog("Enter OMERO URL", gp);
-		        if (!confirm)
-		        	return;
-		        
-		        var path = tf.getText();
+				TextField tf = new TextField();
+				tf.setPrefWidth(400);
+				PaneTools.addGridRow(gp, 0, 0, "Enter OMERO URL", new Label("Enter an OMERO server URL to browse (e.g. http://idr.openmicroscopy.org/):"));
+				PaneTools.addGridRow(gp, 1, 0, "Enter OMERO URL", tf, tf);
+				var confirm = Dialogs.showConfirmDialog("Enter OMERO URL", gp);
+				if (!confirm)
+					return;
+
+				var path = tf.getText();
 				if (path == null || path.isEmpty())
 					return;
 				try {
@@ -146,62 +149,63 @@ public class OmeroExtension implements QuPathExtension, GitHubProject {
 
 					// Make the path a URI
 					URI uri = new URI(path);
-					
+
 					// Clean the URI (in case it's a full path)
-					URI uriServer = OmeroTools.getServerURI(uri);
-					
+					URI uriServer = OmeroRawTools.getServerURI(uri);
+
 					if (uriServer == null)
 						throw new MalformedURLException("Could not parse server from " + uri.toString());
-					
+
 					// Check if client exist and if browser is already opened
-					var client = OmeroWebClients.getClientFromServerURI(uriServer);
+					var client = OmeroRawClients.getClientFromServerURI(uriServer);
 					if (client == null)
-						client = OmeroWebClients.createClientAndLogin(uriServer);
-					
+						client = OmeroRawClients.createClientAndLogin(uriServer);
+
 					if (client == null)
 						throw new IOException("Could not parse server from " + uri.toString());
-					
-					var browser = browsers.get(client);
+
+					var browser = rawBrowsers.get(client);
 					if (browser == null || browser.getStage() == null) {
 						// Create new browser
-						browser = new OmeroWebImageServerBrowserCommand(qupath, client);
-						browsers.put(client, browser);
+						browser = new OmeroRawImageServerBrowserCommand(qupath, client);
+						rawBrowsers.put(client, browser);
 						browser.run();
 					} else	// Request focus for already-existing browser
-						browser.getStage().requestFocus();		
-					
+						browser.getStage().requestFocus();
+
 				} catch (FileNotFoundException ex) {
-					Dialogs.showErrorMessage("OMERO web server", String.format("An error occured when trying to reach %s: %s\"", path, ex.getLocalizedMessage()));
+					Dialogs.showErrorMessage("OMERO-RAW server", String.format("An error occured when trying to reach %s: %s\"", path, ex.getLocalizedMessage()));
 				} catch (IOException | URISyntaxException ex) {
-					Dialogs.showErrorMessage("OMERO web server", ex.getLocalizedMessage());
+					Dialogs.showErrorMessage("OMERO-RAW server", ex.getLocalizedMessage());
 					return;
 				}
 			});
 			MenuTools.addMenuItems(browseServerMenu, null, customServerItem);
 		};
-		
+
 		// Ensure the menu is populated (every time the parent menu is opened)
-		browseServerMenu.getParentMenu().setOnShowing(validationHandler);	
+		browseServerMenu.getParentMenu().setOnShowing(validationHandler);
 		return browseServerMenu;
 	}
-	
+
+
 	/**
 	 * Return map of currently opened browsers.
-	 * 
-	 * @return browsers
+	 *
+	 * @return rawBrowsers
 	 */
-	static Map<OmeroWebClient, OmeroWebImageServerBrowserCommand> getOpenedBrowsers() {
-		return browsers;
+	static Map<OmeroRawClient, OmeroRawImageServerBrowserCommand> getOpenedRawBrowsers() {
+		return rawBrowsers;
 	}
-
 
 	@Override
 	public GitHubRepo getRepository() {
 		return GitHubRepo.create(getName(), "qupath", "qupath-extension-omero");
 	}
+	//return GitHubRepo.create(getName(), "biop", "qupath-extension-omero-raw");
 	
 	@Override
 	public Version getQuPathVersion() {
-		return Version.parse("0.3.0-rc2");
+		return QuPathExtension.super.getQuPathVersion();
 	}
 }

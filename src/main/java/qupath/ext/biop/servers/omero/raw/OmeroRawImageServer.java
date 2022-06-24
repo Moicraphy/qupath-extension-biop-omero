@@ -19,7 +19,7 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import loci.common.DataTools;
 import loci.common.services.DependencyException;
@@ -55,8 +55,10 @@ import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
 import qupath.lib.roi.interfaces.ROI;
 
+
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
+
 import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
@@ -1040,10 +1042,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws IOException
 			 */
 			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws DependencyException, ServiceException, FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
-				for (LocalReaderWrapper wrapper : primaryReaders) {
+				/*for (LocalReaderWrapper wrapper : primaryReaders) {
 					if (pixelsID.equals(wrapper.getReader().getPixelsId()))
 						return wrapper;
-				}
+				}*/
 				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client );
 				primaryReaders.add(reader);
 				return reader;
