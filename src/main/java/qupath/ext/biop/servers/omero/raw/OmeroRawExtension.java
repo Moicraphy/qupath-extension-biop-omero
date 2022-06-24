@@ -200,9 +200,9 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 
 	@Override
 	public GitHubRepo getRepository() {
-		return GitHubRepo.create(getName(), "qupath", "qupath-extension-omero");
+		return GitHubRepo.create(getName(), "biop", "qupath-extension-biop-omero");
 	}
-	//return GitHubRepo.create(getName(), "biop", "qupath-extension-omero-raw");
+
 	
 	@Override
 	public Version getQuPathVersion() {
