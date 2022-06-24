@@ -1231,24 +1231,17 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
                     // Get children and populate maps if necessary
                     Group currentGroup = comboGroup.getSelectionModel().getSelectedItem();
-                    //System.out.println("Group : " +currentGroup);
                     Owner currentOwner = comboOwner.getSelectionModel().getSelectedItem();
-                    //System.out.println("Owner : " +currentOwner);
-                   // long time = System.currentTimeMillis();
+
                     List<OmeroRawObject> children = OmeroRawImageServerBrowserCommand.this.getChildren(omeroObj, currentGroup);
-                    //System.out.println("OmeroRaw...Command->GetChildren time : "+(System.currentTimeMillis()-time));
-
-                   // System.out.println("childrens : " +children);
-
-
+                    children.sort(Comparator.comparing(OmeroRawObject::getName));
 
                     // If server, update list of groups/owners (and comboBoxes)
-                   // System.out.println("parent : "+omeroObj.getType());
                     if (omeroObj.getType() == OmeroRawObjectType.SERVER) {
                         // Fetch ALL Groups and ALL Owners
                         Map<Group, List<Owner>> tempMap = OmeroRawTools.getAvailableGroups(client);
-                        var tempGroups = new ArrayList<>(tempMap.keySet());
-                        var tempOwners = new ArrayList<>(tempMap.get(currentGroup));
+                        List<Group> tempGroups = new ArrayList<>(tempMap.keySet());
+                        List<Owner> tempOwners = new ArrayList<>(tempMap.get(currentGroup));
 
                         // If we suddenly found more Groups, update the set (shoudn't happen)
                         if (tempGroups.size() > groups.size()) {
@@ -1333,7 +1326,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         private final OmeroRawObject obj;
         private final OmeroRawAnnotations tags;
         private final OmeroRawAnnotations keyValuePairs;
-        //		private final OmeroAnnotations tables;
+//		private final OmeroAnnotations tables;
         private final OmeroRawAnnotations attachments;
         private final OmeroRawAnnotations comments;
         private final OmeroRawAnnotations ratings;
@@ -1343,11 +1336,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             this.obj = obj;
             this.tags = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.TAG);
             this.keyValuePairs = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.MAP);
-//			this.tables = OmeroRawTools.getOmeroAnnotations(serverURI, obj, OmeroAnnotationType.TABLE);
+//			this.tables = OmeroRawTools.getOmeroAnnotations(client, obj, OmeroAnnotationType.TABLE);
             this.attachments = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.ATTACHMENT);
             this.comments = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.COMMENT);
             this.ratings = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.RATING);
-//			this.others = OmeroRawTools.getOmeroAnnotations(serverURI, obj, OmeroAnnotationType.CUSTOM);
+//			this.others = OmeroRawTools.getOmeroAnnotations(client, obj, OmeroAnnotationType.CUSTOM);
 
             showOmeroObjectInfo();
         }

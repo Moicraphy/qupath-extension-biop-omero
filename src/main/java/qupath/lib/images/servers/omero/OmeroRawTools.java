@@ -376,11 +376,13 @@ public final class OmeroRawTools {
                         user.getOmeName()==null ? "" : user.getOmeName().getValue()));
 
             }
+
+            owners.sort(Comparator.comparing(Owner::getName));
             map.put(userGroup, owners);
 
         });
 
-        return map;
+        return new TreeMap<>(map);
     }
 
 

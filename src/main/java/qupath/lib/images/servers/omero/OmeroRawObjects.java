@@ -599,10 +599,10 @@ final class OmeroRawObjects {
 
         String getName() {
             // We never know if a deserialized Owner will have all the necessary information
-            firstName = firstName == null ? "" : firstName;
-            middleName = middleName == null ? "" : middleName;
-            lastName = lastName == null ? "" : lastName;
-            return firstName + " " + (middleName.isEmpty() ? "" : middleName + " ") + lastName;
+            this.firstName = this.firstName == null ? "" : this.firstName;
+            this.middleName = this.middleName == null ? "" : this.middleName;
+            this.lastName = this.lastName == null ? "" : this.lastName;
+            return this.firstName + " " + (this.middleName.isEmpty() ? "" : this.middleName + " ") + this.lastName;
         }
 
         long getId() {
@@ -639,13 +639,12 @@ final class OmeroRawObjects {
         }
     }
 
-    static class Group {
+    static class Group implements Comparable {
         private long id;
         private String name;
 
         // Singleton (with static factory)
         private static final Group ALL_GROUPS = new Group(-1, "All groups");
-
 
         public Group(long id, String name) {
             this.id = id;
@@ -660,8 +659,8 @@ final class OmeroRawObjects {
             return ALL_GROUPS;
         }
 
-        String getName() {
-            return name;
+        public String getName() {
+            return this.name;
         }
 
         long getId() {
@@ -685,6 +684,12 @@ final class OmeroRawObjects {
             if (!(obj instanceof Group))
                 return false;
             return ((Group)obj).id == this.id;
+        }
+
+        @Override
+        public int compareTo(Object o) {
+            Group group = (Group)o;
+            return this.getName().compareTo(group.getName());
         }
     }
 
