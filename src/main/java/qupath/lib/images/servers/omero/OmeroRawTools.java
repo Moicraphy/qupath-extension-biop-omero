@@ -393,12 +393,12 @@ public final class OmeroRawTools {
      * @param client
      * @param orphanedFolder
      */
-    public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException, IOException, ServerError {
+   /* public static synchronized void populateOrphanedImageList(OmeroRawClient client, OrphanedFolder orphanedFolder) throws DSOutOfServiceException, ExecutionException, DSAccessException, IOException, ServerError {
         var list = orphanedFolder.getImageList();
         orphanedFolder.setLoading(false);
         list.clear();
 
-       /* System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getOrphanedImages");
+       /System.out.println("OmeroRawToools - populateOrphanedImageList - Begin getOrphanedImages");
         long time = System.currentTimeMillis();
         Collection<ImageData> map = OmeroRawRequests.getOrphanedImages(client);
         System.out.println("OmeroRawToools - populateOrphanedImageList - End getOrphanedImages : "+(System.currentTimeMillis()-time));
@@ -411,7 +411,7 @@ public final class OmeroRawTools {
             orphanedFolder.setLoading(false);
 
         orphanedFolder.setTotalChildCount(max);
-        map.forEach( e -> {*/
+        map.forEach( e -> {
         ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
 
         executorRequests.submit(() -> {
@@ -451,7 +451,7 @@ public final class OmeroRawTools {
 
         });
         executorRequests.shutdown();
-    }
+    }*/
 
     /**
      * Get all the orphaned {@code OmeroObject}s of type {@code type} from the server.
@@ -475,7 +475,6 @@ public final class OmeroRawTools {
 
         });
 
-       //System.out.println("List of orphaned Datasets : "+ list);
         return list;
     }
 
@@ -494,7 +493,6 @@ public final class OmeroRawTools {
 
         });
 
-        //System.out.println("List of orphaned Datasets : "+ list);
         return list;
     }
 
@@ -613,10 +611,8 @@ public final class OmeroRawTools {
      */
     public static OmeroRawAnnotations readOmeroAnnotations(OmeroRawClient client, OmeroRawObject obj, OmeroRawAnnotationType category) {
         try {
-
             List<?> annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), obj.getData());
-            System.out.println(annotations);
-            return OmeroRawAnnotations.getOmeroAnnotations(client, obj, category, annotations);
+            return OmeroRawAnnotations.getOmeroAnnotations(client, category, annotations);
         } catch (Exception ex) {
             logger.warn("Could not fetch {} information: {}", category, ex.getLocalizedMessage());
             return null;
@@ -907,12 +903,11 @@ public final class OmeroRawTools {
             case PROJECT:
                 for (String id: ids) {
                     tempIds.add(client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),Collections.singletonList(Long.parseLong(id))).iterator().next().getDatasets()
-                                    .stream().map(DatasetData::asDataset).map(Dataset::getId).map(RLong::getValue).toString());
-
-                   /* List<JsonElement> data = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.DATASET, Integer.parseInt(id));
-                    for (int i = 0; i < data.size(); i++) {
-                        tempIds.add(data.get(i).getAsJsonObject().get("@id").getAsString());
-                    }*/
+                                    .stream()
+                                    .map(DatasetData::asDataset)
+                                    .map(Dataset::getId)
+                                    .map(RLong::getValue)
+                                    .toString());
                 }
                 ids =  new ArrayList<>(tempIds);
                 tempIds.clear();
@@ -926,10 +921,6 @@ public final class OmeroRawTools {
                             .map(Image::getId)
                             .map(RLong::getValue)
                             .toString());
-                    /*List<JsonElement> data = null;//OmeroRequests.requestObjectList(uri.getScheme(), uri.getHost(), uri.getPort(), OmeroRawObjectType.IMAGE, Integer.parseInt(id));
-                    for (int i = 0; i < data.size(); i++) {
-                        tempIds.add(data.get(i).getAsJsonObject().get("@id").getAsString());
-                    }*/
                 }
                 ids = new ArrayList<>(tempIds);
                 tempIds.clear();
