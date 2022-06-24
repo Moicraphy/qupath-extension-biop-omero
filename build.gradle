@@ -41,7 +41,7 @@ dependencies {
     implementation "io.github.qupath:qupath-core:$qupathVersion"
     shadow "io.github.qupath:qupath-gui-fx:$qupathVersion"
 
-    shadow "org.slf4j:slf4j-api:1.7.30"
+    //shadow "org.slf4j:slf4j-api:1.7.30"
     implementation "commons-io:commons-io:2.11.0"
 
     testImplementation "io.github.qupath:qupath-gui-fx:$qupathVersion"
@@ -82,5 +82,20 @@ java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(version)
         }
+    }
+}
+
+
+jar {
+    // Important to set version so this can be queried within QuPath
+    manifest {
+        def manifestAttributes = [
+                "Implementation-Vendor": "QuPath developers",
+                "Implementation-Version": project.version,
+                //               'Automatic-Module-Name': "io.github." + moduleName,
+                "QuPath-build-time": new Date().format("yyyy-MM-dd, HH:mm")
+        ]
+
+        attributes(manifestAttributes)
     }
 }
