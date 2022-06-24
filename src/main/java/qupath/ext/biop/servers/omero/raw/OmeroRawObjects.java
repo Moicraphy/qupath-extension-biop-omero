@@ -19,24 +19,18 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import omero.ServerError;
+import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.AdminFacility;
-import omero.gateway.facility.BrowseFacility;
 import omero.gateway.model.*;
-import omero.model.Experimenter;
-import omero.model.ExperimenterGroup;
-import omero.model.GroupExperimenterMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.gson.annotations.SerializedName;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -65,7 +59,7 @@ final class OmeroRawObjects {
         WELL("TODO", "Well"),
         SCREEN("TODO", "Screen"),
 
-        // Object for OmeroWebBrowser's 'Orphaned folder' item (not for deserialization)
+        // Object for OmeroRawBrowser's 'Orphaned folder' item (not for deserialization)
         ORPHANED_FOLDER("#OrphanedFolder", "Orphaned Folder"),
 
         // Default if unknown
@@ -95,38 +89,6 @@ final class OmeroRawObjects {
             return displayedName;
         }
     }
-
-
-    /*static class GsonOmeroObjectDeserializer implements JsonDeserializer<OmeroObject> {
-
-        @Override
-        public OmeroObject deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
-                throws JsonParseException {
-
-            var type = OmeroObjectType.fromString(((JsonObject)json).get("@type").getAsString().toLowerCase());
-
-            OmeroObject omeroObj;
-            if (type.equals(OmeroObjectType.PROJECT))
-                omeroObj = context.deserialize(json, Project.class);
-            else if (type.equals(OmeroObjectType.DATASET))
-                omeroObj = context.deserialize(json, Dataset.class);
-            else if (type.equals(OmeroObjectType.IMAGE))
-                omeroObj = context.deserialize(json, Image.class);
-            else {
-                logger.warn("Unsupported type {}", type);
-                return null;
-            }
-            Owner owner = context.deserialize(((JsonObject)json).get("omero:details").getAsJsonObject().get("owner"), Owner.class);
-            Group group = context.deserialize(((JsonObject)json).get("omero:details").getAsJsonObject().get("group"), Group.class);
-            if (owner != null)
-                omeroObj.setOwner(owner);
-            if (group != null)
-                omeroObj.setGroup(group);
-
-            return omeroObj;
-        }
-    }*/
-
 
     static abstract class OmeroRawObject {
 
@@ -195,7 +157,7 @@ final class OmeroRawObjects {
         abstract String getAPIURLString();
 
         /**
-         * Return the {@code OmeroObjectType} associated with this object.
+         * Return the {@code OmeroRawObjectType} associated with this object.
          * @return type
          */
         OmeroRawObjectType getType() {
@@ -309,10 +271,10 @@ final class OmeroRawObjects {
      * is never created through deserialization of JSON objects. Note that it should only
      * contain orphaned images, <b>not</b> orphaned datasets (like the OMERO webclient).
      * <p>
-     * It should only be used once per {@code OmeroWebImageServerBrowser}, with its children objects loaded
-     * in an executor (see {@link OmeroRawTools#populateOrphanedImageList(URI, OrphanedFolder)}). This class keeps track of:
+     * It should only be used once per {@code OmeroRawImageServerBrowser}, with its children objects loaded
+     * in an executor (see {@link OmeroRawTools#readOrphanedImages(OmeroRawClient, SecurityContext)}). This class keeps track of:
      * <li>Total child count: total amount of orphaned images on the server.</li>
-     * <li>Current child count: what is displayed in the current {@code OmeroWebServerImageBrowser}, which depends on what is loaded and the current Group/Owner.</li>
+     * <li>Current child count: what is displayed in the current {@code OmeroRawServerImageBrowser}, which depends on what is loaded and the current Group/Owner.</li>
      * <li>Child count: total amount of orphaned images currently loaded (always smaller than total child count).</li>
      * <li>{@code isLoading} property: defines whether QuPath is still loading its children objects.</li>
      * <li>List of orphaned image objects.</li>
@@ -765,7 +727,7 @@ final class OmeroRawObjects {
 
 
     /**
-     * Both in OmeroAnnotations and in OmeroObjects.
+     * Both in OmeroRawAnnotations and in OmeroRawObjects.
      */
     static class Permission {
 
@@ -777,7 +739,7 @@ final class OmeroRawObjects {
 
         private boolean canEdit;
 
-        // Only in OmeroObjects
+        // Only in OmeroRawObjects
         private boolean isUserWrite;
 
         private boolean isUserRead;

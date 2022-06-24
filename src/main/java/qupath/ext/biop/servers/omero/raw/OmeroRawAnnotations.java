@@ -19,7 +19,7 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 
 import java.util.*;
@@ -29,11 +29,6 @@ import omero.gateway.model.*;
 import omero.model.NamedValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import qupath.lib.images.servers.omero.OmeroRawObjects.Experimenter;
-import qupath.lib.images.servers.omero.OmeroRawObjects.Link;
-import qupath.lib.images.servers.omero.OmeroRawObjects.Owner;
-import qupath.lib.images.servers.omero.OmeroRawObjects.Permission;
 
 /**
  * Class representing OMERO annotations.
@@ -48,7 +43,7 @@ import qupath.lib.images.servers.omero.OmeroRawObjects.Permission;
 // TODO: Handle Table annotations
 final class OmeroRawAnnotations {
 
-    private final static Logger logger = LoggerFactory.getLogger(OmeroAnnotations.class);
+    private final static Logger logger = LoggerFactory.getLogger(OmeroRawAnnotations.class);
 
     public static enum OmeroRawAnnotationType {
         TAG("TagAnnotationI", "tag"),
@@ -86,11 +81,11 @@ final class OmeroRawAnnotations {
 
     private final List<OmeroAnnotation> annotations;
 
-    private final List<Experimenter> experimenters;
+    private final List<OmeroRawObjects.Experimenter> experimenters;
 
     private final OmeroRawAnnotationType type;
 
-    protected OmeroRawAnnotations(List<OmeroAnnotation> annotations, List<Experimenter> experimenters, OmeroRawAnnotationType type) {
+    protected OmeroRawAnnotations(List<OmeroAnnotation> annotations, List<OmeroRawObjects.Experimenter> experimenters, OmeroRawAnnotationType type) {
         this.annotations = Objects.requireNonNull(annotations);
         this.experimenters = Objects.requireNonNull(experimenters);
         this.type = type;
@@ -105,42 +100,42 @@ final class OmeroRawAnnotations {
      */
     public static OmeroRawAnnotations getOmeroAnnotations(OmeroRawClient client, OmeroRawAnnotationType annotationType, List<?> annotations) {
         List<OmeroAnnotation> omeroAnnotations = new ArrayList<>();
-        List<Experimenter> experimenters = new ArrayList<>();
+        List<OmeroRawObjects.Experimenter> experimenters = new ArrayList<>();
 
         switch(annotationType){
             case TAG:
                 List<TagAnnotationData> tags = (List<TagAnnotationData>)annotations.stream().filter(tag-> tag instanceof TagAnnotationData).collect(Collectors.toList());
                 tags.forEach(tag-> {
                     omeroAnnotations.add(new TagAnnotation(client, tag));
-                    experimenters.add(new Experimenter(tag.getOwner().asExperimenter()));
+                    experimenters.add(new OmeroRawObjects.Experimenter(tag.getOwner().asExperimenter()));
                 });
                 break;
             case MAP:
                 List<MapAnnotationData> kvps = (List<MapAnnotationData>)annotations.stream().filter(map-> map instanceof MapAnnotationData).collect(Collectors.toList());
                 kvps.forEach(kvp-> {
                     omeroAnnotations.add(new MapAnnotation(client, kvp));
-                    experimenters.add(new Experimenter(kvp.getOwner().asExperimenter()));
+                    experimenters.add(new OmeroRawObjects.Experimenter(kvp.getOwner().asExperimenter()));
                 });
                 break;
             case ATTACHMENT:
                 List<FileAnnotationData> files = (List<FileAnnotationData>)annotations.stream().filter(file-> file instanceof FileAnnotationData).collect(Collectors.toList());
                 files.forEach(file-> {
                     omeroAnnotations.add(new FileAnnotation(client, file));
-                    experimenters.add(new Experimenter(file.getOwner().asExperimenter()));
+                    experimenters.add(new OmeroRawObjects.Experimenter(file.getOwner().asExperimenter()));
                 });
                 break;
             case RATING:
                 List<RatingAnnotationData> ratings = (List<RatingAnnotationData>)annotations.stream().filter(rating-> rating instanceof RatingAnnotationData).collect(Collectors.toList());
                 ratings.forEach(rating-> {
                     omeroAnnotations.add(new LongAnnotation(client, rating));
-                    experimenters.add(new Experimenter(rating.getOwner().asExperimenter()));
+                    experimenters.add(new OmeroRawObjects.Experimenter(rating.getOwner().asExperimenter()));
                 });
                 break;
             case COMMENT:
                 List<TextualAnnotationData> comments = (List<TextualAnnotationData>)annotations.stream().filter(comment-> comment instanceof TextualAnnotationData).collect(Collectors.toList());
                 comments.forEach(comment-> {
                     omeroAnnotations.add(new CommentAnnotation(client, comment));
-                    experimenters.add(new Experimenter(comment.getOwner().asExperimenter()));
+                    experimenters.add(new OmeroRawObjects.Experimenter(comment.getOwner().asExperimenter()));
                 });
                 break;
 
@@ -162,7 +157,7 @@ final class OmeroRawAnnotations {
      * Return all {@code Experimenter}s present in this {@code OmeroAnnotations} object.
      * @return experimenters
      */
-    public List<Experimenter> getExperimenters() {
+    public List<OmeroRawObjects.Experimenter> getExperimenters() {
         return experimenters;
     }
 
@@ -187,10 +182,10 @@ final class OmeroRawAnnotations {
     abstract static class OmeroAnnotation {
 
         private long id;
-        private Owner owner;
-        private Permission permissions;
+        private OmeroRawObjects.Owner owner;
+        private OmeroRawObjects.Permission permissions;
         private String type;
-        private Link link;
+        private OmeroRawObjects.Link link;
 
         /**
          * Set the id of this object
@@ -205,7 +200,7 @@ final class OmeroRawAnnotations {
          * Set the owner of this object
          * @param owner
          */
-        void setOwner(Owner owner) {
+        void setOwner(OmeroRawObjects.Owner owner) {
             this.owner = owner;
         }
 
@@ -221,13 +216,13 @@ final class OmeroRawAnnotations {
          * Set the permissions of this object
          * @param permissions
          */
-        void setPermissions(Permission permissions) { this.permissions = permissions; }
+        void setPermissions(OmeroRawObjects.Permission permissions) { this.permissions = permissions; }
 
         /**
          * Set the permissions of this object
          * @param link
          */
-        void setLink(Link link) { this.link = link; }
+        void setLink(OmeroRawObjects.Link link) { this.link = link; }
 
         /**
          * Return the {@code OmeroAnnotationType} of this {@code OmeroAnnotation} object.
@@ -243,7 +238,7 @@ final class OmeroRawAnnotations {
          * but not necessarily the person that added it.
          * @return creator of this annotation
          */
-        public Owner getOwner() {
+        public OmeroRawObjects.Owner getOwner() {
             return owner;
         }
 
@@ -252,7 +247,7 @@ final class OmeroRawAnnotations {
          * the same as the owner <b>of</b> the annotation.
          * @return owner who added this annotation
          */
-        public Owner addedBy() {
+        public OmeroRawObjects.Owner addedBy() {
             return link.getOwner();
         }
 
@@ -282,7 +277,7 @@ final class OmeroRawAnnotations {
             super.setType(OmeroRawAnnotationType.TAG.toString());
 
             omero.model.Experimenter user = tag.getOwner().asExperimenter();
-            Owner owner = new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+            OmeroRawObjects.Owner owner = new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
                     user.getLastName()==null ? "" : user.getLastName().getValue(),
@@ -292,8 +287,8 @@ final class OmeroRawAnnotations {
             super.setOwner(owner);
 
             PermissionData permissions = tag.getPermissions();
-            super.setPermissions(new Permission(permissions, client));
-            super.setLink(new Link(owner));
+            super.setPermissions(new OmeroRawObjects.Permission(permissions, client));
+            super.setLink(new OmeroRawObjects.Link(owner));
         }
 }
 
@@ -325,7 +320,7 @@ final class OmeroRawAnnotations {
             super.setType(OmeroRawAnnotationType.MAP.toString());
 
             omero.model.Experimenter user = kvp.getOwner().asExperimenter();
-            Owner owner = new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+            OmeroRawObjects.Owner owner = new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
                     user.getLastName()==null ? "" : user.getLastName().getValue(),
@@ -335,8 +330,8 @@ final class OmeroRawAnnotations {
             super.setOwner(owner);
 
             PermissionData permissions = kvp.getPermissions();
-            super.setPermissions(new Permission(permissions, client));
-            super.setLink(new Link(owner));
+            super.setPermissions(new OmeroRawObjects.Permission(permissions, client));
+            super.setLink(new OmeroRawObjects.Link(owner));
         }
     }
 
@@ -374,7 +369,7 @@ final class OmeroRawAnnotations {
             super.setType(OmeroRawAnnotationType.ATTACHMENT.toString());
 
             omero.model.Experimenter user = file.getOwner().asExperimenter();
-            Owner owner = new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+            OmeroRawObjects.Owner owner = new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
                     user.getLastName()==null ? "" : user.getLastName().getValue(),
@@ -384,8 +379,8 @@ final class OmeroRawAnnotations {
             super.setOwner(owner);
 
             PermissionData permissions = file.getPermissions();
-            super.setPermissions(new Permission(permissions, client));
-            super.setLink(new Link(owner));
+            super.setPermissions(new OmeroRawObjects.Permission(permissions, client));
+            super.setLink(new OmeroRawObjects.Link(owner));
         }
     }
 
@@ -408,7 +403,7 @@ final class OmeroRawAnnotations {
             super.setType(OmeroRawAnnotationType.COMMENT.toString());
 
             omero.model.Experimenter user = comment.getOwner().asExperimenter();
-            Owner owner = new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+            OmeroRawObjects.Owner owner = new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
                     user.getLastName()==null ? "" : user.getLastName().getValue(),
@@ -418,8 +413,8 @@ final class OmeroRawAnnotations {
             super.setOwner(owner);
 
             PermissionData permissions = comment.getPermissions();
-            super.setPermissions(new Permission(permissions, client));
-            super.setLink(new Link(owner));
+            super.setPermissions(new OmeroRawObjects.Permission(permissions, client));
+            super.setLink(new OmeroRawObjects.Link(owner));
         }
 
 
@@ -445,7 +440,7 @@ final class OmeroRawAnnotations {
             super.setType(OmeroRawAnnotationType.RATING.toString());
 
             omero.model.Experimenter user = rating.getOwner().asExperimenter();
-            Owner owner = new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+            OmeroRawObjects.Owner owner = new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
                     user.getLastName()==null ? "" : user.getLastName().getValue(),
@@ -455,8 +450,8 @@ final class OmeroRawAnnotations {
             super.setOwner(owner);
 
             PermissionData permissions = rating.getPermissions();
-            super.setPermissions(new Permission(permissions, client));
-            super.setLink(new Link(owner));
+            super.setPermissions(new OmeroRawObjects.Permission(permissions, client));
+            super.setLink(new OmeroRawObjects.Link(owner));
         }
     }
 }

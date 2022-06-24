@@ -1,30 +1,15 @@
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
-import com.google.gson.JsonObject;
-import loci.common.services.ServiceException;
 import omero.RLong;
 import omero.ServerError;
-import omero.api.IQueryPrx;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
-import omero.model.Dataset;
-import omero.model.ExperimenterGroup;
-import omero.model.GroupExperimenterMap;
 import omero.model.IObject;
-import omero.sys.ParametersI;
-import qupath.lib.io.GsonTools;
 
-import qupath.lib.images.servers.omero.OmeroRawObjects.Owner;
-import qupath.lib.images.servers.omero.OmeroRawObjects.Group;
-
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

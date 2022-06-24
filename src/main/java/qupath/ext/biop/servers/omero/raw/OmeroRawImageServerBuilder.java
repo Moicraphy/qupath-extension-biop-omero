@@ -1,4 +1,4 @@
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +9,6 @@ import qupath.lib.images.servers.ImageServerBuilder;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.*;
-import java.nio.file.AccessDeniedException;
 import java.util.*;
 import java.util.regex.Pattern;
 

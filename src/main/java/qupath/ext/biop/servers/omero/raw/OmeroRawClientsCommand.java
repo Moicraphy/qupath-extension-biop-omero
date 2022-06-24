@@ -19,7 +19,7 @@
  * #L%
  */
 
-package qupath.lib.images.servers.omero;
+package qupath.ext.biop.servers.omero.raw;
 
 import java.net.ConnectException;
 import java.net.URI;
@@ -53,7 +53,6 @@ import qupath.lib.common.ThreadTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.tools.PaneTools;
-import qupath.lib.images.servers.omero.OmeroObjects.OmeroObjectType;
 
 /**
  * Command to manually manage OMERO web clients. This offers the possibility to log in/off
@@ -263,7 +262,7 @@ public class OmeroRawClientsCommand implements Runnable {
                 } else {
                     // Check again the state, in case it wasn't refreshed in time
                     if (client.isLoggedIn()) {
-                        if (OmeroExtension.getOpenedRawBrowsers().containsKey(client)) {
+                        if (OmeroRawExtension.getOpenedRawBrowsers().containsKey(client)) {
                             var confirm = Dialogs.showConfirmDialog("Log out", "A browser for this OMERO server is currently opened and will be closed when logging out. Continue?");
                             if (confirm)
                                 client.logOut();
