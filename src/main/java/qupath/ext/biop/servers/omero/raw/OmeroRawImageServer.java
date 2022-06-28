@@ -50,11 +50,9 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
 import qupath.lib.objects.PathObjects;
 import qupath.lib.regions.ImagePlane;
-import qupath.lib.roi.GeometryROI;
 import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
 import qupath.lib.roi.interfaces.ROI;
-
 
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
@@ -291,7 +289,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			// Try to read the default display colors for each channel from the file
 			List<ChannelData> channelMetadata = client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(), imageID);
 			RenderingDef renderingSettings = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(reader.getPixelsId());
-
+			short nNullChannelName = 0;
 			for (int c = 0; c < nChannels; c++) {
 				ome.xml.model.primitives.Color color = null;
 				String channelName = null;
@@ -300,6 +298,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				try {
 					channelName = channelMetadata.get(c).getName();
 					ChannelBinding binding = renderingSettings.getChannelBinding(c);
+
 					if (binding != null) {
 						channelColor = ColorTools.packARGB(binding.getAlpha().getValue(), binding.getRed().getValue(), binding.getGreen().getValue(), binding.getBlue().getValue());
 					}
@@ -315,21 +314,29 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 						channelColor = ImageChannel.getDefaultChannelColor(c);
 				}
 
-				if (channelName == null || channelName.isBlank())
+				if (channelName == null || channelName.isBlank() || channelName.isEmpty()) {
 					channelName = "Channel " + (c + 1);
+					nNullChannelName++;
+				}
 				channels.add(ImageChannel.getInstance(channelName, channelColor));
 			}
+
 			// Update RGB status if needed - sometimes we might really have an RGB image, but the Bio-Formats flag doesn't show this -
 			// and we want to take advantage of the optimizations where we can
-			if (nChannels == 3 &&
+
+			/*if (nChannels == 3 &&
 					pixelType == PixelType.UINT8 &&
-					channels.equals(ImageChannel.getDefaultRGBChannels())
-			) {
+					channels.equals(ImageChannel.getDefaultRGBChannels())) {
 				isRGB = true;
 				colorModel = ColorModel.getRGBdefault();
 			} else {
 				colorModel = ColorModelFactory.createColorModel(pixelType, channels);
+			}*/
+
+			if (nChannels == 3 && pixelType == PixelType.UINT8 && nNullChannelName == 3) {
+				isRGB = true;
 			}
+			colorModel = ColorModelFactory.createColorModel(pixelType, channels);
 
 			// Try parsing pixel sizes in micrometers
 			double[] timepoints;
