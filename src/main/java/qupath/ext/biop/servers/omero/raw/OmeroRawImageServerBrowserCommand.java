@@ -709,8 +709,6 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
      */
     private List<OmeroRawObjects.OmeroRawObject> getChildren(OmeroRawObjects.OmeroRawObject omeroObj, OmeroRawObjects.Group group) {
         // Check if we already have the children for this OmeroObject (avoid sending request)
-       // if (omeroObj.getType() == OmeroRawObjectType.SERVER && serverChildrenList.size() > 0)
-       //     return serverChildrenList;
         if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER && groupChildrenMap.containsKey(group))
             return groupChildrenMap.get(group);
         else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER && orphanedImageList.size() > 0)
@@ -729,40 +727,23 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 return orphanedImageList;
 
             // Read children and populate maps
-            //System.out.println("Parent object given to have the children: "+omeroObj);
-            //long time = System.currentTimeMillis();
             SecurityContext groupCtx = new SecurityContext(group.getId());
             children = OmeroRawTools.readOmeroObjects(omeroObj, this.client, groupCtx, group);
-            //System.out.println("OmeroRaw...Command-GetChildren around readOmeroObjects time : " +(System.currentTimeMillis()-time));
-            //System.out.println("OmeroObject Parent : "+omeroObj.getType().toString());
-            //if(!children.isEmpty())
-            //    System.out.println("OmeroObject Chilidren : "+children.get(0).getType().toString());
-           // System.out.println("OmeroObject Chilidren size: "+children.size());
-            //System.out.println("children in getChildren(): "+children);
-            //children.forEach(e-> System.out.println("chlid name : "+e.getName()));
-            //children.forEach(e-> System.out.println("child parent : " +e.getParent().getName()));
+            children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
             // If omeroObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
             if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
-                // TODO create this function to get orphaned datasets
-                //time = System.currentTimeMillis();
-                children.addAll(OmeroRawTools.readOrphanedDatasets(client, groupCtx));
-                //System.out.println("OmeroRaw...Command-GetChildren around readOrphanedDatasets time : " +(System.currentTimeMillis()-time));
+                List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawTools.readOrphanedDatasets(client, groupCtx);
+                orphanedDatasets.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
+                children.addAll(orphanedDatasets);
 
                 orphanedImageList.addAll(OmeroRawTools.readOrphanedImages(client, groupCtx));
-                //orphanedFolder.
-                //children.addAll();
-
                 groupChildrenMap.put(group, children);
-                //serverChildrenList = children;
-                //System.out.println("OmeroRaw...Command-getChildren-------> going inside server type");
-                //System.out.println("OmeroRaw...Command-getChildren-------> children : +" +children);
+
             } else if (omeroObj .getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
                 projectMap.put(omeroObj, children);
-               // System.out.println("OmeroRaw...Command-getChildren-------> going inside project type");
             } else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
                 datasetMap.put(omeroObj, children);
-                //System.out.println("OmeroRaw...Command-getChildren-------> going inside dataset type");
             }
         } catch (IOException e) {
             logger.error("Could not fetch server information: {}", e.getLocalizedMessage());
@@ -1204,7 +1185,6 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     OmeroRawObjects.Owner currentOwner = comboOwner.getSelectionModel().getSelectedItem();
 
                     List<OmeroRawObjects.OmeroRawObject> children = OmeroRawImageServerBrowserCommand.this.getChildren(omeroObj, currentGroup);
-                    children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
                     // If server, update list of groups/owners (and comboBoxes)
                     if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
