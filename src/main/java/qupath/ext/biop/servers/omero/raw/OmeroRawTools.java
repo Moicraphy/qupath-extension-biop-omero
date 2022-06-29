@@ -33,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.reflect.Type;
 
 import omero.RLong;
 import omero.ServerError;
@@ -61,6 +62,8 @@ import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.TMACoreObject;
+import qupath.lib.roi.*;
+import qupath.lib.roi.interfaces.ROI;
 
 
 /**
@@ -493,7 +496,13 @@ public final class OmeroRawTools {
        /* if (pathObjects.isEmpty())
             return true;
 
-        String id = server.getId().toString();
+        for (var pathObject: pathObjects) {
+            if (pathObject.isAnnotation()){
+
+            }
+        }*/
+
+        /*String id = server.getId().toString();
         String host = server.getHost();
         String scheme = server.getScheme();
         int port = server.getPort();
