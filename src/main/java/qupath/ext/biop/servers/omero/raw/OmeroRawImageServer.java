@@ -333,7 +333,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				colorModel = ColorModelFactory.createColorModel(pixelType, channels);
 			}*/
 
-			if (nChannels == 3 && pixelType == PixelType.UINT8 && nNullChannelName == 3) {
+			if (nChannels == 3 && pixelType == PixelType.UINT8 && (nNullChannelName == 3 || channels.equals(ImageChannel.getDefaultRGBChannels()))) {
 				isRGB = true;
 			}
 			colorModel = ColorModelFactory.createColorModel(pixelType, channels);
