@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.gson.*;
+import omero.model.Roi;
 import org.locationtech.jts.geom.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,10 +49,9 @@ class OmeroRawShapes {
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawShapes.class);
 
 
-
-    public JsonElement serialize(PathObject src, Type typeOfSrc, JsonSerializationContext context) {
+    public static Roi convertQuPathRoiToOmeroRoi(PathObject src) {
         ROI roi = src.getROI();
-        String type = null;
+
         OmeroRawShape shape;
         if (roi instanceof RectangleROI) {
             shape = new Rectangle(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight(), roi.getC(), roi.getZ(), roi.getT());
@@ -70,7 +70,7 @@ class OmeroRawShapes {
             shape = new Polygon(pointsToString(roi.getAllPoints()), roi.getC(), roi.getZ(), roi.getT());
 
         } else if (roi instanceof PointsROI) {
-            JsonElement[] points = new JsonElement[roi.getNumPoints()];
+            //JsonElement[] points = new JsonElement[roi.getNumPoints()];
             List<Point2> roiPoints = roi.getAllPoints();
             PathClass pathClass = src.getPathClass();
 
@@ -78,9 +78,9 @@ class OmeroRawShapes {
                 shape = new Point(roiPoints.get(i).getX(), roiPoints.get(i).getY(), roi.getC(), roi.getZ(), roi.getT());
                 shape.setText(src.getName() != null ? src.getName() : "");
                 shape.setFillColor(pathClass != null ? ARGBToRGBA(src.getPathClass().getColor()) : -256);
-                points[i] = context.serialize(shape, Point.class);
+                //points[i] = context.serialize(shape, Point.class);
             }
-            return context.serialize(points);
+            return null;//context.serialize(points);
 
         } else if (roi instanceof GeometryROI) {
             // MultiPolygon
@@ -98,16 +98,16 @@ class OmeroRawShapes {
 
             rois = splitHolesAndShape(rois);
 
-            JsonElement[] polygons = new JsonElement[rois.size()];
+           // JsonElement[] polygons = new JsonElement[rois.size()];
 
             for (int i = 0; i < rois.size(); i++) {
                 shape = new Polygon(pointsToString(rois.get(i).getAllPoints()), roi.getC(), roi.getZ(), roi.getT());
                 shape.setText(src.getName() != null ? src.getName() : "");
                 shape.setFillColor(pathClass != null ? ARGBToRGBA(pathClass.getColor()) : -256);
-                polygons[i] = context.serialize(shape, Polygon.class);
+               // polygons[i] = context.serialize(shape, Polygon.class);
             }
 
-            return context.serialize(polygons);
+            return null;//context.serialize(polygons);
 
         } else {
             logger.warn("Unsupported type {}", roi.getRoiName());

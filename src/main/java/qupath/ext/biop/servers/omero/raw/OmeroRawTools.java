@@ -24,6 +24,9 @@ package qupath.ext.biop.servers.omero.raw;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -35,8 +38,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.lang.reflect.Type;
 
+
+import fr.igred.omero.Client;
+import fr.igred.omero.GatewayWrapper;
+import fr.igred.omero.meta.ExperimenterWrapper;
 import omero.RLong;
 import omero.ServerError;
+import omero.gateway.Gateway;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
@@ -55,6 +63,7 @@ import com.google.gson.JsonObject;
 import javafx.scene.Node;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.IconFactory;
+import qupath.lib.images.servers.ImageServer;
 import qupath.lib.io.GsonTools;
 import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.PathCellObject;
@@ -64,6 +73,7 @@ import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.TMACoreObject;
 import qupath.lib.roi.*;
 import qupath.lib.roi.interfaces.ROI;
+import qupath.lib.scripting.QP;
 
 
 /**
@@ -479,6 +489,37 @@ public final class OmeroRawTools {
             logger.warn("Could not fetch {} information: {}", category, ex.getLocalizedMessage());
             return null;
         }
+    }
+
+    /**
+     * This method creates an instance of {@code fr.igred.omero.Client} object to get access to the full
+     * simple-omero-client API, developped by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
+     *
+     * To build the Client constructor without asking the user his credentials, java reflection methods are invoked to
+     * get access to the private constructor (Client(Gateway gateway, SecurityContext ctx, ExperimenterWrapper user))
+     * Parameters for this private constructor are known since the user previously
+     * logged-in and connection information, except credentials, is saved.
+     *
+     *
+     * @return the Client object
+     * @throws ClassNotFoundException
+     * @throws NoSuchMethodException
+     * @throws InvocationTargetException
+     * @throws InstantiationException
+     * @throws IllegalAccessException
+     */
+    public static Client getSimpleOmeroClientInstance() throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        // get the current OmeroRawClient
+        ImageServer<?> server = QP.getCurrentServer();
+        OmeroRawClient omerorawclient = OmeroRawClients.getClientFromServerURI(server.getURIs().iterator().next());
+
+        // build the fr.igred.omero.Client object using reflection
+        Class clientClazz = Class.forName("fr.igred.omero.Client", false, QuPathGUI.getExtensionClassLoader());
+        Constructor<Client> constructor = clientClazz.getDeclaredConstructor(Gateway.class, SecurityContext.class, ExperimenterWrapper.class);
+        constructor.setAccessible(true);
+        Client simpleClient = constructor.newInstance(omerorawclient.getGateway(), omerorawclient.getContext(), new ExperimenterWrapper(omerorawclient.getGateway().getLoggedInUser()));
+
+        return simpleClient;
     }
 
     /**
