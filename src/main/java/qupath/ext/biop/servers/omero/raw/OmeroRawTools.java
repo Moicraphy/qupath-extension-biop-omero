@@ -495,30 +495,22 @@ public final class OmeroRawTools {
      * This method creates an instance of {@code fr.igred.omero.Client} object to get access to the full
      * simple-omero-client API, developped by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
      *
-     * To build the Client constructor without asking the user his credentials, java reflection methods are invoked to
-     * get access to the private constructor (Client(Gateway gateway, SecurityContext ctx, ExperimenterWrapper user))
-     * Parameters for this private constructor are known since the user previously
-     * logged-in and connection information, except credentials, is saved.
-     *
-     *
      * @return the Client object
-     * @throws ClassNotFoundException
-     * @throws NoSuchMethodException
-     * @throws InvocationTargetException
-     * @throws InstantiationException
-     * @throws IllegalAccessException
      */
-    public static Client getSimpleOmeroClientInstance() throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    public static Client getSimpleOmeroClientInstance() throws DSOutOfServiceException {
         // get the current OmeroRawClient
         ImageServer<?> server = QP.getCurrentServer();
-        OmeroRawClient omerorawclient = OmeroRawClients.getClientFromServerURI(server.getURIs().iterator().next());
+        OmeroRawClient omerorawclient = OmeroRawClients.getClientFromImageURI(server.getURIs().iterator().next());
 
-        // build the fr.igred.omero.Client object using reflection
+        Client simpleClient = new Client();
+        simpleClient.connect(omerorawclient.getServerURI().getHost(), omerorawclient.getServerURI().getPort(), omerorawclient.getGateway().getSessionId(omerorawclient.getGateway().getLoggedInUser()));
+
+       /* // build the fr.igred.omero.Client object using reflection
         Class clientClazz = Class.forName("fr.igred.omero.Client", false, QuPathGUI.getExtensionClassLoader());
         Constructor<Client> constructor = clientClazz.getDeclaredConstructor(Gateway.class, SecurityContext.class, ExperimenterWrapper.class);
         constructor.setAccessible(true);
         Client simpleClient = constructor.newInstance(omerorawclient.getGateway(), omerorawclient.getContext(), new ExperimenterWrapper(omerorawclient.getGateway().getLoggedInUser()));
-
+*/
         return simpleClient;
     }
 
