@@ -502,15 +502,10 @@ public final class OmeroRawTools {
         ImageServer<?> server = QP.getCurrentServer();
         OmeroRawClient omerorawclient = OmeroRawClients.getClientFromImageURI(server.getURIs().iterator().next());
 
+        // build the simple-omero-client using the ID of the current session
         Client simpleClient = new Client();
         simpleClient.connect(omerorawclient.getServerURI().getHost(), omerorawclient.getServerURI().getPort(), omerorawclient.getGateway().getSessionId(omerorawclient.getGateway().getLoggedInUser()));
 
-       /* // build the fr.igred.omero.Client object using reflection
-        Class clientClazz = Class.forName("fr.igred.omero.Client", false, QuPathGUI.getExtensionClassLoader());
-        Constructor<Client> constructor = clientClazz.getDeclaredConstructor(Gateway.class, SecurityContext.class, ExperimenterWrapper.class);
-        constructor.setAccessible(true);
-        Client simpleClient = constructor.newInstance(omerorawclient.getGateway(), omerorawclient.getContext(), new ExperimenterWrapper(omerorawclient.getGateway().getLoggedInUser()));
-*/
         return simpleClient;
     }
 
