@@ -24,8 +24,11 @@ package qupath.ext.biop.servers.omero.raw;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import omero.gateway.exception.DSAccessException;
+import omero.gateway.exception.DSOutOfServiceException;
 import org.apache.commons.lang3.StringUtils;
 
 import javafx.scene.control.Label;
@@ -116,7 +119,6 @@ public class OmeroRawWritePathObjectsCommand implements Runnable {
 
         // Write path object(s)
         try {
-            //TODO change the writePathObject function to fit with omeroTools.writePathObjects with OmeroRawImageServer and not with the web
             OmeroRawTools.writePathObjects(objs, omeroServer);
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),
@@ -124,6 +126,8 @@ public class OmeroRawWritePathObjectsCommand implements Runnable {
                     (objs.size() == 1 ? "was" : "were")));
         } catch (IOException ex) {
             Dialogs.showErrorNotification("Could not send " + objectString, ex.getLocalizedMessage());
+        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
+            throw new RuntimeException(e);
         }
     }
 }

@@ -21,42 +21,38 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.lang.reflect.Type;
 
 
 import fr.igred.omero.Client;
-import fr.igred.omero.GatewayWrapper;
-import fr.igred.omero.meta.ExperimenterWrapper;
 import omero.RLong;
 import omero.ServerError;
-import omero.gateway.Gateway;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
+import omero.gateway.facility.DataManagerFacility;
 import omero.gateway.facility.MetadataFacility;
+import omero.gateway.facility.ROIFacility;
 import omero.gateway.model.*;
 import omero.model.*;
+import omero.model.Image;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -65,14 +61,7 @@ import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.io.GsonTools;
-import qupath.lib.objects.PathAnnotationObject;
-import qupath.lib.objects.PathCellObject;
-import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
-import qupath.lib.objects.PathObjects;
-import qupath.lib.objects.TMACoreObject;
-import qupath.lib.roi.*;
-import qupath.lib.roi.interfaces.ROI;
 import qupath.lib.scripting.QP;
 
 
@@ -515,62 +504,31 @@ public final class OmeroRawTools {
      *
      * @param pathObjects
      * @param server
-     * @return success
      * @throws IOException
      */
-    public static boolean writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server) throws IOException {
+    public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         // TODO: What to do if token expires?
         // TODO: What if we have more object than the limit accepted by the OMERO API?
-       /* if (pathObjects.isEmpty())
-            return true;
 
-        for (var pathObject: pathObjects) {
-            if (pathObject.isAnnotation()){
-
+        OmeroRawClient client = server.getClient();
+        Collection<ROIData> omeroRois = new ArrayList<>();
+        pathObjects.forEach(pathObject->{
+            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject);
+            if(!(shapes==null) && !(shapes.isEmpty())) {
+                shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
+                ROIData roiData = new ROIData();
+                shapes.forEach(roiData::addShapeData);
+                omeroRois.add(roiData);
             }
-        }*/
+        });
 
-        /*String id = server.getId().toString();
-        String host = server.getHost();
-        String scheme = server.getScheme();
-        int port = server.getPort();
+        if(!(omeroRois.isEmpty())) {
+            client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
+        }
+        else {
+            logger.info("There is no Annotations to import on OMERO");
+        }
 
-        // TODO: probably should do this in one line
-        Gson gsonTMAs  = null;///new GsonBuilder().registerTypeAdapter(TMACoreObject.class, new OmeroShapes.GsonShapeSerializer()).serializeSpecialFloatingPointValues().setLenient().create();
-        Gson gsonAnnotation = null;///new GsonBuilder().registerTypeAdapter(PathAnnotationObject.class, new OmeroShapes.GsonShapeSerializer()).setLenient().create();
-        Gson gsonDetection  = null;///new GsonBuilder().registerTypeAdapter(PathDetectionObject.class, new OmeroShapes.GsonShapeSerializer()).serializeSpecialFloatingPointValues().setLenient().create();
-
-        // Iterate through PathObjects and get their JSON representation
-        List<String> jsonList = new ArrayList<>();
-        for (var pathObject: pathObjects) {
-            String myJson = "";
-            if (pathObject.isTMACore())
-                myJson = gsonTMAs.toJson(pathObject);
-            else if (pathObject.isAnnotation())
-                myJson = gsonAnnotation.toJson(pathObject);
-            else if (pathObject.isDetection()) {
-                // TODO: ugly design, should improve this
-                if (pathObject instanceof PathCellObject) {
-                    var detTemp = PathObjects.createDetectionObject(pathObject.getROI());
-                    detTemp.setPathClass(pathObject.getPathClass());
-                    detTemp.setColorRGB(pathObject.getColorRGB());
-                    detTemp.setName(pathObject.getName());
-                    pathObject = detTemp;
-                }
-                myJson = gsonDetection.toJson(pathObject);
-            } else
-                throw new IOException(String.format("Type not supported: %s", pathObject.getClass()));
-
-            try {
-                // See if resulting JSON is a list (e.g. Points/MultiPolygon)
-                List<JsonElement> roiList = Arrays.asList(GsonTools.getInstance().fromJson(myJson, JsonElement[].class));
-                roiList.forEach(e -> jsonList.add(e.toString()));
-            } catch (Exception ex) {
-                jsonList.add(myJson);
-            }
-        }*/
-
-        return false;//OmeroRequests.requestWriteROIs(scheme, host, port, Integer.parseInt(id), server.getClient().getToken(), jsonList);
     }
 
     /**
