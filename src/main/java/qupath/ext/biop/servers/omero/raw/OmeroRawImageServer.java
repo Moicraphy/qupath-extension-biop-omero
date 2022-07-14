@@ -49,6 +49,8 @@ import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
 import qupath.lib.objects.PathObjects;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.objects.classes.PathClassFactory;
 import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
@@ -69,6 +71,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * ImageServer that reads pixels using the OMERO web API.
@@ -755,7 +758,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	public Collection<PathObject> readPathObjects() {
 		List<PathObject> list = new ArrayList<>();
 		// get ROIs from OMERO.web
-		List<ROIResult> roiList = null;
+		List<ROIResult> roiList;
 
 		try {
 			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
@@ -770,6 +773,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			// Convert OMERO ROIs into QuPath ROIs
 			for (ROIData roiDatum : roiData) {
 				List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
+				String qpPath = getROIPathClass(roiDatum);
 
 				if (!roi.isEmpty()) {
 					// get the number of ROI "Point" in all shapes attached the current ROI
@@ -813,8 +817,23 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 						}
 					}
 
-					// Convert QuPath ROI to QuPath PathObject
-					list.add(PathObjects.createAnnotationObject(finalROI));
+					String[] tokens = (qpPath.isBlank() || qpPath.isEmpty()) ? null : qpPath.split(":");
+					if(!(tokens == null) && tokens.length == 2){
+						if(tokens[0].equals("Detection") || tokens[0].equals("detection")){
+							if(tokens[1].equals("NoClass"))
+								list.add(PathObjects.createDetectionObject(finalROI));
+							else
+								list.add(PathObjects.createDetectionObject(finalROI, PathClassFactory.getPathClass(tokens[1])));
+						}else {
+							if(tokens[1].equals("NoClass"))
+								list.add(PathObjects.createAnnotationObject(finalROI));
+							else
+								list.add(PathObjects.createAnnotationObject(finalROI, PathClassFactory.getPathClass(tokens[1])));
+						}
+					}else {
+						// Convert QuPath ROI to QuPath PathObject
+						list.add(PathObjects.createAnnotationObject(finalROI));
+					}
 				}
 			}
 		}
@@ -862,6 +881,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
 												s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
 												ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
 
 			}else if(shape instanceof Polygon){
 				PolygonData s = new PolygonData(shape);
@@ -920,6 +940,69 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 																	 Math.min(roi1.getT(), roi2.getT())));
 	}
 
+	/**
+	 * convert Omero ROIs To QuPath ROIs.
+	 *
+	 * *********************** BE CAREFUL *****************************
+	 * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
+	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
+	 * ****************************************************************
+	 *
+	 * @param roiData
+	 * @return list of QuPath ROIs
+	 */
+	public String getROIPathClass(ROIData roiData){
+		// get the ROI
+		Roi omeROI = (Roi) roiData.asIObject();
+
+		// get the shapes contained in the ROI (i.e. holes or something else)
+		List<Shape> shapes = omeROI.copyShapes();
+		List<String> list = new ArrayList<>();
+
+		// Iterate on shapes, select the correct instance and create the corresponding QuPath ROI
+		for (Shape shape:shapes) {
+			if(shape instanceof Rectangle){
+				RectangleData s = new RectangleData(shape);
+				list.add(s.getText());
+			}else if(shape instanceof Ellipse){
+				EllipseData s = new EllipseData(shape);
+				list.add(s.getText());
+			}else if(shape instanceof Point){
+				PointData s = new PointData(shape);
+				list.add(s.getText());
+			}else if(shape instanceof Polyline){
+				PolylineData s = new PolylineData(shape);
+				list.add(s.getText());
+			}else if(shape instanceof Polygon){
+				PolygonData s = new PolygonData(shape);
+				list.add(s.getText());
+			}else if(shape instanceof Label){
+				logger.warn("No ROIs created (requested label shape is unsupported)");
+				//s=new TextData(shape);
+			}else if(shape instanceof Line){
+				LineData s = new LineData(shape);
+				list.add(s.getText());
+			}else if(shape instanceof Mask){
+				logger.warn("No ROIs created (requested Mask shape is not supported yet)");
+				//s=new MaskData(shape);
+			}else{
+				logger.warn("Unsupported shape ");
+			}
+		}
+
+		String pathClass = "";
+		if(!list.isEmpty()) {
+			pathClass = list.get(0);
+			for (int i = 0; i < list.size() - 1; i++) {
+				if (!(list.get(i).equals(list.get(i + 1)))) {
+					logger.warn("Different classes are set for two shapes link to the same parent");
+					logger.warn("The following class will be assigned for all child object -> "+pathClass);
+				}
+			}
+		}
+
+		return pathClass;
+	}
 
 
 
