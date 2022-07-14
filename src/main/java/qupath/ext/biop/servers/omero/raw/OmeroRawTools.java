@@ -507,8 +507,8 @@ public final class OmeroRawTools {
      * @throws IOException
      */
     public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
-        // TODO: What to do if token expires?
-        // TODO: What if we have more object than the limit accepted by the OMERO API?
+        //TODO: What to do if token expires?
+        //TODO: What if we have more object than the limit accepted by the OMERO API?
 
         OmeroRawClient client = server.getClient();
         Collection<ROIData> omeroRois = new ArrayList<>();

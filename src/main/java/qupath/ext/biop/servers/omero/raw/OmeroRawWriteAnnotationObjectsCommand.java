@@ -45,13 +45,13 @@ import qupath.lib.objects.PathObject;
  * @author Melvin Gelbard
  *
  */
-public class OmeroRawWritePathObjectsCommand implements Runnable {
+public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
     private final String title = "Send objects to OMERO";
 
     private QuPathGUI qupath;
 
-    OmeroRawWritePathObjectsCommand(QuPathGUI qupath) {
+    OmeroRawWriteAnnotationObjectsCommand(QuPathGUI qupath) {
         this.qupath = qupath;
     }
 
