@@ -757,23 +757,26 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	@Override
 	public Collection<PathObject> readPathObjects() {
 		List<PathObject> list = new ArrayList<>();
-		// get ROIs from OMERO.web
 		List<ROIResult> roiList;
 
+		// get ROIs from OMERO.web
 		try {
 			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
 		} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
 			throw new RuntimeException(e);
 		}
 
-		// Convert them into ROIData
+
 		for (ROIResult roiResult : roiList) {
+			// Convert them into ROIData
 			List<ROIData> roiData = new ArrayList<>(roiResult.getROIs());
 
-			// Convert OMERO ROIs into QuPath ROIs
+
 			for (ROIData roiDatum : roiData) {
+				// Convert OMERO ROIs into QuPath ROIs
 				List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
-				String qpPath = getROIPathClass(roiDatum);
+				// get the assigned class from QuPath ROIs
+				String qpClass = getROIPathClass(roiDatum);
 
 				if (!roi.isEmpty()) {
 					// get the number of ROI "Point" in all shapes attached the current ROI
@@ -817,7 +820,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 						}
 					}
 
-					String[] tokens = (qpPath.isBlank() || qpPath.isEmpty()) ? null : qpPath.split(":");
+					// get the type and class of PathObject.
+					// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
+					// assign th read class to the pathObject, if there is one
+					String[] tokens = (qpClass.isBlank() || qpClass.isEmpty()) ? null : qpClass.split(":");
 					if(!(tokens == null) && tokens.length == 2){
 						if(tokens[0].equals("Detection") || tokens[0].equals("detection")){
 							if(tokens[1].equals("NoClass"))
@@ -831,13 +837,11 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 								list.add(PathObjects.createAnnotationObject(finalROI, PathClassFactory.getPathClass(tokens[1])));
 						}
 					}else {
-						// Convert QuPath ROI to QuPath PathObject
 						list.add(PathObjects.createAnnotationObject(finalROI));
 					}
 				}
 			}
 		}
-
 		return list;
 	}
 
@@ -941,12 +945,9 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	}
 
 	/**
-	 * convert Omero ROIs To QuPath ROIs.
-	 *
-	 * *********************** BE CAREFUL *****************************
-	 * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
-	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
-	 * ****************************************************************
+	 * Read the comment attach to the current ROI in OMERO. If the ROI has more than one shape, the first comment is
+	 * taken as reference. A warning is displayed to the user because all comments in the nested hierarchy should be
+	 * the same.
 	 *
 	 * @param roiData
 	 * @return list of QuPath ROIs
@@ -959,7 +960,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		List<Shape> shapes = omeROI.copyShapes();
 		List<String> list = new ArrayList<>();
 
-		// Iterate on shapes, select the correct instance and create the corresponding QuPath ROI
+		// Iterate on shapes, select the correct instance and get the comment attached to it.
 		for (Shape shape:shapes) {
 			if(shape instanceof Rectangle){
 				RectangleData s = new RectangleData(shape);
@@ -990,6 +991,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			}
 		}
 
+		// get the first comment
 		String pathClass = "";
 		if(!list.isEmpty()) {
 			pathClass = list.get(0);

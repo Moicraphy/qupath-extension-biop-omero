@@ -44,7 +44,6 @@ import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
-import omero.gateway.facility.DataManagerFacility;
 import omero.gateway.facility.MetadataFacility;
 import omero.gateway.facility.ROIFacility;
 import omero.gateway.model.*;
@@ -504,7 +503,6 @@ public final class OmeroRawTools {
      *
      * @param pathObjects
      * @param server
-     * @throws IOException
      */
     public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         //TODO: What to do if token expires?
@@ -513,8 +511,10 @@ public final class OmeroRawTools {
         OmeroRawClient client = server.getClient();
         Collection<ROIData> omeroRois = new ArrayList<>();
         pathObjects.forEach(pathObject->{
+            // computes OMERO-readable ROIs
             List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject);
             if(!(shapes==null) && !(shapes.isEmpty())) {
+                // set the ROI color according to the class assigned to the corresponding PathObject
                 shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
                 ROIData roiData = new ROIData();
                 shapes.forEach(roiData::addShapeData);
@@ -522,11 +522,12 @@ public final class OmeroRawTools {
             }
         });
 
+        // import ROIs on OMERO
         if(!(omeroRois.isEmpty())) {
             client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
         }
         else {
-            logger.info("There is no Annotations to import on OMERO");
+            logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
         }
 
     }
