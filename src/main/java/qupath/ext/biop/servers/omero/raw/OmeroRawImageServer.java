@@ -63,6 +63,7 @@ import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.*;
 import java.util.*;
@@ -766,7 +767,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			throw new RuntimeException(e);
 		}
 
-
 		for (ROIResult roiResult : roiList) {
 			// Convert them into ROIData
 			List<ROIData> roiData = new ArrayList<>(roiResult.getROIs());
@@ -777,6 +777,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
 				// get the assigned class from QuPath ROIs
 				String qpClass = getROIPathClass(roiDatum);
+
 
 				if (!roi.isEmpty()) {
 					// get the number of ROI "Point" in all shapes attached the current ROI
@@ -845,6 +846,17 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		return list;
 	}
 
+	/*private static void setPathObjectParent(PathObject pathObject){
+
+		try {
+			Field f1 = PathObject.class.getDeclaredField("parent");
+			System.out.println(f1);
+			f1.setAccessible(true);
+			System.out.println("field: " + f1.get(pathObject));
+		} catch (IllegalAccessException | NoSuchFieldException e) {
+			throw new RuntimeException(e);
+		}
+	}*/
 
 	/**
 	 * convert Omero ROIs To QuPath ROIs.

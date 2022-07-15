@@ -25,6 +25,8 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -509,25 +511,119 @@ public final class OmeroRawTools {
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
         OmeroRawClient client = server.getClient();
-        Collection<ROIData> omeroRois = new ArrayList<>();
-        pathObjects.forEach(pathObject->{
-            // computes OMERO-readable ROIs
-            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject);
-            if(!(shapes==null) && !(shapes.isEmpty())) {
-                // set the ROI color according to the class assigned to the corresponding PathObject
-                shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
-                ROIData roiData = new ROIData();
-                shapes.forEach(roiData::addShapeData);
-                omeroRois.add(roiData);
-            }
-        });
 
-        // import ROIs on OMERO
-        if(!(omeroRois.isEmpty())) {
-            client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
-        }
-        else {
-            logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
+        // if the pathObject is a detection
+        if(!pathObjects.isEmpty() && pathObjects.iterator().next().isDetection()){
+            Map<PathObject, Collection<PathObject>> parentChlidMap = new HashMap<>();
+
+            // create a map< Parent Annotation object, List of child detection objects>
+            pathObjects.forEach(pathObject->{
+                PathObject parent = pathObject.getParent();
+
+                if(parentChlidMap.containsKey(parent)){
+                    Collection<PathObject> temp = parentChlidMap.get(parent);
+                    temp.add(pathObject);
+                    parentChlidMap.replace(parent, parentChlidMap.get(parent), temp);
+                }
+                else{
+                    Collection<PathObject> child = new ArrayList<>();
+                    child.add(pathObject);
+                    parentChlidMap.put(parent, child);
+                }
+            });
+
+            parentChlidMap.keySet().forEach(parent->{
+                List<ShapeData> shapes;
+                Long ROIParentID = 0L;
+
+                // send first the parent object to OMERO
+                // get the newly created ID (parent ID)
+                if(!(parent == null)) {
+                    Collection<ROIData> parentOmeroROIs = new ArrayList<>();
+                    // QuPath-OMERO conversion
+                    shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(parent, "NoParent");
+                    if (!(shapes == null) && !(shapes.isEmpty())) {
+                        // set the ROI color according to the class assigned to the corresponding PathObject
+                        shapes.forEach(shape -> shape.getShapeSettings().setStroke(parent.getPathClass() == null ? Color.WHITE : new Color(parent.getPathClass().getColor())));
+                        ROIData roiData = new ROIData();
+                        shapes.forEach(roiData::addShapeData);
+                        parentOmeroROIs.add(roiData);
+                    }
+
+                    // sending to OMERO
+                    if(!(parentOmeroROIs.isEmpty())) {
+                        try {
+                            Collection<ROIData> roidata = client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), parentOmeroROIs);
+                            if(!(roidata == null) && !(roidata.isEmpty())){
+                                ROIParentID = roidata.iterator().next().getId();
+                            }else
+                                logger.info("The parent ROI has not been sent to OMERO");
+
+                        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    else
+                        logger.info("The parent ROI do not contains any shape to send to OMERO");
+                }
+                else
+                    logger.info("No parent for this detection object");
+
+                Collection<ROIData> childOmeroROIs = new ArrayList<>();
+                List<ShapeData> childShapes = new ArrayList<>();
+                Long finalROIParentID = ROIParentID;
+
+                // secondly send all the child object to OMERO
+                // each child object will have the ID of its parent in the comment
+                parentChlidMap.get(parent).forEach(child->{
+                    // QuPath-OMERO conversion
+                    List<ShapeData> childShapesTemp = OmeroRawShapes.convertQuPathRoiToOmeroRoi(child, finalROIParentID == 0 ? "NoParent" :Long.toString(finalROIParentID));
+                    if(!(childShapesTemp==null) && !(childShapesTemp.isEmpty())) {
+                        // set the ROI color according to the class assigned to the corresponding PathObject
+                        childShapesTemp.forEach(shape -> shape.getShapeSettings().setStroke(child.getPathClass() == null ? Color.WHITE : new Color(child.getPathClass().getColor())));
+                        childShapes.addAll(childShapesTemp);
+                    }
+                });
+
+                ROIData roiData = new ROIData();
+                if(!(childShapes.isEmpty())) {
+                    childShapes.forEach(roiData::addShapeData);
+                    childOmeroROIs.add(roiData);
+                }
+
+                // sending to OMERO
+                if(!(childOmeroROIs.isEmpty())) {
+                    try {
+                        client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), childOmeroROIs);
+                    } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                else {
+                    logger.info("There is no child detection to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
+                }
+            });
+        }else {
+            // for each annotation object, send it to OMERO without any parent
+            Collection<ROIData> omeroRois = new ArrayList<>();
+            pathObjects.forEach(pathObject -> {
+                // computes OMERO-readable ROIs
+                List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, "NoParent");
+                if (!(shapes == null) && !(shapes.isEmpty())) {
+                    // set the ROI color according to the class assigned to the corresponding PathObject
+                    shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
+                    ROIData roiData = new ROIData();
+                    shapes.forEach(roiData::addShapeData);
+                    omeroRois.add(roiData);
+                }
+            });
+
+            // import ROIs on OMERO
+            if (!(omeroRois.isEmpty())) {
+                client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
+            } else {
+                logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
+            }
         }
 
     }
