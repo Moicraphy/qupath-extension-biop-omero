@@ -55,6 +55,7 @@ import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
 import qupath.lib.roi.interfaces.ROI;
+import qupath.lib.scripting.QP;
 
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
@@ -757,7 +758,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 */
 	@Override
 	public Collection<PathObject> readPathObjects() {
-		List<PathObject> list = new ArrayList<>();
 		List<ROIResult> roiList;
 
 		// get ROIs from OMERO.web
@@ -767,96 +767,118 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			throw new RuntimeException(e);
 		}
 
+		if(roiList == null || roiList.isEmpty())
+			return new ArrayList<>();
+
+		// Convert them into ROIData
+		List<ROIData> roiData = new ArrayList<>();
 		for (ROIResult roiResult : roiList) {
-			// Convert them into ROIData
-			List<ROIData> roiData = new ArrayList<>(roiResult.getROIs());
+			roiData.addAll(roiResult.getROIs());
+		}
 
+		if(roiData.isEmpty())
+			return new ArrayList<>();
 
-			for (ROIData roiDatum : roiData) {
-				// Convert OMERO ROIs into QuPath ROIs
-				List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
-				// get the assigned class from QuPath ROIs
-				String qpClass = getROIPathClass(roiDatum);
+		Map<Long,Long> idParentIdMap = new HashMap<>();
+		Map<Long,PathObject> idObjectMap = new HashMap<>();
 
+		for (ROIData roiDatum : roiData) {
+			// convert OMERO ROIs to QuPath ROIs
+			ROI finalROI = roiConversion(roiDatum);
 
-				if (!roi.isEmpty()) {
-					// get the number of ROI "Point" in all shapes attached the current ROI
-					// Points are not supported during the XOR operation ; they are processed differently.
-					long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
-					ROI finalROI = roi.get(0);
-
-					// process ROIs with multiple points only
-					if (nbPoints == roi.size() && roi.size() > 1) {
-						// create a pointsROI instance with multiple points
-						finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
-								roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
-								ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
-					}
-
-					// Process ROIs with multiple shapes, containing one or more points
-					else if (nbPoints > 0 && roi.size() > 1) {
-						List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
-						List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
-
-						// create a pointsROI instance with multiple points
-						ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
-								pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
-								ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
-
-						// make a complex roi by applying XOR operation between shapes
-						finalROI = notPointsList.get(0);
-						for (int k = 1; k < notPointsList.size(); k++) {
-							finalROI = linkShapes(finalROI, notPointsList.get(k));
-						}
-
-						// make the union between points and complex ROI
-						finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
-					}
-
-					// Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
-					else {
-						for (int k = 1; k < roi.size(); k++) {
-							// make a complex roi by applying XOR operation between shapes
-							finalROI = linkShapes(finalROI, roi.get(k));
-						}
-					}
-
-					// get the type and class of PathObject.
-					// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
-					// assign th read class to the pathObject, if there is one
-					String[] tokens = (qpClass.isBlank() || qpClass.isEmpty()) ? null : qpClass.split(":");
-					if(!(tokens == null) && tokens.length == 2){
-						if(tokens[0].equals("Detection") || tokens[0].equals("detection")){
-							if(tokens[1].equals("NoClass"))
-								list.add(PathObjects.createDetectionObject(finalROI));
-							else
-								list.add(PathObjects.createDetectionObject(finalROI, PathClassFactory.getPathClass(tokens[1])));
-						}else {
-							if(tokens[1].equals("NoClass"))
-								list.add(PathObjects.createAnnotationObject(finalROI));
-							else
-								list.add(PathObjects.createAnnotationObject(finalROI, PathClassFactory.getPathClass(tokens[1])));
-						}
-					}else {
-						list.add(PathObjects.createAnnotationObject(finalROI));
-					}
-				}
+			if (!(finalROI == null)) {
+				// get the type and assigned class from OMERO ROIs
+				String[] roiComment = getROIComment(roiDatum);
+				// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
+				idObjectMap.put(roiDatum.getId(),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1]));
+				// populate parent map
+				Long parentID = Long.parseLong(roiComment[2]);
+				idParentIdMap.put(roiDatum.getId(),parentID);
 			}
 		}
+
+		// set the parent/child hierarchy and add objects without any parent to the final list
+		List<PathObject> list = new ArrayList<>();
+
+		idParentIdMap.keySet().forEach(objID->{
+			if(idParentIdMap.get(objID) > 0){
+				if(!(idObjectMap.get(objID) == null))
+					idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
+			}else
+				list.add(idObjectMap.get(objID));
+
+		});
+
 		return list;
 	}
 
-	/*private static void setPathObjectParent(PathObject pathObject){
 
-		try {
-			Field f1 = PathObject.class.getDeclaredField("parent");
-			System.out.println(f1);
-			f1.setAccessible(true);
-			System.out.println("field: " + f1.get(pathObject));
-		} catch (IllegalAccessException | NoSuchFieldException e) {
-			throw new RuntimeException(e);
+	private static PathObject createPathObjectFromRoi(ROI roi, String roiType, String roiClass){
+		PathObject p;
+		if (roiType.equals("Detection")) {
+			if (roiClass.equals("NoClass"))
+				p = PathObjects.createDetectionObject(roi);
+			else
+				p = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
+		} else {
+			if (roiClass.equals("NoClass"))
+				p = PathObjects.createAnnotationObject(roi);
+			else
+				p = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
 		}
-	}*/
+		return p;
+	}
+
+
+	private static ROI roiConversion(ROIData roiDatum) {
+		// Convert OMERO ROIs into QuPath ROIs
+		List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
+
+		if (!roi.isEmpty()) {
+			// get the number of ROI "Point" in all shapes attached the current ROI
+			// Points are not supported during the XOR operation ; they are processed differently.
+			long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
+			ROI finalROI = roi.get(0);
+
+			// process ROIs with multiple points only
+			if (nbPoints == roi.size() && roi.size() > 1) {
+				// create a pointsROI instance with multiple points
+				finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
+						roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
+						ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
+			}
+
+			// Process ROIs with multiple shapes, containing one or more points
+			else if (nbPoints > 0 && roi.size() > 1) {
+				List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
+				List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
+
+				// create a pointsROI instance with multiple points
+				ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
+						pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
+						ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
+
+				// make a complex roi by applying XOR operation between shapes
+				finalROI = notPointsList.get(0);
+				for (int k = 1; k < notPointsList.size(); k++) {
+					finalROI = linkShapes(finalROI, notPointsList.get(k));
+				}
+
+				// make the union between points and complex ROI
+				finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
+			}
+
+			// Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
+			else {
+				for (int k = 1; k < roi.size(); k++) {
+					// make a complex roi by applying XOR operation between shapes
+					finalROI = linkShapes(finalROI, roi.get(k));
+				}
+			}
+			return finalROI;
+		}
+		return null;
+	}
 
 	/**
 	 * convert Omero ROIs To QuPath ROIs.
@@ -869,7 +891,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * @param roiData
 	 * @return list of QuPath ROIs
 	 */
-	public List<ROI> convertOmeroROIsToQuPathROIs(ROIData roiData){
+	private static List<ROI> convertOmeroROIsToQuPathROIs(ROIData roiData){
 		// get the ROI
 		Roi omeROI = (Roi) roiData.asIObject();
 
@@ -937,7 +959,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * @param roi2
 	 * @return ROI resulting of the XOR operation
 	 */
-	public ROI linkShapes(ROI roi1, ROI roi2){
+	private static ROI linkShapes(ROI roi1, ROI roi2){
 		// get the area of the first roi
 		Area a1 = new Area(roi1.getShape());
 
@@ -964,7 +986,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * @param roiData
 	 * @return list of QuPath ROIs
 	 */
-	public String getROIPathClass(ROIData roiData){
+	private static String[] getROIComment(ROIData roiData){
 		// get the ROI
 		Roi omeROI = (Roi) roiData.asIObject();
 
@@ -1015,7 +1037,32 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			}
 		}
 
-		return pathClass;
+		String roiClass = "NoClass";
+		String roiType = "Annotation";
+		String roiParent =  "0";
+
+		String[] tokens = (pathClass.isBlank() || pathClass.isEmpty()) ? null : pathClass.split(":");
+		if(tokens== null)
+			return new String[]{roiType, roiClass, roiParent};
+
+		if (tokens.length > 0 ) {
+			if (tokens[0].equals("Detection") || tokens[0].equals("detection"))
+				roiType = "Detection";
+
+			if(tokens.length > 1)
+				roiClass = tokens[1];
+
+			if(tokens.length > 2) {
+				try {
+					Long.parseLong(tokens[2]);
+					roiParent = tokens[2];
+				} catch (NumberFormatException e) {
+					roiParent = "0";
+				}
+			}
+		}
+
+		return new String[]{roiType, roiClass, roiParent};
 	}
 
 
