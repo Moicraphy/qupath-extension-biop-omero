@@ -920,7 +920,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 			}else if(shape instanceof Ellipse){
 				EllipseData s = new EllipseData(shape);
-				list.add(ROIs.createEllipseROI(s.getX(),s.getY(),s.getRadiusX(), s.getRadiusY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+				list.add(ROIs.createEllipseROI(s.getX()-s.getRadiusX(),s.getY()-s.getRadiusY(),s.getRadiusX()*2, s.getRadiusY()*2,ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
 			}else if(shape instanceof Point){
 				PointData s = new PointData(shape);
