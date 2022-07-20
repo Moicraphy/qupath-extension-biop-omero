@@ -49,13 +49,11 @@ import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
 import qupath.lib.objects.PathObjects;
-import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.classes.PathClassFactory;
 import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
 import qupath.lib.roi.interfaces.ROI;
-import qupath.lib.scripting.QP;
 
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
@@ -64,7 +62,6 @@ import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.*;
 import java.util.*;
@@ -73,7 +70,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * ImageServer that reads pixels using the OMERO web API.
@@ -785,10 +781,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		for (ROIData roiDatum : roiData) {
 			// get the type and assigned class from OMERO ROIs
 			String[] roiComment = getROIComment(roiDatum);
-			//System.out.println("ROI : "+roiDatum.getId()+"; roiType : "+roiComment[0]+"; roiClass : "+roiComment[1]+"; roiID : "+roiComment[2]+"; roiParent : "+roiComment[3]);
 			// convert OMERO ROIs to QuPath ROIs
 			ROI finalROI = roiConversion(roiDatum);
-
 			// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
 			idObjectMap.put(Double.parseDouble(roiComment[2]),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1]));
 			// populate parent map
@@ -800,14 +794,11 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		List<PathObject> list = new ArrayList<>();
 
 		idParentIdMap.keySet().forEach(objID->{
-			//System.out.println("ObjID : "+objID+" ; Parent ID:"+idParentIdMap.get(objID));
 			if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID))==null)){
 				idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
 			}else
 				list.add(idObjectMap.get(objID));
-
 		});
-		//System.out.println(list.size());
 
 		return list;
 	}
@@ -815,6 +806,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 	/**
 	 * Create an annotation or a detection PathObject with a certain PathClass
+	 *
 	 * @param roi
 	 * @param roiType
 	 * @param roiClass
@@ -839,6 +831,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * convert Omero ROIs To QuPath ROIs.
 	 * For annotations, takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality.
 	 * For detections, no complex ROIs are possible. So, each shape = one ROI
+	 *
 	 * @param roiDatum
 	 * @return
 	 */
@@ -1049,39 +1042,38 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			}
 		}
 
-
 		String roiClass = "NoClass";
 		String roiType = "Annotation";
 		String roiParent =  "0";
 		String roiID =  "-"+roiData.hashCode();
 
+		// Parse the string and get object information
 		String[] tokens = (pathClass.isBlank() || pathClass.isEmpty()) ? null : pathClass.split(":");
 		if(tokens== null)
 			return new String[]{roiType, roiClass, roiID, roiParent};
 
-		if (tokens.length > 0 ) {
+		if (tokens.length > 0)
 			if (tokens[0].equals("Detection") || tokens[0].equals("detection"))
 				roiType = "Detection";
 
-			if(tokens.length > 1)
-				roiClass = tokens[1];
+		if(tokens.length > 1)
+			roiClass = tokens[1];
 
-			if(tokens.length > 2) {
-				try {
-					Double.parseDouble(tokens[2]);
-					roiID = tokens[2];
-				} catch (NumberFormatException e) {
-					roiID = "-"+roiData.hashCode();;
-				}
+		if(tokens.length > 2) {
+			try {
+				Double.parseDouble(tokens[2]);
+				roiID = tokens[2];
+			} catch (NumberFormatException e) {
+				roiID = "-"+roiData.hashCode();
 			}
+		}
 
-			if(tokens.length > 3) {
-				try {
-					Double.parseDouble(tokens[3]);
-					roiParent = tokens[3];
-				} catch (NumberFormatException e) {
-					roiParent = "0";
-				}
+		if(tokens.length > 3) {
+			try {
+				Double.parseDouble(tokens[3]);
+				roiParent = tokens[3];
+			} catch (NumberFormatException e) {
+				roiParent = "0";
 			}
 		}
 

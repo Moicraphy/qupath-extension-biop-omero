@@ -25,8 +25,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -37,7 +35,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 
 import fr.igred.omero.Client;
 import omero.RLong;
@@ -292,6 +289,7 @@ public final class OmeroRawTools {
                 user.getOmeName()==null ? "" : user.getOmeName().getValue());
     }
 
+
     /**
      * return the group object corresponding to the default group attributed to the logged in user
      * @param client
@@ -304,14 +302,15 @@ public final class OmeroRawTools {
         return new OmeroRawObjects.Group(userGroup.getId().getValue(), userGroup.getName().getValue());
     }
 
+
     /**
      * return a map of available groups with its attached users.
+     *
      * @param client
      * @return
      * @throws DSOutOfServiceException
      * @throws ServerError
      */
-
     public static Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> getAvailableGroups(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
         Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> map = new HashMap<>();
 
@@ -343,7 +342,6 @@ public final class OmeroRawTools {
                         user.getEmail()==null ? "" : user.getEmail().getValue(),
                         user.getInstitution()==null ? "" : user.getInstitution().getValue(),
                         user.getOmeName()==null ? "" : user.getOmeName().getValue()));
-
             }
 
             owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
@@ -355,11 +353,14 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Get all the orphaned {@code OmeroRawObject}s of type {@code type} from the server.
+     * Get all the orphaned {@code OmeroRawObject}s of type Dataset from the server.
      *
      * @param client the client {@code OmeroRawClient} object
+     * @param groupCtx security context of the current group
      * @return list of orphaned datasets
      * @throws IOException
+     * @throws ServerError
+     * @throws DSOutOfServiceException
      */
     public static List<OmeroRawObjects.OmeroRawObject> readOrphanedDatasets(OmeroRawClient client, SecurityContext groupCtx) throws IOException, ServerError, DSOutOfServiceException {
         List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
@@ -379,6 +380,17 @@ public final class OmeroRawTools {
         return list;
     }
 
+
+    /**
+     * Get all the orphaned {@code OmeroRawObject}s of type Image from the server.
+     *
+     * @param client the client {@code OmeroRawClient} object
+     * @param groupCtx security context of the current group
+     * @return list of orphaned images
+     * @throws IOException
+     * @throws ServerError
+     * @throws DSOutOfServiceException
+     */
     public static List<OmeroRawObjects.OmeroRawObject> readOrphanedImages(OmeroRawClient client, SecurityContext groupCtx) throws IOException, ServerError, DSOutOfServiceException {
         List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
         Collection<ImageData> orphanedImages = OmeroRawRequests.getOrphanedImages(client,groupCtx);
@@ -510,129 +522,36 @@ public final class OmeroRawTools {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
+        // get the current OMERO-RAW client
         OmeroRawClient client = server.getClient();
 
         Date date = new Date();
-       // pathObjects.forEach(p->System.out.printf("%d%d%n",date.getTime(),p.hashCode()));
+        Collection<ROIData> omeroRois = new ArrayList<>();
+        Map<PathObject,String> idObjectMap = new HashMap<>();
 
+        // create unique ID for each object
+        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, ""+ date.getTime() + pathObject.hashCode()));
 
-        // if the pathObject is a detection
-        /*if(!pathObjects.isEmpty() && pathObjects.iterator().next().isDetection()){
-            Map<PathObject, Collection<PathObject>> parentChlidMap = new HashMap<>();
-
-            // create a map< Parent Annotation object, List of child detection objects>
-            pathObjects.forEach(pathObject->{
-                PathObject parent = pathObject.getParent();
-
-                if(parentChlidMap.containsKey(parent)){
-                    Collection<PathObject> temp = parentChlidMap.get(parent);
-                    temp.add(pathObject);
-                    parentChlidMap.replace(parent, parentChlidMap.get(parent), temp);
-                }
-                else{
-                    Collection<PathObject> child = new ArrayList<>();
-                    child.add(pathObject);
-                    parentChlidMap.put(parent, child);
-                }
-            });
-
-            parentChlidMap.keySet().forEach(parent->{
-                List<ShapeData> shapes;
-                Long ROIParentID = 0L;
-
-                // send first the parent object to OMERO
-                // get the newly created ID (parent ID)
-                if(!(parent == null)) {
-                    Collection<ROIData> parentOmeroROIs = new ArrayList<>();
-                    // QuPath-OMERO conversion
-                    shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(parent, "NoParent");
-                    if (!(shapes == null) && !(shapes.isEmpty())) {
-                        // set the ROI color according to the class assigned to the corresponding PathObject
-                        shapes.forEach(shape -> shape.getShapeSettings().setStroke(parent.getPathClass() == null ? Color.WHITE : new Color(parent.getPathClass().getColor())));
-                        ROIData roiData = new ROIData();
-                        shapes.forEach(roiData::addShapeData);
-                        parentOmeroROIs.add(roiData);
-                    }
-
-                    // sending to OMERO
-                    if(!(parentOmeroROIs.isEmpty())) {
-                        try {
-                            Collection<ROIData> roidata = client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), parentOmeroROIs);
-                            if(!(roidata == null) && !(roidata.isEmpty())){
-                                ROIParentID = roidata.iterator().next().getId();
-                            }else
-                                logger.info("The parent ROI has not been sent to OMERO");
-
-                        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                    else
-                        logger.info("The parent ROI do not contains any shape to send to OMERO");
-                }
-                else
-                    logger.info("No parent for this detection object");
-
-                Collection<ROIData> childOmeroROIs = new ArrayList<>();
-                List<ShapeData> childShapes = new ArrayList<>();
-                Long finalROIParentID = ROIParentID;
-
-                // secondly send all the child object to OMERO
-                // each child object will have the ID of its parent in the comment
-                parentChlidMap.get(parent).forEach(child->{
-                    // QuPath-OMERO conversion
-                    List<ShapeData> childShapesTemp = OmeroRawShapes.convertQuPathRoiToOmeroRoi(child, finalROIParentID == 0 ? "NoParent" :Long.toString(finalROIParentID));
-                    if(!(childShapesTemp==null) && !(childShapesTemp.isEmpty())) {
-                        // set the ROI color according to the class assigned to the corresponding PathObject
-                        childShapesTemp.forEach(shape -> shape.getShapeSettings().setStroke(child.getPathClass() == null ? Color.WHITE : new Color(child.getPathClass().getColor())));
-                        childShapes.addAll(childShapesTemp);
-                    }
-                });
-
+        pathObjects.forEach(pathObject -> {
+            // computes OMERO-readable ROIs
+            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent()==null ?"NoParent":idObjectMap.get(pathObject.getParent()));
+            if (!(shapes == null) && !(shapes.isEmpty())) {
+                // set the ROI color according to the class assigned to the corresponding PathObject
+                shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
                 ROIData roiData = new ROIData();
-                if(!(childShapes.isEmpty())) {
-                    childShapes.forEach(roiData::addShapeData);
-                    childOmeroROIs.add(roiData);
-                }
-
-                // sending to OMERO
-                if(!(childOmeroROIs.isEmpty())) {
-                    try {
-                        client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), childOmeroROIs);
-                    } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                else {
-                    logger.info("There is no child detection to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
-                }
-            });
-        }else {*/
-            // for each annotation object, send it to OMERO without any parent
-            Collection<ROIData> omeroRois = new ArrayList<>();
-            Map<PathObject,String> idObjectMap = new HashMap<>();
-            pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, ""+ date.getTime() + pathObject.hashCode()));
-            pathObjects.forEach(pathObject -> {
-                // computes OMERO-readable ROIs
-                List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent()==null ?"NoParent":idObjectMap.get(pathObject.getParent()));
-                if (!(shapes == null) && !(shapes.isEmpty())) {
-                    // set the ROI color according to the class assigned to the corresponding PathObject
-                    shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
-                    ROIData roiData = new ROIData();
-                    shapes.forEach(roiData::addShapeData);
-                    omeroRois.add(roiData);
-                }
-            });
-
-            // import ROIs on OMERO
-            if (!(omeroRois.isEmpty())) {
-                client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
-            } else {
-                logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
+                shapes.forEach(roiData::addShapeData);
+                omeroRois.add(roiData);
             }
-        }
+        });
 
-   // }
+        // import ROIs on OMERO
+        if (!(omeroRois.isEmpty())) {
+            client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
+        } else {
+            logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
+        }
+    }
+
 
     /**
      * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.

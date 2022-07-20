@@ -45,7 +45,6 @@ class OmeroRawShapes {
 
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawShapes.class);
 
-
     /**
      * Convert PathObjects into OMERO-readable objects. In case the PathObject contains holes, it is split
      * into individual shapes and each shape will be part of the same OMERO ROI (nested hierarchy in OMERO.web).
@@ -128,18 +127,25 @@ class OmeroRawShapes {
             // process each individual shape
             for (ROI value : rois) {
                 if(!(value ==null))
-                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value),objectID,parentID));
+                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value, src.getPathClass()),objectID,parentID));
             }
 
         } else {
             logger.warn("Unsupported type {}", roi.getRoiName());
             return null;
         }
-
         return shapes;
     }
 
 
+    /**
+     * Write a string to populate ROI comment and have access to the type,class and parent of each object.
+     *
+     * @param src
+     * @param objectID
+     * @param parentID
+     * @return
+     */
     private static String setRoiComment(PathObject src, String objectID, String parentID){
         if (src.isDetection()) {
              return src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+objectID+":"+parentID : "Detection:NoClass:"+objectID+":"+parentID;
@@ -192,6 +198,7 @@ class OmeroRawShapes {
 
     /**
      * According to specificities of the shape coordinates, rectangle or polygon ROI is created
+     *
      * @param polygonROICoordinates
      * @param roi
      * @return
@@ -243,7 +250,6 @@ class OmeroRawShapes {
             }
             else*/
                 return ROIs.createPolygonROI(polygonROICoordinates, roi.getImagePlane());
-
         }
     }
 }
