@@ -512,8 +512,12 @@ public final class OmeroRawTools {
 
         OmeroRawClient client = server.getClient();
 
+        Date date = new Date();
+       // pathObjects.forEach(p->System.out.printf("%d%d%n",date.getTime(),p.hashCode()));
+
+
         // if the pathObject is a detection
-        if(!pathObjects.isEmpty() && pathObjects.iterator().next().isDetection()){
+        /*if(!pathObjects.isEmpty() && pathObjects.iterator().next().isDetection()){
             Map<PathObject, Collection<PathObject>> parentChlidMap = new HashMap<>();
 
             // create a map< Parent Annotation object, List of child detection objects>
@@ -603,12 +607,14 @@ public final class OmeroRawTools {
                     logger.info("There is no child detection to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
                 }
             });
-        }else {
+        }else {*/
             // for each annotation object, send it to OMERO without any parent
             Collection<ROIData> omeroRois = new ArrayList<>();
+            Map<PathObject,String> idObjectMap = new HashMap<>();
+            pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, ""+ date.getTime() + pathObject.hashCode()));
             pathObjects.forEach(pathObject -> {
                 // computes OMERO-readable ROIs
-                List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, "NoParent");
+                List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent()==null ?"NoParent":idObjectMap.get(pathObject.getParent()));
                 if (!(shapes == null) && !(shapes.isEmpty())) {
                     // set the ROI color according to the class assigned to the corresponding PathObject
                     shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
@@ -626,7 +632,7 @@ public final class OmeroRawTools {
             }
         }
 
-    }
+   // }
 
     /**
      * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.

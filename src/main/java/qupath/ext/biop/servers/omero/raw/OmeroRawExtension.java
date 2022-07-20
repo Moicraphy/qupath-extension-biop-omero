@@ -74,20 +74,20 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		// for OMERO raw extension
 		var actionRawClients = ActionTools.createAction(new OmeroRawClientsCommand(qupath), "Manage server connections");
 		var actionRawSendAnnotationObjects = ActionTools.createAction(new OmeroRawWriteAnnotationObjectsCommand(qupath), "Send annotations to OMERO");
-		var actionRawSendDetectionObjects = ActionTools.createAction(new OmeroRawWriteDetectionObjectsCommand(qupath), "Send detections to OMERO");
+	//	var actionRawSendDetectionObjects = ActionTools.createAction(new OmeroRawWriteDetectionObjectsCommand(qupath), "Send detections to OMERO");
 		Menu browseRawServerMenu = new Menu("Browse server...");
 
 //		actionRawClients.disabledProperty().bind(qupath.projectProperty().isNull());
 //		browseRawServerMenu.disableProperty().bind(qupath.projectProperty().isNull());
 		actionRawSendAnnotationObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
-		actionRawSendDetectionObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		//actionRawSendDetectionObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		MenuTools.addMenuItems(qupath.getMenu("Extensions", false),
 				MenuTools.createMenu("OMERO-RAW",
 						browseRawServerMenu,
 						actionRawClients,
 						null,
-						actionRawSendAnnotationObjects,
-						actionRawSendDetectionObjects
+						actionRawSendAnnotationObjects
+			//			actionRawSendDetectionObjects
 				)
 		);
 

@@ -52,7 +52,7 @@ class OmeroRawShapes {
      * @param src : pathObject
      * @return
      */
-    public static List<ShapeData> convertQuPathRoiToOmeroRoi(PathObject src, String parentID) {
+    public static List<ShapeData> convertQuPathRoiToOmeroRoi(PathObject src, String objectID, String parentID) {
         ROI roi = src.getROI();
 
         List<ShapeData> shapes = new ArrayList<>();
@@ -60,11 +60,7 @@ class OmeroRawShapes {
             // Build the OMERO object
             RectangleData rectangle = new RectangleData(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight());
             // Write in comments the type of PathObject as well as the assigned class if there is one
-            if (src.isDetection()) {
-                rectangle.setText(src.getPathClass()!= null ? "Detection:"+src.getPathClass().getName()+":"+parentID : "Detection:NoClass:"+parentID);
-            } else {
-                rectangle.setText(src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+parentID : "Annotation:NoClass:"+parentID);
-            }
+            rectangle.setText(setRoiComment(src, objectID, parentID));
 
             // set the ROI position in the image
             rectangle.setC(roi.getC());
@@ -74,11 +70,7 @@ class OmeroRawShapes {
 
         } else if (roi instanceof EllipseROI) {
             EllipseData ellipse = new EllipseData(roi.getCentroidX(), roi.getCentroidY(), roi.getBoundsWidth()/2, roi.getBoundsHeight()/2);
-            if (src.isDetection()) {
-                ellipse.setText(src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+parentID : "Detection:NoClass:"+parentID);
-            } else {
-                ellipse.setText(src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+parentID : "Annotation:NoClass:"+parentID);
-            }
+            ellipse.setText(setRoiComment(src, objectID, parentID));
             ellipse.setC(roi.getC());
             ellipse.setT(roi.getT());
             ellipse.setZ(roi.getZ());
@@ -87,11 +79,7 @@ class OmeroRawShapes {
         } else if (roi instanceof LineROI) {
             LineROI lineRoi = (LineROI)roi;
             LineData line = new LineData(lineRoi.getX1(), lineRoi.getY1(), lineRoi.getX2(), lineRoi.getY2());
-            if (src.isDetection()) {
-                line.setText(src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+parentID : "Detection:NoClass:"+parentID);
-            } else {
-                line.setText(src.getPathClass()!= null ? "Annotation:"+src.getPathClass().getName()+":"+parentID : "Annotation:NoClass:"+parentID);
-            }
+            line.setText(setRoiComment(src, objectID, parentID));
             line.setC(roi.getC());
             line.setT(roi.getT());
             line.setZ(roi.getZ());
@@ -101,11 +89,7 @@ class OmeroRawShapes {
             List<Point2D.Double> points = new ArrayList<>();
             roi.getAllPoints().forEach(point2->points.add(new Point2D.Double(point2.getX(), point2.getY())));
             PolylineData polyline = new PolylineData(points);
-            if (src.isDetection()) {
-                polyline.setText(src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+parentID : "Detection:NoClass:"+parentID);
-            } else {
-                polyline.setText(src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+parentID : "Annotation:NoClass:"+parentID);
-            }
+            polyline.setText(setRoiComment(src, objectID, parentID));
             polyline.setC(roi.getC());
             polyline.setT(roi.getT());
             polyline.setZ(roi.getZ());
@@ -115,11 +99,7 @@ class OmeroRawShapes {
             List<Point2D.Double> points = new ArrayList<>();
             roi.getAllPoints().forEach(point2->points.add(new Point2D.Double(point2.getX(), point2.getY())));
             PolygonData polygon = new PolygonData(points);
-            if (src.isDetection()) {
-                polygon.setText(src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+parentID : "Detection:NoClass:"+parentID);
-            } else {
-                polygon.setText(src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+parentID : "Annotation:NoClass:"+parentID);
-            }
+            polygon.setText(setRoiComment(src, objectID, parentID));
             polygon.setC(roi.getC());
             polygon.setT(roi.getT());
             polygon.setZ(roi.getZ());
@@ -130,11 +110,7 @@ class OmeroRawShapes {
 
             for (Point2 roiPoint : roiPoints) {
                 PointData point = new PointData(roiPoint.getX(), roiPoint.getY());
-                if (src.isDetection()) {
-                    point.setText(src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+parentID : "Detection:NoClass:"+parentID);
-                } else {
-                    point.setText(src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+parentID : "Annotation:NoClass:"+parentID);
-                }
+                point.setText(setRoiComment(src, objectID, parentID));
                 point.setC(roi.getC());
                 point.setT(roi.getT());
                 point.setZ(roi.getZ());
@@ -152,7 +128,7 @@ class OmeroRawShapes {
             // process each individual shape
             for (ROI value : rois) {
                 if(!(value ==null))
-                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value),"NoParent"));
+                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value),objectID,parentID));
             }
 
         } else {
@@ -161,6 +137,15 @@ class OmeroRawShapes {
         }
 
         return shapes;
+    }
+
+
+    private static String setRoiComment(PathObject src, String objectID, String parentID){
+        if (src.isDetection()) {
+             return src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+objectID+":"+parentID : "Detection:NoClass:"+objectID+":"+parentID;
+        } else {
+            return src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+objectID+":"+parentID : "Annotation:NoClass:"+objectID+":"+parentID;
+        }
     }
 
 
@@ -229,7 +214,7 @@ class OmeroRawShapes {
                 return ROIs.createPolygonROI(polygonROICoordinates, roi.getImagePlane());
         }
         else{
-            //TODO find a way to capture precisely if the plygon is an ellipse or not
+            //TODO find a way to capture precisely if the polygon is an ellipse or not
             /*List<Double> distance = new ArrayList<>();
             double dist = 0;
             for(int i = 0; i < polygonROICoordinates.size()-1; i++){
