@@ -31,3 +31,6 @@ gradlew clean build
 
 The output will be under `build/libs`.
 You can drag the jar file on top of QuPath to install the extension.
+
+## Documentation
+You can find all the documentation on how to use this extension on our [wiki page](https://wiki-biop.epfl.ch/en/Image_Storage/OMERO/OmeroQuPath).
