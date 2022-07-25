@@ -21,6 +21,9 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
 import loci.common.DataTools;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
@@ -32,8 +35,10 @@ import loci.formats.meta.MetadataStore;
 import omero.ServerError;
 import omero.api.RawPixelsStorePrx;
 import omero.api.ResolutionDescription;
+import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
+import omero.gateway.facility.AdminFacility;
 import omero.gateway.facility.BrowseFacility;
 import omero.gateway.facility.MetadataFacility;
 import omero.gateway.facility.ROIFacility;
@@ -44,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.color.ColorModelFactory;
 import qupath.lib.common.ColorTools;
+import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.*;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
@@ -62,6 +68,7 @@ import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
+import java.net.PasswordAuthentication;
 import java.net.URI;
 import java.nio.*;
 import java.util.*;
@@ -70,6 +77,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static fr.igred.omero.exception.ExceptionHandler.handleServiceOrAccess;
 
 /**
  * ImageServer that reads pixels using the OMERO web API.
@@ -104,6 +113,11 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * Client used to open this image.
 	 */
 	private final OmeroRawClient client;
+
+	/**
+	 * Security context to open this image, depending on sudo connecion or not
+	 */
+	private SecurityContext securityContext;
 
 	/**
 	 * Main reader for metadata and all that jazz
@@ -149,6 +163,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		this.host = uri.getHost();
 		this.port = uri.getPort();
 		this.client = client;
+		this.securityContext = client.getContext();
 		this.originalMetadata = buildMetadata();
 		// Args are stored in the JSON - passwords and usernames must not be included!
 		// Do an extra check to ensure someone hasn't accidentally passed one
@@ -186,9 +201,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 
 		// Create a reader & extract the metadata
-		readerWrapper = manager.getPrimaryReaderWrapper(imageID, client);
+		readerWrapper = manager.getPrimaryReaderWrapper(imageID, client, this.securityContext);
 		RawPixelsStorePrx reader = readerWrapper.getReader();
 		PixelsData meta = readerWrapper.getPixelsData();
+		this.securityContext = readerWrapper.getContext();
 
 		// There is just one series per image ID
 		synchronized (reader) {
@@ -211,7 +227,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			try {
 				MetadataFacility metaFacility = client.getGateway().getFacility(MetadataFacility.class);
 
-				Double magnificationObject = metaFacility.getImageAcquisitionData(client.getContext(), imageID).getObjective().getNominalMagnification();
+				Double magnificationObject = metaFacility.getImageAcquisitionData(this.securityContext, imageID).getObjective().getNominalMagnification();
 
 				if (magnificationObject == null) {
 					logger.warn("Nominal objective magnification missing for {}", imageID);
@@ -288,8 +304,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 
 			// Try to read the default display colors for each channel from the file
-			List<ChannelData> channelMetadata = client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(), imageID);
-			RenderingDef renderingSettings = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(reader.getPixelsId());
+			List<ChannelData> channelMetadata = client.getGateway().getFacility(MetadataFacility.class).getChannelData(this.securityContext, imageID);
+			RenderingDef renderingSettings = client.getGateway().getRenderingSettingsService(this.securityContext).getRenderingSettings(reader.getPixelsId());
 			short nNullChannelName = 0;
 			for (int c = 0; c < nChannels; c++) {
 				ome.xml.model.primitives.Color color = null;
@@ -682,9 +698,18 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		return getMetadata().getPreferredTileHeight();
 	}
 
-	
+
 	/**
-	 * Return the web client used for this image server.
+	 * Return the security context used for this image server.
+	 * Can be different from the context of the logged-in user depending if it is a sudo connection.
+	 * @return security context
+	 */
+	public SecurityContext getContext() {
+		return securityContext;
+	}
+
+	/**
+	 * Return the raw client used for this image server.
 	 * @return client
 	 */
 	public OmeroRawClient getClient() {
@@ -758,7 +783,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 		// get ROIs from OMERO.web
 		try {
-			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
+			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(this.securityContext, imageID);
 		} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
 			throw new RuntimeException(e);
 		}
@@ -1142,7 +1167,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			public synchronized RawPixelsStorePrx getReaderForThread( final Long pixelsId,  OmeroRawClient client ) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
+			public synchronized RawPixelsStorePrx getReaderForThread( final Long pixelsId,  OmeroRawClient client , SecurityContext ctx) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
 
 				LocalReaderWrapper wrapper = localReader.get();
 
@@ -1158,7 +1183,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				}
 
 				// Create a new reader
-				wrapper = createReader( pixelsId, null, client );
+				wrapper = createReader( pixelsId, null, client ,ctx);
 
 				// Store wrapped reference with associated cleaner
 				localReader.set(wrapper);
@@ -1167,8 +1192,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			}
 
 
-			private LocalReaderWrapper wrapReader(RawPixelsStorePrx reader, PixelsData pixelsData) {
-				LocalReaderWrapper wrapper = new LocalReaderWrapper(reader, pixelsData);
+			private LocalReaderWrapper wrapReader(RawPixelsStorePrx reader, PixelsData pixelsData, SecurityContext ctx) {
+				LocalReaderWrapper wrapper = new LocalReaderWrapper(reader, pixelsData, ctx);
 				logger.debug("Constructing reader for {}", Thread.currentThread());
 				cleaner.register(
 						wrapper,
@@ -1192,8 +1217,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			synchronized LocalReaderWrapper createPrimaryReader(final Long pixelsID, IMetadata metadata, OmeroRawClient client) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
-				return createReader(pixelsID, metadata == null ? MetadataTools.createOMEXMLMetadata() : metadata, client);
+			synchronized LocalReaderWrapper createPrimaryReader(final Long pixelsID, IMetadata metadata, OmeroRawClient client, SecurityContext ctx) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
+				return createReader(pixelsID, metadata == null ? MetadataTools.createOMEXMLMetadata() : metadata, client, ctx);
 			}
 
 
@@ -1207,12 +1232,12 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws DependencyException, ServiceException, FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
+			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client, SecurityContext ctx) throws DependencyException, ServiceException, FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
 				/*for (LocalReaderWrapper wrapper : primaryReaders) {
 					if (pixelsID.equals(wrapper.getReader().getPixelsId()))
 						return wrapper;
 				}*/
-				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client );
+				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client, ctx );
 				primaryReaders.add(reader);
 				return reader;
 			}
@@ -1227,17 +1252,76 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
+			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client, SecurityContext ctx) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException {
 				BrowseFacility browse = client.getGateway().getFacility(BrowseFacility.class);
+				SecurityContext currentCtx = ctx;
+				ImageData image;
+				try {
+					image = browse.getImage(currentCtx, imageID);
+				}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e){
+					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
+						SecurityContext sudoCtx = sudoConnection(client);
+						if (!(sudoCtx == null)) {
+							currentCtx = sudoCtx;
+							image = browse.getImage(currentCtx, imageID);
+						} else
+							return null;
+					}else{
+						logger.error("You do not have access to this image because it is part of another group");
+						throw new RuntimeException(e);
+					}
+				}
 
-				ImageData image = browse.getImage(client.getContext(), imageID);
 				PixelsData pixelData = image.getDefaultPixels();
-				RawPixelsStorePrx rawPixStore = client.getGateway().getPixelsStore(client.getContext());
+				RawPixelsStorePrx rawPixStore = client.getGateway().getPixelsStore(currentCtx);
 				rawPixStore.setPixelsId(pixelData.getId(), false);
 
-				LocalReaderWrapper readerWrapper = new LocalReaderWrapper(rawPixStore, pixelData);
-				return readerWrapper;
+				return new LocalReaderWrapper(rawPixStore, pixelData, currentCtx);
 			}
+
+			// code adapted from Pierre Pouchin (@ppouchin) from simple-omero-client project
+			private SecurityContext sudoConnection(OmeroRawClient client){
+
+				String username = getSudoUsername("Enter the sudo username");
+				ExperimenterData sudoUser;
+
+				try {
+					sudoUser = client.getGateway().getFacility(AdminFacility.class).lookupExperimenter(client.getContext(), username);
+				} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+					logger.error("Cannot retrieve user: " + username);
+					return null;
+				}
+
+				if (sudoUser != null) {
+					SecurityContext context = new SecurityContext(sudoUser.getDefaultGroup().getId());
+					context.setExperimenter(sudoUser);
+					context.sudo();
+					return context;
+				}
+
+				return null;
+			}
+
+		private static String getSudoUsername(String prompt) {
+			GridPane pane = new GridPane();
+			javafx.scene.control.Label labUsername = new javafx.scene.control.Label("Username");
+			TextField tfUsername = new TextField("");
+			labUsername.setLabelFor(tfUsername);
+
+			int row = 0;
+			if (prompt != null && !prompt.isBlank())
+				pane.add(new javafx.scene.control.Label(prompt), 0, row++, 2, 1);
+			pane.add(labUsername, 0, row);
+			pane.add(tfUsername, 1, row);
+
+			pane.setHgap(5);
+			pane.setVgap(5);
+
+			if (!Dialogs.showConfirmDialog("Login Sudo", pane))
+				return null;
+
+			return tfUsername.getText();
+		}
 
 			/**
 			 * Simple wrapper for a reader to help with cleanup.
@@ -1250,10 +1334,12 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				int[] imageSizeX;
 				int[] imageSizeY;
 				private Map<String, String> readerOptions;
+				private SecurityContext ctx;
 
-				LocalReaderWrapper(RawPixelsStorePrx reader, PixelsData pixelsData) {
+				LocalReaderWrapper(RawPixelsStorePrx reader, PixelsData pixelsData, SecurityContext ctx) {
 					this.reader = reader;
 					this.pixelsData = pixelsData;
+					this.ctx = ctx;
 					try {
 
 						this.nLevels = reader.getResolutionLevels();
@@ -1278,6 +1364,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				}
 
 				public PixelsData getPixelsData() { return pixelsData; }
+
+				public SecurityContext getContext() { return ctx; }
 
 				public boolean argsMatch(Map<String, String> readerOptions) {
 					return this.readerOptions.equals(readerOptions);
