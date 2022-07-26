@@ -109,7 +109,7 @@ public class OmeroRawClientsCommand implements Runnable {
             mainPane.setVgap(10.0);
             dialog.sizeToScene();
             dialog.setResizable(false);
-            dialog.setTitle("OMERO web clients");
+            dialog.setTitle("OMERO raw clients");
             dialog.setScene(new Scene(mainPane));
             dialog.setOnCloseRequest(e -> dialog = null);
             QuPathGUI qupath2 = QuPathGUI.getInstance();

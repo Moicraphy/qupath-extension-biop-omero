@@ -35,7 +35,9 @@ import javafx.scene.layout.GridPane;
 import omero.gateway.Gateway;
 import omero.gateway.LoginCredentials;
 import omero.gateway.SecurityContext;
+import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
+import omero.gateway.facility.AdminFacility;
 import omero.gateway.model.ExperimenterData;
 import omero.log.SimpleLogger;
 import org.slf4j.Logger;
@@ -49,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Class representing an OMERO Web Client. This class takes care of
@@ -183,6 +186,58 @@ public class OmeroRawClient {
         this.gateway = gateway;
 
         return gateway.isConnected();
+    }
+
+    boolean sudoConnection(OmeroRawClient currentClient) {
+
+        // If the port is unset, use the default one
+        if (serverURI.getPort() != -1) port = serverURI.getPort();
+        String username = getSudoUsername("Enter the sudo username");
+
+        ExperimenterData sudoUser;
+        this.gateway = currentClient.getGateway();
+
+        try {
+            sudoUser = currentClient.getGateway().getFacility(AdminFacility.class).lookupExperimenter(currentClient.getContext(), username);
+        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+            logger.error("Cannot retrieve user: " + username);
+            return false;
+        }
+        System.out.println("Security contetxt : "+this.securityContext);
+        if (sudoUser != null) {
+            SecurityContext context = new SecurityContext(sudoUser.getDefaultGroup().getId());
+            context.setExperimenter(sudoUser);
+            context.sudo();
+            this.securityContext = context;
+            this.username = new SimpleStringProperty(username);
+            this.loggedIn = new SimpleBooleanProperty(true);
+        }
+        else
+            this.securityContext = currentClient.getContext();
+        System.out.println("Security contetxt : "+this.securityContext);
+        return this.gateway.isConnected();
+    }
+
+
+    private static String getSudoUsername(String prompt) {
+        GridPane pane = new GridPane();
+        javafx.scene.control.Label labUsername = new javafx.scene.control.Label("Username");
+        TextField tfUsername = new TextField("");
+        labUsername.setLabelFor(tfUsername);
+
+        int row = 0;
+        if (prompt != null && !prompt.isBlank())
+            pane.add(new javafx.scene.control.Label(prompt), 0, row++, 2, 1);
+        pane.add(labUsername, 0, row);
+        pane.add(tfUsername, 1, row);
+
+        pane.setHgap(5);
+        pane.setVgap(5);
+
+        if (!Dialogs.showConfirmDialog("Login Sudo", pane))
+            return null;
+
+        return tfUsername.getText();
     }
 
     Gateway getGateway() {
