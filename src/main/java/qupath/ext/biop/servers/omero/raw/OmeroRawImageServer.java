@@ -1239,21 +1239,20 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @param imageID 		file path for the image.
 			 * @param store 	optional MetadataStore; this will be set in the reader if needed.
 			 * @return the {@code IFormatReader}
-			 * @throws FormatException
 			 * @throws IOException
 			 */
-			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 				BrowseFacility browse = client.getGateway().getFacility(BrowseFacility.class);
 				ImageData image = null;
 				OmeroRawClient currentClient = client;
+
 				try {
 					image = browse.getImage(currentClient.getContext(), imageID);
 				}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e){
-					System.out.println("Catch the first exception ; not possible to read the image with the current client");
 					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
 						List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
 						boolean canConnectWithOtherClients = false;
-						System.out.println("Size of the list of other clients : "+otherClients.size());
+
 						for(OmeroRawClient cli:otherClients){
 							try{
 								image = browse.getImage(cli.getContext(), imageID);
@@ -1264,18 +1263,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 							}
 						}
-						System.out.println("canConnectWithOtherClients : "+canConnectWithOtherClients);
+
 						if (!canConnectWithOtherClients) {
-							System.out.println("need to create a new client");
 							OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
 							if(sudoClient.sudoConnection(client)){
-								System.out.println("client created");
 								image = browse.getImage(sudoClient.getContext(), imageID);
-								System.out.println("sudoClient.context : " + sudoClient.getContext());
 								currentClient = sudoClient;
 								OmeroRawClients.addClient(sudoClient);
-								System.out.println("client added to teh list of current clients");
-								System.out.println("OmeroRawClients : " + new ArrayList<>(OmeroRawClients.getAllClients()));
 							}else
 								return null;
 						}
@@ -1293,53 +1287,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				}
 				else
 					return null;
-
-
 			}
-
-			// code adapted from Pierre Pouchin (@ppouchin) from simple-omero-client project
-			/*private SecurityContext sudoConnection(OmeroRawClient client){
-
-				String username = getSudoUsername("Enter the sudo username");
-				ExperimenterData sudoUser;
-
-				try {
-					sudoUser = client.getGateway().getFacility(AdminFacility.class).lookupExperimenter(client.getContext(), username);
-				} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-					logger.error("Cannot retrieve user: " + username);
-					return null;
-				}
-
-				if (sudoUser != null) {
-					SecurityContext context = new SecurityContext(sudoUser.getDefaultGroup().getId());
-					context.setExperimenter(sudoUser);
-					context.sudo();
-					return context;
-				}
-
-				return null;
-			}*/
-
-		/*private static String getSudoUsername(String prompt) {
-			GridPane pane = new GridPane();
-			javafx.scene.control.Label labUsername = new javafx.scene.control.Label("Username");
-			TextField tfUsername = new TextField("");
-			labUsername.setLabelFor(tfUsername);
-
-			int row = 0;
-			if (prompt != null && !prompt.isBlank())
-				pane.add(new javafx.scene.control.Label(prompt), 0, row++, 2, 1);
-			pane.add(labUsername, 0, row);
-			pane.add(tfUsername, 1, row);
-
-			pane.setHgap(5);
-			pane.setVgap(5);
-
-			if (!Dialogs.showConfirmDialog("Login Sudo", pane))
-				return null;
-
-			return tfUsername.getText();
-		}*/
 
 			/**
 			 * Simple wrapper for a reader to help with cleanup.

@@ -188,11 +188,12 @@ public class OmeroRawClient {
         return gateway.isConnected();
     }
 
+
     boolean sudoConnection(OmeroRawClient currentClient) {
 
         // If the port is unset, use the default one
         if (serverURI.getPort() != -1) port = serverURI.getPort();
-        String username = getSudoUsername("Enter the sudo username");
+        String username = getSudoUsername("Enter username");
 
         ExperimenterData sudoUser;
         this.gateway = currentClient.getGateway();
@@ -203,7 +204,7 @@ public class OmeroRawClient {
             logger.error("Cannot retrieve user: " + username);
             return false;
         }
-        System.out.println("Security contetxt : "+this.securityContext);
+
         if (sudoUser != null) {
             SecurityContext context = new SecurityContext(sudoUser.getDefaultGroup().getId());
             context.setExperimenter(sudoUser);
@@ -214,9 +215,10 @@ public class OmeroRawClient {
         }
         else
             this.securityContext = currentClient.getContext();
-        System.out.println("Security contetxt : "+this.securityContext);
+
         return this.gateway.isConnected();
     }
+
 
 
     private static String getSudoUsername(String prompt) {

@@ -23,9 +23,14 @@ package qupath.ext.biop.servers.omero.raw;
 
 import java.net.ConnectException;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
+import javafx.collections.*;
+import javafx.scene.layout.Pane;
+import omero.gateway.exception.DSOutOfServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,9 +38,6 @@ import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableSet;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -126,6 +128,11 @@ public class OmeroRawClientsCommand implements Runnable {
     private void refreshServerGrid() {
         mainPane.getChildren().clear();
         var allClients = OmeroRawClients.getAllClients();
+
+        for (var client: allClients) {
+            clientsDisplayed.removeIf(serverInfo -> serverInfo.client.getGateway().equals(client.getGateway()));
+        }
+
         for (var client: allClients) {
             // If new client is not displayed, add it to the set
             if (clientsDisplayed.stream().noneMatch(e -> e.client.equals(client)))
@@ -136,6 +143,7 @@ public class OmeroRawClientsCommand implements Runnable {
         // Using iterator to avoid ConcurrentModificationExceptions
         for (var i = clientsDisplayed.iterator(); i.hasNext();) {
             var serverInfo = i.next();
+
             // If the client list does not contain this client, remove from set
             if (!allClients.contains(serverInfo.client)) {
                 i.remove();
@@ -261,14 +269,14 @@ public class OmeroRawClientsCommand implements Runnable {
                         Dialogs.showErrorMessage("Log in to OMERO server", "Could not log in to server. Check the log for more info.");
                 } else {
                     // Check again the state, in case it wasn't refreshed in time
-                    if (client.isLoggedIn()) {
+                    //if (client.isLoggedIn()) {     // commented because of sudo connection
                         if (OmeroRawExtension.getOpenedRawBrowsers().containsKey(client)) {
                             var confirm = Dialogs.showConfirmDialog("Log out", "A browser for this OMERO server is currently opened and will be closed when logging out. Continue?");
                             if (confirm)
                                 client.logOut();
                         } else
                             client.logOut();
-                    }
+                   //}
                 }
             });
 

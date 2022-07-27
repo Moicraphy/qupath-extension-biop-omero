@@ -135,7 +135,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 			customServerItem.setOnAction(e2 -> {
 				GridPane gp = new GridPane();
 				gp.setVgap(5.0);
-				TextField tf = new TextField();
+				TextField tf = new TextField("https://omero-server.epfl.ch");
 				tf.setPrefWidth(400);
 				PaneTools.addGridRow(gp, 0, 0, "Enter OMERO URL", new Label("Enter an OMERO server URL to browse (e.g. http://idr.openmicroscopy.org/):"));
 				PaneTools.addGridRow(gp, 1, 0, "Enter OMERO URL", tf, tf);
