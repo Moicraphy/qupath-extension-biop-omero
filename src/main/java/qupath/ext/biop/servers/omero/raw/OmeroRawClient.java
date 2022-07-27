@@ -188,16 +188,31 @@ public class OmeroRawClient {
         return gateway.isConnected();
     }
 
-
+    /**
+     * Code adapted from Pierre Pouchin (@ppouchin) from simple-omero-client project
+     * https://github.com/GReD-Clermont/simple-omero-client
+     *
+     * Create a new OmeroRawClient from a given username. You need to have
+     * administrator rights to be allowed to connect as if you were the user defined by the given username.
+     * The new OmeroRawClient has a Security Context corresponding to the username but the Gateway is identical for
+     * both current and sudo OmeroRawClient
+     *
+     * @param currentClient
+     * @return
+     */
     boolean sudoConnection(OmeroRawClient currentClient) {
 
         // If the port is unset, use the default one
         if (serverURI.getPort() != -1) port = serverURI.getPort();
+
+        // get the username
         String username = getSudoUsername("Enter username");
 
-        ExperimenterData sudoUser;
+        // set the gateway as the same as the current OmeroRawClient
         this.gateway = currentClient.getGateway();
 
+        ExperimenterData sudoUser;
+        // get the OMERO user according to the username
         try {
             sudoUser = currentClient.getGateway().getFacility(AdminFacility.class).lookupExperimenter(currentClient.getContext(), username);
         } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
@@ -205,6 +220,7 @@ public class OmeroRawClient {
             return false;
         }
 
+        // create the new security context corresponding to the user
         if (sudoUser != null) {
             SecurityContext context = new SecurityContext(sudoUser.getDefaultGroup().getId());
             context.setExperimenter(sudoUser);
@@ -220,7 +236,13 @@ public class OmeroRawClient {
     }
 
 
-
+    /**
+     * Popup a small window to get the username of the user you want to import an image from, to be able to build
+     * a sudo connection.
+     *
+     * @param prompt
+     * @return the username as a string
+     */
     private static String getSudoUsername(String prompt) {
         GridPane pane = new GridPane();
         javafx.scene.control.Label labUsername = new javafx.scene.control.Label("Username");

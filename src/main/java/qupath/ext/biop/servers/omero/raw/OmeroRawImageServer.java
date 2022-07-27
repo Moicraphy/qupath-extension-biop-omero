@@ -114,7 +114,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	/**
 	 * Client used to open this image.
 	 */
-	private OmeroRawClient client;
+	private OmeroRawClient client; //not final anymore because we need to update the client for the image when we use sudo connection
 
 	/**
 	 * Main reader for metadata and all that jazz
@@ -197,13 +197,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 
 		// Create a reader & extract the metadata
-		//System.out.println("Get a primary reader for the OmeroRawImageServer n° "+this.hashCode());
-		//System.out.println("Security context : "+this.securityContext.toString());
 		readerWrapper = manager.getPrimaryReaderWrapper(imageID, client);
 		RawPixelsStorePrx reader = readerWrapper.getReader();
 		PixelsData meta = readerWrapper.getPixelsData();
 		this.client = readerWrapper.getClient();
-		//System.out.println("Security context : "+this.securityContext.toString());
 
 		// There is just one series per image ID
 		synchronized (reader) {
@@ -1246,13 +1243,17 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				ImageData image = null;
 				OmeroRawClient currentClient = client;
 
+				// first, try to access the image with the main OmeroRawClient
 				try {
 					image = browse.getImage(currentClient.getContext(), imageID);
 				}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e){
+					// if the main OmeroRawClient could not access the image, check if the user has admin rights
 					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
+
 						List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
 						boolean canConnectWithOtherClients = false;
 
+						// browse in the list of opened OmeroRawClients and try to find one that can open the image
 						for(OmeroRawClient cli:otherClients){
 							try{
 								image = browse.getImage(cli.getContext(), imageID);
@@ -1264,7 +1265,9 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 							}
 						}
 
+						// if none of clients can open, ask for a sudo connection
 						if (!canConnectWithOtherClients) {
+							// create a new OmeroRawClient
 							OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
 							if(sudoClient.sudoConnection(client)){
 								image = browse.getImage(sudoClient.getContext(), imageID);
@@ -1274,11 +1277,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 								return null;
 						}
 					}else{
+						// user does not have admin rights
 						logger.error("You do not have access to this image because it is part of another group");
 						throw new RuntimeException(e);
 					}
 				}
 
+				// read the imported image
 				if(!(image == null)) {
 					PixelsData pixelData = image.getDefaultPixels();
 					RawPixelsStorePrx rawPixStore = currentClient.getGateway().getPixelsStore(currentClient.getContext());
@@ -1307,6 +1312,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 					this.reader = reader;
 					this.pixelsData = pixelsData;
 					this.client = client;
+
 					try {
 
 						this.nLevels = reader.getResolutionLevels();
