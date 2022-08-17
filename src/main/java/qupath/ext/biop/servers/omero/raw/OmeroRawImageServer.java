@@ -206,6 +206,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		synchronized (reader) {
 			String name = meta.getImage().getName();
 
+			//meta.getImage().getDefaultPixels().asPixels().en
+
 			long sizeX = meta.getSizeX();
 			long sizeY = meta.getSizeY();
 
@@ -289,6 +291,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 			// Determine min/max values if we can
 			int bpp = pixelType.getBitsPerPixel();
+
 			Number minValue = null;
 			Number maxValue = null;
 			if (pixelType.isSignedInteger()) {
@@ -297,7 +300,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			} else if (pixelType.isUnsignedInteger()) {
 				maxValue = (int) (Math.pow(2, bpp) - 1);
 			}
-
+			/*System.out.println("minValue : "+minValue);
+			System.out.println("maxValue : "+maxValue);*/
 
 			// Try to read the default display colors for each channel from the file
 			List<ChannelData> channelMetadata = client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(), imageID);
@@ -553,17 +557,19 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				order = ByteOrder.BIG_ENDIAN; // ByteOrder.LITTLE_ENDIAN
 				interleaved = false;
 				pixelType = readerWrapper.getPixelsData().getPixelType();
+
 				normalizeFloats = false;
 
 				// Single-channel
-				if (nChannels() == 1) {
+				/*if (nChannels() == 1) {
 					// Read the image - or at least the first channel
 
 					byte[] bytesSimple = rawPixelsStore.getTile(z, 0, t, tileX, tileY, tileWidth, tileHeight);
-					return AWTImageTools.makeImage(bytesSimple, tileWidth, tileHeight, 1, interleaved, 1, false, false, false );
+					return AWTImageTools.makeImage(bytesSimple, tileWidth, tileHeight, 1, interleaved, 2, false, false, false );
 
 
-				}
+				}*/
+
 				// Read bytes for all the required channels
 				effectiveC = readerWrapper.getPixelsData().getSizeC();
 				//effectiveC = 1; // TODO find a way to get the channel size
