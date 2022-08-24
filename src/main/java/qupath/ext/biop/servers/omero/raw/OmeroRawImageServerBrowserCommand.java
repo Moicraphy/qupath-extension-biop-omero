@@ -436,9 +436,9 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
 
         // If the currently opened image belongs to the server that we are browsing, switch combo to the relevant group
-        var imageData = qupath.getImageData();
+        /*var imageData = qupath.getImageData();
 
-        if (imageData != null && (imageData.getServer() instanceof OmeroRawImageServer)) {
+       if (imageData != null && (imageData.getServer() instanceof OmeroRawImageServer)) {
             var server = (OmeroRawImageServer)imageData.getServer();
 
             try {
@@ -465,7 +465,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 logger.warn(ex.getLocalizedMessage());
                 logger.info("Will not fetch the current OMERO group.");
             }
-        }
+        }*/
 
         // If nothing is selected (i.e. currently opened image is not from the same server/an error occurred), select first item
         if (comboGroup.getSelectionModel().isEmpty())

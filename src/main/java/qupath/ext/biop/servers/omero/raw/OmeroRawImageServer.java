@@ -853,7 +853,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			if (roiClass.equals("NoClass"))
 				pathObject = PathObjects.createAnnotationObject(roi);
 			else
-			pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
+				pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
 		}
 
 		pathObject.setColorRGB(color.getRGB());
