@@ -16,7 +16,7 @@ To install the OMERO extension, download the latest `qupath-extension-biop-omero
 If you haven't installed any extensions before, you'll be prompted to select a QuPath user directory.
 The extension will then be copied to a location inside that directory.
 
-The `OMERO-java dependencies` are required to make this extension working. Download the zipped file from the [OMERO download page](https://www.openmicroscopy.org/omero/downloads/), under "OMERO Java". Unzip the file and copy `libs` folder in `C:\QuPath_Common_Data_0.3\extensions`.
+The `OMERO-java dependencies` are required to make this extension working. Download the .jar file from the [OMERO download page](https://www.openmicroscopy.org/omero/downloads/), under "OMERO Java". Copy it in `C:\QuPath_Common_Data_0.3\extensions`.
 
 You might then need to restart QuPath (but not your computer).
 
