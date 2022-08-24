@@ -44,6 +44,11 @@ import omero.gateway.facility.MetadataFacility;
 import omero.gateway.facility.ROIFacility;
 import omero.gateway.model.*;
 import omero.model.*;
+import omero.model.Label;
+import omero.model.Point;
+import omero.model.Polygon;
+import omero.model.Rectangle;
+import omero.model.Shape;
 import omero.model.enums.UnitsLength;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +66,7 @@ import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
 import qupath.lib.roi.interfaces.ROI;
 
+import java.awt.*;
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
 
@@ -73,6 +79,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.*;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -801,8 +808,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			String[] roiComment = getROIComment(roiDatum);
 			// convert OMERO ROIs to QuPath ROIs
 			ROI finalROI = roiConversion(roiDatum);
+			// get the roi color
+			Color color = Color.WHITE;
+			if(roiDatum.getShapeCount() > 0)
+				color = roiDatum.getShapes().iterator().next().getShapeSettings().getStroke();
+
 			// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
-			idObjectMap.put(Double.parseDouble(roiComment[2]),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1]));
+			idObjectMap.put(Double.parseDouble(roiComment[2]),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1], color));
 			// populate parent map
 			double parentID = Double.parseDouble(roiComment[3]);
 			idParentIdMap.put(Double.parseDouble(roiComment[2]),parentID);
@@ -830,18 +842,22 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * @param roiClass
 	 * @return
 	 */
-	private static PathObject createPathObjectFromRoi(ROI roi, String roiType, String roiClass){
+	private static PathObject createPathObjectFromRoi(ROI roi, String roiType, String roiClass, Color color){
+		PathObject pathObject;
 		if (roiType.equals("Detection")) {
 			if (roiClass.equals("NoClass"))
-				return PathObjects.createDetectionObject(roi);
+				pathObject = PathObjects.createDetectionObject(roi);
 			else
-				return PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
+				pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
 		} else {
 			if (roiClass.equals("NoClass"))
-				return PathObjects.createAnnotationObject(roi);
+				pathObject = PathObjects.createAnnotationObject(roi);
 			else
-				return PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
+			pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
 		}
+
+		pathObject.setColorRGB(color.getRGB());
+		return pathObject;
 	}
 
 
