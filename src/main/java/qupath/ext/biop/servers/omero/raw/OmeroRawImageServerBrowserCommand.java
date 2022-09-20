@@ -881,7 +881,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
         } else if (omeroObject.getType() == OmeroRawObjects.OmeroRawObjectType.IMAGE) {
             OmeroRawObjects.Image obj = (OmeroRawObjects.Image)omeroObject;
-            String acquisitionDate = obj.getAcquisitionDate() == -1 ? "-" : new Date(obj.getAcquisitionDate()*1000).toString();
+            String acquisitionDate = obj.getAcquisitionDate() == -1 ? "-" : new Date(obj.getAcquisitionDate()).toString();
             String width = obj.getImageDimensions()[0] + " px";
             String height = obj.getImageDimensions()[1] + " px";
             String c = obj.getImageDimensions()[2] + "";
@@ -1456,7 +1456,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 OmeroRawObjects.Image temp = (OmeroRawObjects.Image)obj;
 
                 gp.add(new Separator(), 0, gp.getRowCount() + 1, gp.getColumnCount(), 1);
-                String acquisitionDate = temp.getAcquisitionDate() == -1 ? "-" : temp.getAcquisitionDate() + "";
+                String acquisitionDate = temp.getAcquisitionDate() == -1 ? "-" : new Date(temp.getAcquisitionDate()).toString();
                 String pixelSizeX = temp.getPhysicalSizes()[0] == null ? "-" : temp.getPhysicalSizes()[0].getValue() + " " + temp.getPhysicalSizes()[0].getSymbol();
                 String pixelSizeY = temp.getPhysicalSizes()[1] == null ? "-" : temp.getPhysicalSizes()[1].getValue() + " " + temp.getPhysicalSizes()[1].getSymbol();
                 String pixelSizeZ = temp.getPhysicalSizes()[2] == null ? "-" : temp.getPhysicalSizes()[2].getValue() + temp.getPhysicalSizes()[2].getSymbol();
