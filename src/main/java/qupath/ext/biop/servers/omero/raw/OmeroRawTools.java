@@ -43,6 +43,7 @@ import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
+import omero.gateway.facility.DataManagerFacility;
 import omero.gateway.facility.MetadataFacility;
 import omero.gateway.facility.ROIFacility;
 import omero.gateway.model.*;
@@ -550,6 +551,34 @@ public final class OmeroRawTools {
         } else {
             logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
         }
+    }
+
+
+    /**
+     * Write metadata collection to OMERO server. This will not delete the existing
+     * key-value pairs present on the OMERO server. Rather, it will simply add the new ones.
+     *
+     * @param qpKeyValues
+     * @param imageServer
+     * @throws ExecutionException
+     * @throws DSOutOfServiceException
+     * @throws DSAccessException
+     */
+    public static void writeMetadata(Map<String,String> qpKeyValues, OmeroRawImageServer imageServer) throws ExecutionException, DSOutOfServiceException, DSAccessException {
+        // build OMERO-compatible key-value pairs
+        List<NamedValue> OmeroNamedValues = new ArrayList<>();
+        for (String key : qpKeyValues.keySet()) {
+            OmeroNamedValues.add(new NamedValue(key, qpKeyValues.get(key)));
+        }
+
+        MapAnnotationData OmeroKeyValues = new MapAnnotationData();
+        OmeroKeyValues.setContent(OmeroNamedValues);
+        OmeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+
+        // send key-values to OMERO
+        OmeroRawClient client = imageServer.getClient();
+        ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageServer.getId());
+        client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(),OmeroKeyValues,imageData);
     }
 
 
