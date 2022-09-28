@@ -76,6 +76,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		var actionRawSendAnnotationObjects = ActionTools.createAction(new OmeroRawWriteAnnotationObjectsCommand(qupath), "Send annotations to OMERO");
 		var actionRawSendMetadataObjects = ActionTools.createAction(new OmeroRawWriteMetadataCommand(qupath), "Send metadata to OMERO");
 		var actionRawImportAnnotationObjects = ActionTools.createAction(new OmeroRawImportAnnotationObjectsCommand(qupath), "Import annotations from OMERO");
+		var actionRawImportMetadataObjects = ActionTools.createAction(new OmeroRawImportMetadataCommand(qupath), "Import Metadata from OMERO");
 	//	var actionRawSendDetectionObjects = ActionTools.createAction(new OmeroRawWriteDetectionObjectsCommand(qupath), "Send detections to OMERO");
 		Menu browseRawServerMenu = new Menu("Browse server...");
 
@@ -84,6 +85,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		actionRawSendAnnotationObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		actionRawImportAnnotationObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		actionRawSendMetadataObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		actionRawImportMetadataObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		//actionRawSendDetectionObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		MenuTools.addMenuItems(qupath.getMenu("Extensions", false),
 				MenuTools.createMenu("OMERO-RAW",
@@ -92,7 +94,8 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 						null,
 						actionRawSendAnnotationObjects,
 						actionRawSendMetadataObjects,
-						actionRawImportAnnotationObjects
+						actionRawImportAnnotationObjects,
+						actionRawImportMetadataObjects
 			//			actionRawSendDetectionObjects
 				)
 		);

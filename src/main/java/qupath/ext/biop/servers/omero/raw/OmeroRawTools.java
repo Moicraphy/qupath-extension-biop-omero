@@ -35,8 +35,10 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import fr.igred.omero.Client;
+import fr.igred.omero.annotations.MapAnnotationWrapper;
 import omero.RLong;
 import omero.ServerError;
 import omero.gateway.SecurityContext;
@@ -581,6 +583,28 @@ public final class OmeroRawTools {
         client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(),OmeroKeyValues,imageData);
     }
 
+    /**
+     * Read Key Values from OMERO server.
+     *
+     * Code partially taken from Pierre Pouchin, from his simple-omero-client project
+     *
+     * @param imageServer
+     * @throws ExecutionException
+     * @throws DSOutOfServiceException
+     * @throws DSAccessException
+     */
+    public static List<MapAnnotationData> readKeyValues(OmeroRawImageServer imageServer) throws ExecutionException, DSOutOfServiceException, DSAccessException {
+
+        // read key-values from OMERO
+        OmeroRawClient client = imageServer.getClient();
+        ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageServer.getId());
+        List<AnnotationData> annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), imageData);
+
+        return annotations.stream()
+                .filter(MapAnnotationData.class::isInstance)
+                .map(MapAnnotationData.class::cast)
+                .collect(Collectors.toList());
+    }
 
     /**
      * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.
