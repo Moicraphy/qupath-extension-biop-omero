@@ -568,19 +568,41 @@ public final class OmeroRawTools {
      */
     public static void writeMetadata(Map<String,String> qpKeyValues, OmeroRawImageServer imageServer) throws ExecutionException, DSOutOfServiceException, DSAccessException {
         // build OMERO-compatible key-value pairs
-        List<NamedValue> OmeroNamedValues = new ArrayList<>();
+        List<NamedValue> omeroNamedValues = new ArrayList<>();
         for (String key : qpKeyValues.keySet()) {
-            OmeroNamedValues.add(new NamedValue(key, qpKeyValues.get(key)));
+            omeroNamedValues.add(new NamedValue(key, qpKeyValues.get(key)));
         }
 
-        MapAnnotationData OmeroKeyValues = new MapAnnotationData();
-        OmeroKeyValues.setContent(OmeroNamedValues);
-        OmeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+        MapAnnotationData omeroKeyValues = new MapAnnotationData();
+        omeroKeyValues.setContent(omeroNamedValues);
+        omeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+
+        List<MapAnnotationData> currentOmeroAnnotationData = readKeyValues(imageServer);
+        List<NamedValue> currentOmeroKeyValues = new ArrayList<>();
+        currentOmeroAnnotationData.forEach(annotation->{
+            currentOmeroKeyValues.addAll((List<NamedValue>)annotation.getContent());
+        });
+
+
+        omeroNamedValues.forEach(pair-> {
+            boolean existingKeyValue = false;
+
+            // check if the key-value already exists in QuPath
+            for (NamedValue keyvalue : currentOmeroKeyValues) {
+                if (pair.name.equals(keyvalue.name)) {
+                    existingKeyValue = true;
+                    omeroNamedValues.remove(pair);
+                    break;
+                }
+            }
+        });
+
+
 
         // send key-values to OMERO
         OmeroRawClient client = imageServer.getClient();
         ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageServer.getId());
-        client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(),OmeroKeyValues,imageData);
+        client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(),omeroKeyValues,imageData);
     }
 
     /**
@@ -605,6 +627,39 @@ public final class OmeroRawTools {
                 .map(MapAnnotationData.class::cast)
                 .collect(Collectors.toList());
     }
+
+
+    /**
+     * Try to solve an error in OMERO regarding the creation keys.
+     * On OMERO, it is possible to have two identical keys with a different value. This should normally never append.
+     * This method check if all keys are unique and output false if there is at least two identical keys.
+     *
+     * @param annotationDataList
+     * @return
+     */
+    public static boolean checkUniqueKeyInAnnotationMap(List<MapAnnotationData> annotationDataList){
+        boolean uniqueKey = true;
+
+        List<NamedValue> keyValues = new ArrayList<>();
+        annotationDataList.forEach(annotation->{
+            keyValues.addAll((List<NamedValue>)annotation.getContent());
+        });
+
+        for(int i = 0; i < keyValues.size()-1;i++){
+            for(int j = i+1;j < keyValues.size();j++){
+                if(keyValues.get(i).name.equals(keyValues.get(j).name)){
+                    uniqueKey = false;
+                    break;
+                }
+            }
+            if(!uniqueKey)
+                break;
+        }
+        return uniqueKey;
+    }
+
+
+
 
     /**
      * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.

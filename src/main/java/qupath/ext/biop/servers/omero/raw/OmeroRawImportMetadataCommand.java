@@ -44,17 +44,21 @@ public class OmeroRawImportMetadataCommand implements Runnable{
         GridPane pane = new GridPane();
         final ToggleGroup group = new ToggleGroup();
 
-        RadioButton rbKeepMetadata = new RadioButton("Add to existing Key-Values");
+        RadioButton rbKeepMetadata = new RadioButton("Keep existing and add new");
         rbKeepMetadata.setToggleGroup(group);
-        rbKeepMetadata.setSelected(true);
 
-        RadioButton rbRemoveMetadata = new RadioButton("Replace existing Key-Values");
-        rbRemoveMetadata.setToggleGroup(group);
+        RadioButton rbReplaceMetadata = new RadioButton("Replace existing and add new");
+        rbReplaceMetadata.setToggleGroup(group);
+        rbReplaceMetadata.setSelected(true);
+
+        RadioButton rbDeleteMetadata = new RadioButton("Delete all and add new");
+        rbDeleteMetadata.setToggleGroup(group);
 
         int row = 0;
         pane.add(new Label("Select import options"), 0, row++, 2, 1);
         pane.add(rbKeepMetadata, 0, row++);
-        pane.add(rbRemoveMetadata, 0, row);
+        pane.add(rbReplaceMetadata, 0, row++);
+        pane.add(rbDeleteMetadata, 0, row);
 
         pane.setHgap(5);
         pane.setVgap(5);
@@ -64,59 +68,76 @@ public class OmeroRawImportMetadataCommand implements Runnable{
 
         // get user choice
         boolean keepMetadata = rbKeepMetadata.isSelected();
+        boolean replaceMetadata = rbReplaceMetadata.isSelected();
+        boolean deleteMetadata = rbDeleteMetadata.isSelected();
 
         // read keyValue from QuPath
         ProjectImageEntry<BufferedImage> entry = this.qupath.getProject().getEntry(this.qupath.getImageData());
 
-        // delete metadata
-        if(!keepMetadata)
-            entry.clearMetadata();
-
 
         // get key values in OMERO
         List<MapAnnotationData> annotationData;
+        boolean uniqueOmeroKeys;
         try {
             annotationData = OmeroRawTools.readKeyValues((OmeroRawImageServer) imageServer);
+            uniqueOmeroKeys = OmeroRawTools.checkUniqueKeyInAnnotationMap(annotationData);
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
             throw new RuntimeException(e);
         }
 
-        if(annotationData.isEmpty()) {
+        if (annotationData.isEmpty()) {
             Dialogs.showWarningNotification(title, "The current image does not have any KeyValues on OMERO");
             return;
         }
 
+        if (!uniqueOmeroKeys) {
+            Dialogs.showErrorMessage(title, "There is at least two identical keys on OMERO. Please, make all keys unique. Metadata has not been modified.");
+            return;
+        }
+
         List<NamedValue> keyValues = new ArrayList<>();
-        annotationData.forEach(annotation->{
-            keyValues.addAll((List<NamedValue>)annotation.getContent());
+        annotationData.forEach(annotation -> {
+            keyValues.addAll((List<NamedValue>) annotation.getContent());
         });
+
+        // delete metadata
+        if (deleteMetadata)
+            entry.clearMetadata();
+
 
         Map<String, String> currentKV = entry.getMetadataMap();
         AtomicInteger nExistingKV = new AtomicInteger();
 
-        keyValues.forEach(pair->{
+        keyValues.forEach(pair -> {
             boolean existingKeyValue = false;
             ArrayList<String> existingKeys = new ArrayList<>(currentKV.keySet());
 
             // check if the key-value already exists in QuPath
             for (String existingKey : existingKeys) {
-                if (pair.name.equals(existingKey) && pair.value.equals(currentKV.get(existingKey))) {
+                if (pair.name.equals(existingKey)) {
                     existingKeyValue = true;
+                    nExistingKV.getAndIncrement();
                     break;
                 }
             }
 
             // add key values to qupath metadata
-            if(!existingKeyValue)
+            if (!existingKeyValue || replaceMetadata)
                 entry.putMetadataValue(pair.name, pair.value);
-            else
-                nExistingKV.getAndIncrement();
         });
 
         // inform user if some key-values already exists in QuPath
-        if(nExistingKV.get() > 0)
-            Dialogs.showWarningNotification(title, String.format("%d %s already %s in QuPath",nExistingKV.get(),
+        if (keepMetadata)
+            Dialogs.showInfoNotification(title, String.format("Add %d %s", keyValues.size()-nExistingKV.get(),
+                    (keyValues.size()-nExistingKV.get() <= 1 ? "key-value" : "key-values")));
+        if(replaceMetadata)
+            Dialogs.showInfoNotification(title, String.format("Update %d %s and add %d %s", nExistingKV.get(),
                     (nExistingKV.get() == 1 ? "key-value" : "key-values"),
-                    (nExistingKV.get() == 1 ? "exists" : "exist")));
+                    keyValues.size()-nExistingKV.get(),
+                    (keyValues.size()-nExistingKV.get() == 1 ? "key-value" : "key-values")));
+        if(deleteMetadata)
+            Dialogs.showInfoNotification(title, String.format("Delete all previous key-values and add %d %s", keyValues.size(),
+                    (keyValues.size()== 1 ? "key-value" : "key-values")));
     }
+
 }
