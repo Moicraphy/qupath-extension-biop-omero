@@ -566,43 +566,61 @@ public final class OmeroRawTools {
      * @throws DSOutOfServiceException
      * @throws DSAccessException
      */
-    public static void writeMetadata(Map<String,String> qpKeyValues, OmeroRawImageServer imageServer) throws ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static boolean writeMetadata(Map<String,String> qpKeyValues, OmeroRawImageServer imageServer, boolean deleteAll, boolean replace) throws ExecutionException, DSOutOfServiceException, DSAccessException {
+        // read current key-value on OMERO
+        List<MapAnnotationData> currentOmeroAnnotationData = readKeyValues(imageServer);
+
+        // check unique keys
+        boolean uniqueOmeroKeys = checkUniqueKeyInAnnotationMap(currentOmeroAnnotationData);
+
+        if(!uniqueOmeroKeys)
+            return false;
+
         // build OMERO-compatible key-value pairs
-        List<NamedValue> omeroNamedValues = new ArrayList<>();
+        List<NamedValue> qpNamedValues = new ArrayList<>();
         for (String key : qpKeyValues.keySet()) {
-            omeroNamedValues.add(new NamedValue(key, qpKeyValues.get(key)));
+            qpNamedValues.add(new NamedValue(key, qpKeyValues.get(key)));
         }
 
-        MapAnnotationData omeroKeyValues = new MapAnnotationData();
-        omeroKeyValues.setContent(omeroNamedValues);
-        omeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
-
-        List<MapAnnotationData> currentOmeroAnnotationData = readKeyValues(imageServer);
         List<NamedValue> currentOmeroKeyValues = new ArrayList<>();
         currentOmeroAnnotationData.forEach(annotation->{
             currentOmeroKeyValues.addAll((List<NamedValue>)annotation.getContent());
         });
 
 
-        omeroNamedValues.forEach(pair-> {
-            boolean existingKeyValue = false;
-
+        // update current OMERO key-values
+        qpNamedValues.forEach(pair-> {
             // check if the key-value already exists in QuPath
             for (NamedValue keyvalue : currentOmeroKeyValues) {
                 if (pair.name.equals(keyvalue.name)) {
-                    existingKeyValue = true;
-                    omeroNamedValues.remove(pair);
+                    if(!replace)
+                        pair.value = keyvalue.value;
+                    currentOmeroKeyValues.remove(keyvalue);
                     break;
                 }
             }
         });
 
+        // delete all currentif asked
+        if(!deleteAll)
+            qpNamedValues.addAll(currentOmeroKeyValues);
 
+        // set annotation map
+        MapAnnotationData omeroKeyValues = new MapAnnotationData();
+        omeroKeyValues.setContent(qpNamedValues);
+        omeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
 
-        // send key-values to OMERO
+        // get OMERO client
         OmeroRawClient client = imageServer.getClient();
         ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageServer.getId());
+
+        // send key-values to OMERO
         client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(),omeroKeyValues,imageData);
+
+        // remove previous key-values
+        client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(),currentOmeroAnnotationData.stream().map(MapAnnotationData::asIObject).collect(Collectors.toList()));
+
+        return true;
     }
 
     /**

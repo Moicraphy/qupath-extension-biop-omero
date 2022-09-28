@@ -1,5 +1,9 @@
 package qupath.ext.biop.servers.omero.raw;
 
+import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.GridPane;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import org.apache.commons.lang3.StringUtils;
@@ -40,6 +44,38 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
             return;
         }
 
+        // build the GUI for import options
+        GridPane pane = new GridPane();
+        final ToggleGroup group = new ToggleGroup();
+
+        RadioButton rbKeepMetadata = new RadioButton("Keep existing and add new");
+        rbKeepMetadata.setToggleGroup(group);
+
+        RadioButton rbReplaceMetadata = new RadioButton("Replace existing and add new");
+        rbReplaceMetadata.setToggleGroup(group);
+        rbReplaceMetadata.setSelected(true);
+
+        RadioButton rbDeleteMetadata = new RadioButton("Delete all and add new");
+        rbDeleteMetadata.setToggleGroup(group);
+
+        int row = 0;
+        pane.add(new Label("Select import options"), 0, row++, 2, 1);
+        pane.add(rbKeepMetadata, 0, row++);
+        pane.add(rbReplaceMetadata, 0, row++);
+        pane.add(rbDeleteMetadata, 0, row);
+
+        pane.setHgap(5);
+        pane.setVgap(5);
+
+        if (!Dialogs.showConfirmDialog(title, pane))
+            return;
+
+        // get user choice
+        boolean keepMetadata = rbKeepMetadata.isSelected();
+        boolean replaceMetadata = rbReplaceMetadata.isSelected();
+        boolean deleteMetadata = rbDeleteMetadata.isSelected();
+
+
         // get keys
         ProjectImageEntry<BufferedImage> entry = this.qupath.getProject().getEntry(this.qupath.getImageData());
         Collection<String> keys = entry.getMetadataKeys();
@@ -67,11 +103,14 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
         // send metadata to OMERO
         String objectString = "key-value" + (keys.size() == 1 ? "" : "s");
         try {
-            OmeroRawTools.writeMetadata(keyValues, (OmeroRawImageServer)imageServer);
-            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
-                    keys.size(),
-                    objectString,
-                    (keys.size() == 1 ? "was" : "were")));
+            boolean uniqueKeys = OmeroRawTools.writeMetadata(keyValues, (OmeroRawImageServer)imageServer, deleteMetadata, replaceMetadata);
+            if(uniqueKeys)
+                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
+                        keys.size(),
+                        objectString,
+                        (keys.size() == 1 ? "was" : "were")));
+            else
+                Dialogs.showErrorMessage(StringUtils.capitalize(objectString),"There is at least two identical keys on OMERO. Please, make all keys unique. Metadata has not been modified.");
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
             Dialogs.showErrorNotification("Could not send " + objectString, e.getLocalizedMessage());
             throw new RuntimeException(e);
