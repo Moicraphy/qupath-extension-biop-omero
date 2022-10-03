@@ -71,7 +71,6 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
             return;
 
         // get user choice
-        boolean keepMetadata = rbKeepMetadata.isSelected();
         boolean replaceMetadata = rbReplaceMetadata.isSelected();
         boolean deleteMetadata = rbDeleteMetadata.isSelected();
 

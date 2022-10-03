@@ -23,6 +23,7 @@ package qupath.ext.biop.servers.omero.raw;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -30,6 +31,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -39,15 +41,13 @@ import java.util.stream.Collectors;
 
 import fr.igred.omero.Client;
 import fr.igred.omero.annotations.MapAnnotationWrapper;
+import ij.measure.ResultsTable;
 import omero.RLong;
 import omero.ServerError;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.BrowseFacility;
-import omero.gateway.facility.DataManagerFacility;
-import omero.gateway.facility.MetadataFacility;
-import omero.gateway.facility.ROIFacility;
+import omero.gateway.facility.*;
 import omero.gateway.model.*;
 import omero.model.*;
 import omero.model.Image;
@@ -58,10 +58,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import javafx.scene.Node;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.io.GsonTools;
+import qupath.lib.measurements.MeasurementList;
 import qupath.lib.objects.PathObject;
 import qupath.lib.scripting.QP;
 
@@ -96,6 +99,8 @@ public final class OmeroRawTools {
      */
     private final static Pattern patternLinkProject = Pattern.compile("show=project-(\\d+)");
     private final static Pattern patternLinkDataset = Pattern.compile("show=dataset-(\\d+)");
+
+    private final static String um = GeneralTools.micrometerSymbol();
 
     /**
      * Suppress default constructor for non-instantiability
@@ -514,6 +519,81 @@ public final class OmeroRawTools {
         return simpleClient;
     }
 
+
+    /**
+     * Write PathObject collection to OMERO server. This will not delete the existing
+     * ROIs present on the OMERO server. Rather, it will simply add the new ones.
+     *
+     * @param pathObjects
+     * @param server
+     */
+    public static void writePathObjects(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException, IOException {
+        //TODO: What to do if token expires?
+        //TODO: What if we have more object than the limit accepted by the OMERO API?
+
+        // write ROI on OMERO
+        writePathObjects(pathObjects,server);
+
+        // get the current OMERO-RAW client
+        OmeroRawClient client = server.getClient();
+
+        List<TableDataColumn> columns = new ArrayList<>();
+        List<List<Object>> measurements = new ArrayList<>();
+
+        int i = 0;
+        columns.add(new TableDataColumn("Type", i++, String.class));
+        List<Object> label = new ArrayList<>();
+        for (PathObject pathObject : pathObjects) {
+           if(pathObject.isAnnotation())
+               label.add("Annotation");
+           else
+               label.add("Detection");
+        }
+        measurements.add(label);
+
+
+        // create formatted Lists of measurements to be compatible with omero.tables
+        for (String col : ob.getAllNames()) {
+            if (ob.isNumericMeasurement(col)) {
+                // feature name
+                columns.add(new TableDataColumn(col, i++, Double.class));
+
+                //feature value for each pathObject
+                List<Object> feature = new ArrayList<>();
+                for (PathObject pathObject : pathObjects) {
+                    feature.add(ob.getNumericValue(pathObject, col));
+                }
+                measurements.add(feature);
+            }
+
+            if (ob.isStringMeasurement(col)) {
+                // feature name
+                columns.add(new TableDataColumn(col, i++, String.class));
+
+                //feature value for each pathObject
+                List<Object> feature = new ArrayList<>();
+                for (PathObject pathObject : pathObjects) {
+                    feature.add(ob.getStringValue(pathObject, col));
+                }
+                measurements.add(feature);
+            }
+        }
+
+        // create omero Table
+        TableData omeroTable = new TableData(columns, measurements);
+
+        // get the current image to attach the omero.table to
+        ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
+
+        // attach the omero.table to the image
+       /* String date = new Date().toString();
+        String[] dateParsing = date.split(" ");
+        String formattedDate = dateParsing[5] + " " + dateParsing[1] + " " + dateParsing[2] + " " + dateParsing[3];*/
+        client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(),image,"QP Measurements_"+qpprojName+"_"+new Date(), omeroTable);
+    }
+
+
+
     /**
      * Write PathObject collection to OMERO server. This will not delete the existing
      * ROIs present on the OMERO server. Rather, it will simply add the new ones.
@@ -533,7 +613,7 @@ public final class OmeroRawTools {
         Map<PathObject,String> idObjectMap = new HashMap<>();
 
         // create unique ID for each object
-        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, ""+ date.getTime() + pathObject.hashCode()));
+        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()/*""+ date.getTime() + pathObject.hashCode()*/));
 
         pathObjects.forEach(pathObject -> {
             // computes OMERO-readable ROIs
