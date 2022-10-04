@@ -24,9 +24,13 @@ package qupath.ext.biop.servers.omero.raw;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
+import java.util.Date;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.ToggleGroup;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import org.apache.commons.lang3.StringUtils;
@@ -35,6 +39,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
+import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.objects.PathObject;
 
@@ -65,6 +70,36 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
             Dialogs.showErrorMessage(title, "The current image is not from OMERO!");
             return;
         }
+
+        // build the GUI for import options
+        GridPane pane = new GridPane();
+        final ToggleGroup group = new ToggleGroup();
+
+        RadioButton rbDetections = new RadioButton("Only Detections");
+        rbDetections.setToggleGroup(group);
+        rbDetections.setSelected(true);
+
+        RadioButton rbDetectionsAndMeasurements = new RadioButton("Detections with Measurements");
+        rbDetectionsAndMeasurements.setToggleGroup(group);
+
+        CheckBox cbDeleteRois = new CheckBox("Delete existing ROIs");
+        cbDeleteRois.setSelected(false);
+
+        int row = 0;
+        pane.add(new Label("Select import options"), 0, row++, 2, 1);
+        pane.add(rbDetections, 0, row++);
+        pane.add(rbDetectionsAndMeasurements, 0, row++);
+        pane.add(cbDeleteRois, 0, row);
+
+        pane.setHgap(5);
+        pane.setVgap(5);
+
+        if (!Dialogs.showConfirmDialog(title, pane))
+            return;
+
+        // get user choice
+        boolean onlyDetections = rbDetections.isSelected();
+        boolean deleteRois = cbDeleteRois.isSelected();
 
         // Check if at least one object was selected (and type)
         var selectedObjects = viewer.getAllSelectedObjects();
@@ -110,7 +145,7 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
         var omeroServer = (OmeroRawImageServer) server;
         URI uri = server.getURIs().iterator().next();
         String objectString = "object" + (objs.size() == 1 ? "" : "s");
-        GridPane pane = new GridPane();
+        pane = new GridPane();
         PaneTools.addGridRow(pane, 0, 0, null, new Label(String.format("%d %s will be sent to:", objs.size(), objectString)));
         PaneTools.addGridRow(pane, 1, 0, null, new Label(uri.toString()));
         var confirm = Dialogs.showConfirmDialog("Send " + (selectedObjects.size() == 0 ? "all " : "") + objectString, pane);
@@ -119,14 +154,27 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
 
         // Write path object(s)
         try {
-            OmeroRawTools.writePathObjects(objs, omeroServer);
+            // give to each pathObject a unique name
+            objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
+            if(!onlyDetections) {
+                // get annotation measurements
+                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+                ob.setImageData(qupath.getImageData(), objs);
+                OmeroRawTools.writePathObjects(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer, deleteRois);
+            }
+            else
+                OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
+
+            objs.forEach(pathObject -> pathObject.setName(null));
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),
                     objectString,
                     (objs.size() == 1 ? "was" : "were")));
         } catch (IOException ex) {
+            objs.forEach(pathObject -> pathObject.setName(null));
             Dialogs.showErrorNotification("Could not send " + objectString, ex.getLocalizedMessage());
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
+            objs.forEach(pathObject -> pathObject.setName(null));
             throw new RuntimeException(e);
         }
     }

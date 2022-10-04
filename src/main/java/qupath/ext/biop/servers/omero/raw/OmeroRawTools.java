@@ -527,12 +527,12 @@ public final class OmeroRawTools {
      * @param pathObjects
      * @param server
      */
-    public static void writePathObjects(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException, IOException {
+    public static void writePathObjects(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server, boolean toDelete) throws ExecutionException, DSOutOfServiceException, DSAccessException, IOException {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
         // write ROI on OMERO
-        writePathObjects(pathObjects,server);
+        writePathObjects(pathObjects,server, toDelete);
 
         // get the current OMERO-RAW client
         OmeroRawClient client = server.getClient();
@@ -540,6 +540,7 @@ public final class OmeroRawTools {
         List<TableDataColumn> columns = new ArrayList<>();
         List<List<Object>> measurements = new ArrayList<>();
 
+        // add the pathObject type to the omero.table
         int i = 0;
         columns.add(new TableDataColumn("Type", i++, String.class));
         List<Object> label = new ArrayList<>();
@@ -586,9 +587,6 @@ public final class OmeroRawTools {
         ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
 
         // attach the omero.table to the image
-       /* String date = new Date().toString();
-        String[] dateParsing = date.split(" ");
-        String formattedDate = dateParsing[5] + " " + dateParsing[1] + " " + dateParsing[2] + " " + dateParsing[3];*/
         client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(),image,"QP Measurements_"+qpprojName+"_"+new Date(), omeroTable);
     }
 
@@ -601,14 +599,13 @@ public final class OmeroRawTools {
      * @param pathObjects
      * @param server
      */
-    public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server, boolean toDelete) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
         // get the current OMERO-RAW client
         OmeroRawClient client = server.getClient();
 
-        Date date = new Date();
         Collection<ROIData> omeroRois = new ArrayList<>();
         Map<PathObject,String> idObjectMap = new HashMap<>();
 
@@ -627,6 +624,17 @@ public final class OmeroRawTools {
             }
         });
 
+        // delete existing ROIs on OMERO
+        if(toDelete) {
+            try {
+                List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), server.getId());
+                List<IObject> roiData = new ArrayList<>();
+                roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
+                client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
+            }catch(DSOutOfServiceException | DSAccessException e){
+                logger.error("Could not delete existing ROIS on OMERO");
+            }
+        }
         // import ROIs on OMERO
         if (!(omeroRois.isEmpty())) {
             client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);

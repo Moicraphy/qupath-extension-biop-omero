@@ -29,6 +29,7 @@ import java.util.Date;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
 import omero.gateway.exception.DSAccessException;
@@ -78,15 +79,19 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         RadioButton rbAnnotations = new RadioButton("Only Annotations");
         rbAnnotations.setToggleGroup(group);
+        rbAnnotations.setSelected(true);
 
         RadioButton rbannotationsAndMeasurements = new RadioButton("Annotations with Measurements");
         rbannotationsAndMeasurements.setToggleGroup(group);
-        rbannotationsAndMeasurements.setSelected(true);
+
+        CheckBox cbDeleteRois = new CheckBox("Delete existing ROIs");
+        cbDeleteRois.setSelected(false);
 
         int row = 0;
         pane.add(new Label("Select import options"), 0, row++, 2, 1);
         pane.add(rbAnnotations, 0, row++);
-        pane.add(rbannotationsAndMeasurements, 0, row);
+        pane.add(rbannotationsAndMeasurements, 0, row++);
+        pane.add(cbDeleteRois, 0, row);
 
         pane.setHgap(5);
         pane.setVgap(5);
@@ -96,6 +101,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         // get user choice
         boolean onlyAnnotations = rbAnnotations.isSelected();
+        boolean deleteRois = cbDeleteRois.isSelected();
 
         // Check if at least one object was selected (and type)
         var selectedObjects = viewer.getAllSelectedObjects();
@@ -151,15 +157,18 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         // Write path object(s)
         try {
+            // give to each pathObject a unique name
             objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
             if(!onlyAnnotations) {
+                // get annotation measurements
                 ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
                 ob.setImageData(qupath.getImageData(), objs);
-                OmeroRawTools.writePathObjects(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer);
+                OmeroRawTools.writePathObjects(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer, deleteRois);
             }
             else
-                OmeroRawTools.writePathObjects(objs, omeroServer);
+                OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
 
+            // remove the name to not interfere with QuPath ROI display.
             objs.forEach(pathObject -> pathObject.setName(null));
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),
