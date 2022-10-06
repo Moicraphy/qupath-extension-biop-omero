@@ -23,7 +23,6 @@ package qupath.ext.biop.servers.omero.raw;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -47,7 +46,6 @@ import omero.ServerError;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.BrowseFacility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -536,7 +534,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                             executorThumbnails.submit(() -> {
                                 // Note: it is possible that another task for the same id exists, but it
                                 // shouldn't cause inconsistent results anyway, since '1 id = 1 thumbnail'
-                                BufferedImage img = OmeroRawTools.getThumbnail(serverURI, client, selectedObjectLocal.getId(), imgPrefSize);
+                                BufferedImage img = OmeroRawTools.getThumbnail(client, selectedObjectLocal.getId(), imgPrefSize);
 
                                 if (img != null) {
                                     thumbnailBank.put(selectedObjectLocal.getId(), img);
@@ -1105,7 +1103,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     else {
                         // Get thumbnail from JSON API in separate thread
                         executorThumbnails.submit(() -> {
-                            var loadedImg = OmeroRawTools.getThumbnail(serverURI, client, item.getId(), imgPrefSize);
+                            var loadedImg = OmeroRawTools.getThumbnail(client, item.getId(), imgPrefSize);
                             if (loadedImg != null) {
                                 thumbnailBank.put(item.getId(), loadedImg);
                                 Platform.runLater(() -> paintBufferedImageOnCanvas(loadedImg, tooltipCanvas, 100));
@@ -1934,7 +1932,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
             for (var searchResult: thumbnailsToQuery) {
                 executorThumbnail.submit(() -> {
-                    BufferedImage thumbnail = OmeroRawTools.getThumbnail(serverURI, client, searchResult.id, imgPrefSize);
+                    BufferedImage thumbnail = OmeroRawTools.getThumbnail(client, searchResult.id, imgPrefSize);
                     if (thumbnail != null) {
                         thumbnailBank.put((long)searchResult.id, thumbnail);	// 'Put' shouldn't need synchronized key
                         Platform.runLater(() -> resultsTableView.refresh());

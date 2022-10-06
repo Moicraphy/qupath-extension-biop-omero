@@ -23,7 +23,7 @@ package qupath.ext.biop.servers.omero.raw;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -31,7 +31,6 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -40,10 +39,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import fr.igred.omero.Client;
-import fr.igred.omero.annotations.MapAnnotationWrapper;
-import ij.measure.ResultsTable;
 import omero.RLong;
 import omero.ServerError;
+import omero.api.ThumbnailStorePrx;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
@@ -60,13 +58,17 @@ import com.google.gson.JsonObject;
 import javafx.scene.Node;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.io.GsonTools;
-import qupath.lib.measurements.MeasurementList;
 import qupath.lib.objects.PathObject;
 import qupath.lib.scripting.QP;
+
+import javax.imageio.ImageIO;
+
+import static omero.rtypes.rint;
 
 
 /**
@@ -110,7 +112,7 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Return the web client used for the specified OMERO server.
+     * Return the raw client used for the specified OMERO server.
      *
      * @param server
      * @return client
@@ -689,7 +691,7 @@ public final class OmeroRawTools {
             }
         });
 
-        // delete all currentif asked
+        // delete all current if asked
         if(!deleteAll)
             qpNamedValues.addAll(currentOmeroKeyValues);
 
@@ -770,39 +772,55 @@ public final class OmeroRawTools {
     /**
      * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.
      *
-     * @param server
+     * Code copied from Pierre Pouchin from {simple-omero-client} project, {ImageWrapper} class, {getThumbnail} method
+     * and adapted for QuPath compatibility.
+     *
+     * @param client
      * @param imageId
      * @param prefSize
      * @return thumbnail
      */
-    public static BufferedImage getThumbnail(OmeroRawImageServer server, long imageId, int prefSize) {
-        //try {
-            return null;//OmeroRequests.requestThumbnail(server.getScheme(), server.getHost(), server.getPort(), imageId, prefSize);
-        /*} catch (IOException ex) {
-            logger.warn("Error requesting the thumbnail: {}", ex.getLocalizedMessage());
+    public static BufferedImage getThumbnail(OmeroRawClient client, long imageId, int prefSize) {
+
+        Pixels pixel = null;
+        try {
+            ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+            pixel = image.asImage().getPixels(0);
+        }catch(ExecutionException | DSOutOfServiceException | DSAccessException e){
+            Dialogs.showErrorMessage( "Error retrieving image and pixels for thumbnail :","" +e);
             return null;
-        }*/
+        }
+
+        int   sizeX  = pixel.getSizeX().getValue();
+        int   sizeY  = pixel.getSizeY().getValue();
+        float ratioX = (float) sizeX / prefSize;
+        float ratioY = (float) sizeY / prefSize;
+        float ratio  = Math.max(ratioX, ratioY);
+        int   width  = (int) (sizeX / ratio);
+        int   height = (int) (sizeY / ratio);
+
+        BufferedImage thumbnail = null;
+        byte[] array = null;
+        try {
+            ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
+            store.setPixelsId(pixel.getId().getValue());
+            array = store.getThumbnail(rint(width), rint(height));
+            store.close();
+        } catch (DSOutOfServiceException | ServerError e) {
+            Dialogs.showErrorMessage( "Error retrieving thumbnail :","" +e);
+        }
+
+        if (array != null) {
+            try (ByteArrayInputStream stream = new ByteArrayInputStream(array)) {
+                //Create a buffered image to display
+                thumbnail = ImageIO.read(stream);
+            }catch(IOException e){
+                Dialogs.showErrorMessage( "Error converting thumbnail to bufferedImage :","" +e);
+            }
+        }
+
+        return thumbnail;
     }
-
-    /**
-     * Return the thumbnail of the OMERO image corresponding to the specified {@code id}.
-     *
-     * @param uri
-     * @param id
-     * @param prefSize
-     * @return thumbnail
-     */
-    public static BufferedImage getThumbnail(URI uri, OmeroRawClient client, long id, int prefSize) {
-        /*try {
-            return OmeroRequests.requestThumbnail(uri.getScheme(), uri.getHost(), uri.getPort(), id, prefSize);
-        } catch (IOException ex) {
-            logger.warn("Error requesting the thumbnail: {}", ex.getLocalizedMessage());
-            return null;
-        }*/
-
-        return null;
-    }
-
 
 //	/**
 //	 * Return a list of all {@code OmeroWebClient}s that are using the specified URI (based on their {@code host}).
