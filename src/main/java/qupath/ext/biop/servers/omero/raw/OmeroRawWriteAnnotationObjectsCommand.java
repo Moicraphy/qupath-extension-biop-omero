@@ -26,6 +26,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -54,7 +55,7 @@ import qupath.lib.scripting.QP;
  */
 public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
-    private final String title = "Send objects to OMERO";
+    private final String title = "Select OMERO import options";
 
     private QuPathGUI qupath;
 
@@ -75,23 +76,21 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         // build the GUI for import options
         GridPane pane = new GridPane();
-        final ToggleGroup group = new ToggleGroup();
 
-        RadioButton rbAnnotations = new RadioButton("Only Annotations");
-        rbAnnotations.setToggleGroup(group);
-        rbAnnotations.setSelected(true);
+        CheckBox cbAnnotationsMap = new CheckBox("Annotation map");
+        cbAnnotationsMap.setSelected(false);
 
-        RadioButton rbannotationsAndMeasurements = new RadioButton("Annotations with Measurements");
-        rbannotationsAndMeasurements.setToggleGroup(group);
+        CheckBox cbDetectionsMap = new CheckBox("Detection map");
+        cbDetectionsMap.setSelected(false);
 
         CheckBox cbDeleteRois = new CheckBox("Delete existing ROIs");
         cbDeleteRois.setSelected(false);
 
         int row = 0;
-        pane.add(new Label("Select import options"), 0, row++, 2, 1);
-        pane.add(rbAnnotations, 0, row++);
-        pane.add(rbannotationsAndMeasurements, 0, row++);
-        pane.add(cbDeleteRois, 0, row);
+        pane.add(new Label("Import annotations with : "), 0, row++, 2, 1);
+        pane.add(cbAnnotationsMap, 0, row++);
+        pane.add(cbDetectionsMap, 0, row++);
+        pane.add(cbDeleteRois, 0, ++row);
 
         pane.setHgap(5);
         pane.setVgap(5);
@@ -100,11 +99,12 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             return;
 
         // get user choice
-        boolean onlyAnnotations = rbAnnotations.isSelected();
+        boolean annotationMap = cbAnnotationsMap.isSelected();
         boolean deleteRois = cbDeleteRois.isSelected();
+        boolean detectionMap = cbDetectionsMap.isSelected();
 
         // Check if at least one object was selected (and type)
-        var selectedObjects = viewer.getAllSelectedObjects();
+       /* Collection<PathObject> selectedObjects = viewer.getHierarchy().getAnnotationObjects();//viewer.getAllSelectedObjects();
         Collection<PathObject> objs;
         if (selectedObjects.size() == 0) {
             // If no selection, get all annotation objects
@@ -121,27 +121,36 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
             if (!confirm)
                 return;
-        } else {
-            objs = selectedObjects;
+        } else {*/
+            Collection<PathObject> objs = viewer.getHierarchy().getAnnotationObjects();
+            //objs = selectedObjects;
 
             // Get detections amongst selection
-            var detections = objs.stream().filter(e -> e.isDetection()).collect(Collectors.toList());
+            //List<PathObject> detections = objs.stream().filter(e -> e.isDetection()).collect(Collectors.toList());
 
             // Give warning and filter out detection objects
-            if (detections.size() > 0) {
+           /* if (detections.size() > 0) {
                 Dialogs.showWarningNotification(title, String.format("Sending detection objects is not supported (%d %s)",
                         detections.size(),
                         (detections.size() == 1 ? "object" : "objects")));
 
                 objs = objs.stream().filter(e -> !e.isDetection()).collect(Collectors.toList());
-            }
+            }*/
 
             // Output message if no annotation object was found
             if (objs.size() == 0) {
                 Dialogs.showErrorMessage(title, "No annotation objects to send!");
                 return;
             }
-        }
+
+            // Ask user if he/she wants to send all annotations instead
+          /*  var confirm = Dialogs.showConfirmDialog("Send annotations", String.format("Send all annotations ? (%d %s)",
+                    objs.size(),
+                    (objs.size() == 1 ? "object" : "objects")));
+
+            if (!confirm)
+                return;*/
+        //}
 
         // Confirm
         var omeroServer = (OmeroRawImageServer) server;
@@ -150,7 +159,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         pane = new GridPane();
         PaneTools.addGridRow(pane, 0, 0, null, new Label(String.format("%d %s will be sent to:", objs.size(), objectString)));
         PaneTools.addGridRow(pane, 1, 0, null, new Label(uri.toString()));
-        var confirm = Dialogs.showConfirmDialog("Send " + (selectedObjects.size() == 0 ? "all " : "") + objectString, pane);
+        var confirm = Dialogs.showConfirmDialog("Send " + (objs.size() == 0 ? "all " : "") + objectString, pane);
         if (!confirm)
             return;
 
@@ -159,21 +168,43 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         try {
             // give to each pathObject a unique name
             objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
-            if(!onlyAnnotations) {
-                // get annotation measurements
-                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
-                ob.setImageData(qupath.getImageData(), objs);
-                OmeroRawTools.writePathObjects(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer, deleteRois);
-            }
-            else
-                OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
 
-            // remove the name to not interfere with QuPath ROI display.
-            objs.forEach(pathObject -> pathObject.setName(null));
+            // send annotations to OMERO
+            OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),
                     objectString,
                     (objs.size() == 1 ? "was" : "were")));
+
+            if(annotationMap) {
+                // send annotation measurements
+                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+                ob.setImageData(qupath.getImageData(), objs);
+                OmeroRawTools.writeMeasurementTableData(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer);
+            }
+            if(detectionMap){
+                // get detection objects
+                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+                Collection<PathObject> detections = viewer.getHierarchy().getDetectionObjects();
+                //detections.addAll(viewer.getHierarchy().getCellObjects());
+
+                // send detection measurement map
+                if(detections.size() > 0) {
+                    ob.setImageData(qupath.getImageData(), detections);
+                    OmeroRawTools.writeMeasurementTableData(detections, ob, qupath.getProject().getName().split("/")[0], omeroServer);
+                }
+                else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
+            }
+
+            // remove the name to not interfere with QuPath ROI display.
+            objs.forEach(pathObject -> pathObject.setName(null));
+
+            if(detectionMap || annotationMap)
+                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement %s %s successfully written to OMERO server",
+                        detectionMap && annotationMap ? 2 : 1,
+                        detectionMap && annotationMap ? "maps": "map",
+                        detectionMap && annotationMap ? "was" : "were"));
+
         } catch (IOException ex) {
             objs.forEach(pathObject -> pathObject.setName(null));
             Dialogs.showErrorNotification("Could not send " + objectString, ex.getLocalizedMessage());

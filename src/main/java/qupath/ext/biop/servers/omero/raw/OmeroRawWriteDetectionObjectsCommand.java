@@ -156,14 +156,16 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
         try {
             // give to each pathObject a unique name
             objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
+
+            // send detections to OMERO
+            OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
+
             if(!onlyDetections) {
-                // get annotation measurements
+                // get detection measurements
                 ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
                 ob.setImageData(qupath.getImageData(), objs);
-                OmeroRawTools.writePathObjects(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer, deleteRois);
+                OmeroRawTools.writeMeasurementTableData(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer);
             }
-            else
-                OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
 
             objs.forEach(pathObject -> pathObject.setName(null));
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",

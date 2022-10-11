@@ -531,12 +531,9 @@ public final class OmeroRawTools {
      * @param pathObjects
      * @param server
      */
-    public static void writePathObjects(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server, boolean toDelete) throws ExecutionException, DSOutOfServiceException, DSAccessException, IOException {
+    public static void writeMeasurementTableData(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
-
-        // write ROI on OMERO
-        writePathObjects(pathObjects,server, toDelete);
 
         // get the current OMERO-RAW client
         OmeroRawClient client = server.getClient();
