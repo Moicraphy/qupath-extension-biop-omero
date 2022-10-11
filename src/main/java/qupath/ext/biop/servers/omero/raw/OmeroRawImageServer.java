@@ -813,6 +813,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			if(roiDatum.getShapeCount() > 0)
 				color = roiDatum.getShapes().iterator().next().getShapeSettings().getStroke();
 
+			// because Yellow in QuPath is reserved to show which annotation is selected.
+			if(color.equals(Color.YELLOW))
+				color = Color.RED;
+
 			// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
 			idObjectMap.put(Double.parseDouble(roiComment[2]),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1], color));
 			// populate parent map

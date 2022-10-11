@@ -56,10 +56,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import javafx.scene.Node;
+import qupath.lib.color.ColorToolsAwt;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
+import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.io.GsonTools;
@@ -612,14 +614,17 @@ public final class OmeroRawTools {
         Map<PathObject,String> idObjectMap = new HashMap<>();
 
         // create unique ID for each object
-        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()/*""+ date.getTime() + pathObject.hashCode()*/));
+        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()));
 
         pathObjects.forEach(pathObject -> {
             // computes OMERO-readable ROIs
             List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent()==null ?"NoParent":idObjectMap.get(pathObject.getParent()));
             if (!(shapes == null) && !(shapes.isEmpty())) {
                 // set the ROI color according to the class assigned to the corresponding PathObject
-                shapes.forEach(shape -> shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.WHITE : new Color(pathObject.getPathClass().getColor())));
+                shapes.forEach(shape -> {
+                    shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.YELLOW : new Color(pathObject.getPathClass().getColor()));
+                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathObject.getPathClass() == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathObject.getPathClass().getColor())));
+                });
                 ROIData roiData = new ROIData();
                 shapes.forEach(roiData::addShapeData);
                 omeroRois.add(roiData);
