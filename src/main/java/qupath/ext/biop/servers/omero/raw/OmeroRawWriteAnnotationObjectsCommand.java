@@ -186,7 +186,6 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                 // get detection objects
                 ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
                 Collection<PathObject> detections = viewer.getHierarchy().getDetectionObjects();
-                //detections.addAll(viewer.getHierarchy().getCellObjects());
 
                 // send detection measurement map
                 if(detections.size() > 0) {

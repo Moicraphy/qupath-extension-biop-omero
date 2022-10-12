@@ -505,9 +505,10 @@ public final class OmeroRawTools {
         }
     }
 
+
     /**
      * This method creates an instance of {@code fr.igred.omero.Client} object to get access to the full
-     * simple-omero-client API, developped by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
+     * simple-omero-client API, developed by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
      *
      * @return the Client object
      */
@@ -540,25 +541,13 @@ public final class OmeroRawTools {
 
         List<TableDataColumn> columns = new ArrayList<>();
         List<List<Object>> measurements = new ArrayList<>();
-
-        // add the pathObject type to the omero.table
         int i = 0;
-        columns.add(new TableDataColumn("Type", i++, String.class));
-        List<Object> label = new ArrayList<>();
-        for (PathObject pathObject : pathObjects) {
-           if(pathObject.isAnnotation())
-               label.add("Annotation");
-           else
-               label.add("Detection");
-        }
-        measurements.add(label);
-
 
         // create formatted Lists of measurements to be compatible with omero.tables
         for (String col : ob.getAllNames()) {
             if (ob.isNumericMeasurement(col)) {
                 // feature name
-                columns.add(new TableDataColumn(col, i++, Double.class));
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, Double.class)); // OMERO table does not support "/"
 
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
@@ -570,7 +559,7 @@ public final class OmeroRawTools {
 
             if (ob.isStringMeasurement(col)) {
                 // feature name
-                columns.add(new TableDataColumn(col, i++, String.class));
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, String.class)); // OMERO table does not support "/"
 
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
@@ -588,14 +577,18 @@ public final class OmeroRawTools {
         ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
 
         // attach the omero.table to the image
-        client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(),image,"QP Measurements_"+qpprojName+"_"+new Date(), omeroTable);
+        String type;
+        if(pathObjects.iterator().next().isAnnotation())
+            type = "annotation";
+        else
+            type = "detection";
+        client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(),image,"QP "+type+" table_"+qpprojName+"_"+new Date(), omeroTable);
     }
 
 
-
     /**
-     * Write PathObject collection to OMERO server. This will not delete the existing
-     * ROIs present on the OMERO server. Rather, it will simply add the new ones.
+     * Write PathObject collection to OMERO server. This will delete the existing
+     * ROIs present on the OMERO server if the user asked for.
      *
      * @param pathObjects
      * @param server
