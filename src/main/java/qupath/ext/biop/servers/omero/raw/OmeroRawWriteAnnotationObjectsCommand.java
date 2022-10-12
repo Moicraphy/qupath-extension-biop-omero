@@ -181,6 +181,9 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                 ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
                 ob.setImageData(qupath.getImageData(), objs);
                 OmeroRawTools.writeMeasurementTableData(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer);
+
+                // send the corresponding csv file
+                OmeroRawTools.writeMeasurementTableDataAsCSV(objs, ob, qupath.getProject().getName().split("/")[0], qupath.getProject().getPath().getParent().toString(), omeroServer);
             }
             if(detectionMap){
                 // get detection objects
@@ -191,6 +194,9 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                 if(detections.size() > 0) {
                     ob.setImageData(qupath.getImageData(), detections);
                     OmeroRawTools.writeMeasurementTableData(detections, ob, qupath.getProject().getName().split("/")[0], omeroServer);
+
+                    // send the corresponding csv file
+                    OmeroRawTools.writeMeasurementTableDataAsCSV(detections, ob, qupath.getProject().getName().split("/")[0], qupath.getProject().getPath().getParent().toString(), omeroServer);
                 }
                 else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
             }
@@ -200,7 +206,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
             if(detectionMap || annotationMap)
                 Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement %s %s successfully written to OMERO server",
-                        detectionMap && annotationMap ? 2 : 1,
+                        detectionMap && annotationMap ? 4 : 2,
                         detectionMap && annotationMap ? "maps": "map",
                         detectionMap && annotationMap ? "was" : "were"));
 
