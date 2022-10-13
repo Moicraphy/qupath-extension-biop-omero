@@ -77,10 +77,10 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         // build the GUI for import options
         GridPane pane = new GridPane();
 
-        CheckBox cbAnnotationsMap = new CheckBox("Annotation map");
+        CheckBox cbAnnotationsMap = new CheckBox("Annotations table");
         cbAnnotationsMap.setSelected(false);
 
-        CheckBox cbDetectionsMap = new CheckBox("Detection map");
+        CheckBox cbDetectionsMap = new CheckBox("Detections table");
         cbDetectionsMap.setSelected(false);
 
         CheckBox cbDeleteRois = new CheckBox("Delete existing ROIs");
