@@ -53,7 +53,7 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
         int row = 0;
         pane.add(new Label("Select import options"), 0, row++, 2, 1);
         pane.add(cbRemoveAnnotations, 0, row++);
-        pane.add(cbRemoveDetections, 0, row++);
+        pane.add(cbRemoveDetections, 0, row);
 
         pane.setHgap(5);
         pane.setVgap(5);
@@ -79,7 +79,7 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
         // remove current annotations
         if(removeAnnotations){
             Collection<PathObject> annotationObjects = hierarchy.getAnnotationObjects();
-            hierarchy.removeObjects(annotationObjects,false);
+            hierarchy.removeObjects(annotationObjects,true);
         }
 
         // remove current detections

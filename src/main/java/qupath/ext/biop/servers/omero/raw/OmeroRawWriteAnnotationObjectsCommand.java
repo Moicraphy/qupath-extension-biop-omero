@@ -103,54 +103,13 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         boolean deleteRois = cbDeleteRois.isSelected();
         boolean detectionMap = cbDetectionsMap.isSelected();
 
-        // Check if at least one object was selected (and type)
-       /* Collection<PathObject> selectedObjects = viewer.getHierarchy().getAnnotationObjects();//viewer.getAllSelectedObjects();
-        Collection<PathObject> objs;
-        if (selectedObjects.size() == 0) {
-            // If no selection, get all annotation objects
-            objs = viewer.getHierarchy().getAnnotationObjects();
-            if (objs.size() == 0) {
-                Dialogs.showErrorMessage(title, "No annotations to send!");
-                return;
-            }
+        Collection<PathObject> objs = viewer.getHierarchy().getAnnotationObjects();
 
-            // Ask user if he/she wants to send all annotations instead
-            var confirm = Dialogs.showConfirmDialog("Send annotations", String.format("No annotations are selected. Send all annotations instead? (%d %s)",
-                    objs.size(),
-                    (objs.size() == 1 ? "object" : "objects")));
-
-            if (!confirm)
-                return;
-        } else {*/
-            Collection<PathObject> objs = viewer.getHierarchy().getAnnotationObjects();
-            //objs = selectedObjects;
-
-            // Get detections amongst selection
-            //List<PathObject> detections = objs.stream().filter(e -> e.isDetection()).collect(Collectors.toList());
-
-            // Give warning and filter out detection objects
-           /* if (detections.size() > 0) {
-                Dialogs.showWarningNotification(title, String.format("Sending detection objects is not supported (%d %s)",
-                        detections.size(),
-                        (detections.size() == 1 ? "object" : "objects")));
-
-                objs = objs.stream().filter(e -> !e.isDetection()).collect(Collectors.toList());
-            }*/
-
-            // Output message if no annotation object was found
-            if (objs.size() == 0) {
-                Dialogs.showErrorMessage(title, "No annotation objects to send!");
-                return;
-            }
-
-            // Ask user if he/she wants to send all annotations instead
-          /*  var confirm = Dialogs.showConfirmDialog("Send annotations", String.format("Send all annotations ? (%d %s)",
-                    objs.size(),
-                    (objs.size() == 1 ? "object" : "objects")));
-
-            if (!confirm)
-                return;*/
-        //}
+        // Output message if no annotation object was found
+        if (objs.size() == 0) {
+            Dialogs.showErrorMessage(title, "No annotation objects to send!");
+            return;
+        }
 
         // Confirm
         var omeroServer = (OmeroRawImageServer) server;
@@ -162,7 +121,6 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         var confirm = Dialogs.showConfirmDialog("Send " + (objs.size() == 0 ? "all " : "") + objectString, pane);
         if (!confirm)
             return;
-
 
         // Write path object(s)
         try {
@@ -205,16 +163,12 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             objs.forEach(pathObject -> pathObject.setName(null));
 
             if(detectionMap || annotationMap)
-                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement %s %s successfully written to OMERO server",
-                        detectionMap && annotationMap ? 4 : 2,
-                        detectionMap && annotationMap ? "maps": "map",
-                        detectionMap && annotationMap ? "was" : "were"));
+                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully written to OMERO server",
+                        detectionMap && annotationMap ? 4 : 2));
 
-        } catch (IOException ex) {
-            objs.forEach(pathObject -> pathObject.setName(null));
-            Dialogs.showErrorNotification("Could not send " + objectString, ex.getLocalizedMessage());
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
             objs.forEach(pathObject -> pathObject.setName(null));
+            Dialogs.showErrorMessage("Could not send objects", e.getLocalizedMessage());
             throw new RuntimeException(e);
         }
     }

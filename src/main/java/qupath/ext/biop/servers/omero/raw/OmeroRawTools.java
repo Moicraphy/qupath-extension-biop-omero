@@ -47,6 +47,7 @@ import omero.gateway.facility.*;
 import omero.gateway.model.*;
 import omero.model.*;
 import omero.model.Image;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -631,7 +632,7 @@ public final class OmeroRawTools {
             type = "detection";
 
         // create the file locally
-        File file = new File(path + File.separator + "QP " + type + " table_" + qpprojName + "_" + new Date().toString().replace(":", "-") + ".csv"); // replace : to be windows compatible
+        File file = new File(path + File.separator + "QP " + type + " table_" + qpprojName + "_" + new Date().toString().replace(":", "-") + ".csv"); // replace ":" to be Windows compatible
         try {
            try {
                BufferedWriter buffer = new BufferedWriter(new FileWriter(file));
@@ -646,6 +647,7 @@ public final class OmeroRawTools {
            OmeroRawClient client = server.getClient();
 
            // get the current image to attach the omero.table to
+           // TODO see if the try/catch statement still allows to throw error for getFacility and getImage in the parent call
            ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
 
            try {
@@ -669,7 +671,7 @@ public final class OmeroRawTools {
      * @param pathObjects
      * @param server
      */
-    public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server, boolean toDelete) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server, boolean toDelete) throws ExecutionException, DSOutOfServiceException, DSAccessException {// throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
@@ -684,7 +686,7 @@ public final class OmeroRawTools {
 
         pathObjects.forEach(pathObject -> {
             // computes OMERO-readable ROIs
-            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent()==null ?"NoParent":idObjectMap.get(pathObject.getParent()));
+            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent() == null ?"NoParent":idObjectMap.get(pathObject.getParent()));
             if (!(shapes == null) && !(shapes.isEmpty())) {
                 // set the ROI color according to the class assigned to the corresponding PathObject
                 shapes.forEach(shape -> {
@@ -700,19 +702,24 @@ public final class OmeroRawTools {
         // delete existing ROIs on OMERO
         if(toDelete) {
             try {
+                // get existing OMERO ROIs
                 List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), server.getId());
                 List<IObject> roiData = new ArrayList<>();
                 roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
+
+                // delete ROis
                 client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
-            }catch(DSOutOfServiceException | DSAccessException e){
-                logger.error("Could not delete existing ROIS on OMERO");
+                logger.info("ROIs successfully deleted");
+            }catch(DSOutOfServiceException | DSAccessException | ExecutionException e){
+                Dialogs.showErrorMessage("ROI Deletion","Could not delete existing ROIs on OMERO");
             }
         }
+
         // import ROIs on OMERO
         if (!(omeroRois.isEmpty())) {
             client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
         } else {
-            logger.info("There is no Annotations to import on OMERO OR something goes wrong during the conversion from QuPath to OMERO");
+            Dialogs.showInfoNotification("Upload annotations","There is no Annotations to upload on OMERO");
         }
     }
 

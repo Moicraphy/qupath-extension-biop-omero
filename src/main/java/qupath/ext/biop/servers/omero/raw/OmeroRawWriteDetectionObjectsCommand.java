@@ -172,9 +172,6 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
                     objs.size(),
                     objectString,
                     (objs.size() == 1 ? "was" : "were")));
-        } catch (IOException ex) {
-            objs.forEach(pathObject -> pathObject.setName(null));
-            Dialogs.showErrorNotification("Could not send " + objectString, ex.getLocalizedMessage());
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
             objs.forEach(pathObject -> pathObject.setName(null));
             throw new RuntimeException(e);

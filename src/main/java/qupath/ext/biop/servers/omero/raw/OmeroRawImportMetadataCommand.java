@@ -100,6 +100,7 @@ public class OmeroRawImportMetadataCommand implements Runnable{
             keyValues.addAll((List<NamedValue>) annotation.getContent());
         });
 
+        int nQuPathKV = entry.getMetadataKeys().size();
         // delete metadata
         if (deleteMetadata)
             entry.clearMetadata();
@@ -128,16 +129,18 @@ public class OmeroRawImportMetadataCommand implements Runnable{
 
         // inform user if some key-values already exists in QuPath
         if (keepMetadata)
-            Dialogs.showInfoNotification(title, String.format("Add %d %s", keyValues.size()-nExistingKV.get(),
+            Dialogs.showInfoNotification(title, String.format("Keep %d %s and add %d new %s", nQuPathKV,
+                    (nQuPathKV <= 1 ? "key-value" : "key-values"),
+                    keyValues.size()-nExistingKV.get(),
                     (keyValues.size()-nExistingKV.get() <= 1 ? "key-value" : "key-values")));
         if(replaceMetadata)
-            Dialogs.showInfoNotification(title, String.format("Update %d %s and add %d %s", nExistingKV.get(),
-                    (nExistingKV.get() == 1 ? "key-value" : "key-values"),
+            Dialogs.showInfoNotification(title, String.format("Update %d %s and add %d new %s", nExistingKV.get(),
+                    (nExistingKV.get() <= 1 ? "key-value" : "key-values"),
                     keyValues.size()-nExistingKV.get(),
-                    (keyValues.size()-nExistingKV.get() == 1 ? "key-value" : "key-values")));
+                    (keyValues.size()-nExistingKV.get() <= 1 ? "key-value" : "key-values")));
         if(deleteMetadata)
-            Dialogs.showInfoNotification(title, String.format("Delete all previous key-values and add %d %s", keyValues.size(),
-                    (keyValues.size()== 1 ? "key-value" : "key-values")));
+            Dialogs.showInfoNotification(title, String.format("Delete %d previous key-values and add %d new %s", nQuPathKV, keyValues.size(),
+                    (keyValues.size() <= 1 ? "key-value" : "key-values")));
     }
 
 }
