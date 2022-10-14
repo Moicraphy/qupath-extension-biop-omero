@@ -77,16 +77,12 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
         PathObjectHierarchy hierarchy = this.qupath.getViewer().getImageData().getHierarchy();
 
         // remove current annotations
-        if(removeAnnotations){
-            Collection<PathObject> annotationObjects = hierarchy.getAnnotationObjects();
-            hierarchy.removeObjects(annotationObjects,true);
-        }
+        if(removeAnnotations)
+            hierarchy.removeObjects(hierarchy.getAnnotationObjects(),true);
 
         // remove current detections
-        if(removeDetections) {
-            Collection<PathObject> detectionObjects = hierarchy.getDetectionObjects();
-            hierarchy.removeObjects(detectionObjects, false);
-        }
+        if(removeDetections)
+            hierarchy.removeObjects(hierarchy.getDetectionObjects(), false);
 
         // add rois from OMERO
         if(!roiFromOmero.isEmpty()) {

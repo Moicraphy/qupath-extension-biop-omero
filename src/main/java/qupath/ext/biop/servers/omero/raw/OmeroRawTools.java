@@ -647,7 +647,7 @@ public final class OmeroRawTools {
            OmeroRawClient client = server.getClient();
 
            // get the current image to attach the omero.table to
-           // TODO see if the try/catch statement still allows to throw error for getFacility and getImage in the parent call
+           //TODO see if the try/catch statement still allows to throw error for getFacility and getImage in the parent call
            ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
 
            try {
