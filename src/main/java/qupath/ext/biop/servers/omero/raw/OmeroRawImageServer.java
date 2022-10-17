@@ -21,15 +21,11 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.GridPane;
 import loci.common.DataTools;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
 import loci.formats.FormatException;
 import loci.formats.MetadataTools;
-import loci.formats.gui.AWTImageTools;
 import loci.formats.meta.IMetadata;
 import loci.formats.meta.MetadataStore;
 import omero.ServerError;
@@ -38,7 +34,6 @@ import omero.api.ResolutionDescription;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.AdminFacility;
 import omero.gateway.facility.BrowseFacility;
 import omero.gateway.facility.MetadataFacility;
 import omero.gateway.facility.ROIFacility;
@@ -54,7 +49,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.color.ColorModelFactory;
 import qupath.lib.common.ColorTools;
-import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.*;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
@@ -74,7 +68,6 @@ import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
-import java.net.PasswordAuthentication;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.*;
@@ -85,9 +78,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static fr.igred.omero.exception.ExceptionHandler.handleServiceOrAccess;
 
 /**
  * ImageServer that reads pixels using the OMERO web API.
@@ -779,343 +769,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 */
 	@Override
 	public Collection<PathObject> readPathObjects() {
-		List<ROIResult> roiList;
 
-		// get ROIs from OMERO.web
-		try {
-			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
-		} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-			throw new RuntimeException(e);
-		}
-
-		if(roiList == null || roiList.isEmpty())
-			return new ArrayList<>();
-
-		// Convert them into ROIData
-		List<ROIData> roiData = new ArrayList<>();
-		for (ROIResult roiResult : roiList) {
-			roiData.addAll(roiResult.getROIs());
-		}
+		List<ROIData> roiData = OmeroRawTools.readOmeroROIs(this.getClient(), this.imageID);
 
 		if(roiData.isEmpty())
 			return new ArrayList<>();
 
-		Map<Double,Double> idParentIdMap = new HashMap<>();
-		Map<Double,PathObject> idObjectMap = new HashMap<>();
-
-		for (ROIData roiDatum : roiData) {
-			// get the type and assigned class from OMERO ROIs
-			String[] roiComment = getROIComment(roiDatum);
-			// convert OMERO ROIs to QuPath ROIs
-			ROI finalROI = roiConversion(roiDatum);
-			// get the roi color
-			Color color = Color.WHITE;
-			if(roiDatum.getShapeCount() > 0)
-				color = roiDatum.getShapes().iterator().next().getShapeSettings().getStroke();
-
-			// because Yellow in QuPath is reserved to show which annotation is selected.
-			if(color.equals(Color.YELLOW))
-				color = Color.RED;
-
-			// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
-			idObjectMap.put(Double.parseDouble(roiComment[2]),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1], color));
-			// populate parent map
-			double parentID = Double.parseDouble(roiComment[3]);
-			idParentIdMap.put(Double.parseDouble(roiComment[2]),parentID);
-		}
-
-		// set the parent/child hierarchy and add objects without any parent to the final list
-		List<PathObject> list = new ArrayList<>();
-
-		idParentIdMap.keySet().forEach(objID->{
-			if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID))==null)){
-				idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
-			}else
-				list.add(idObjectMap.get(objID));
-		});
-
-		return list;
-	}
-
-
-	/**
-	 * Create an annotation or a detection PathObject with a certain PathClass
-	 *
-	 * @param roi
-	 * @param roiType
-	 * @param roiClass
-	 * @return
-	 */
-	private static PathObject createPathObjectFromRoi(ROI roi, String roiType, String roiClass, Color color){
-		PathObject pathObject;
-		if (roiType.equals("Detection")) {
-			if (roiClass.equals("NoClass"))
-				pathObject = PathObjects.createDetectionObject(roi);
-			else
-				pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
-		} else {
-			if (roiClass.equals("NoClass"))
-				pathObject = PathObjects.createAnnotationObject(roi);
-			else
-				pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
-		}
-
-		pathObject.setColorRGB(color.getRGB());
-		return pathObject;
-	}
-
-
-	/**
-	 * convert Omero ROIs To QuPath ROIs.
-	 * For annotations, takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality.
-	 * For detections, no complex ROIs are possible. So, each shape = one ROI
-	 *
-	 * @param roiDatum
-	 * @return
-	 */
-	private static ROI roiConversion(ROIData roiDatum) {
-		// Convert OMERO ROIs into QuPath ROIs
-		List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
-
-		if (!roi.isEmpty()) {
-			// get the number of ROI "Point" in all shapes attached the current ROI
-			// Points are not supported during the XOR operation ; they are processed differently.
-			long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
-			ROI finalROI = roi.get(0);
-
-			// process ROIs with multiple points only
-			if (nbPoints == roi.size() && roi.size() > 1) {
-				// create a pointsROI instance with multiple points
-				finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
-						roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
-						ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
-			}
-
-			// Process ROIs with multiple shapes, containing one or more points
-			else if (nbPoints > 0 && roi.size() > 1) {
-				List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
-				List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
-
-				// create a pointsROI instance with multiple points
-				ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
-						pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
-						ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
-
-				// make a complex roi by applying XOR operation between shapes
-				finalROI = notPointsList.get(0);
-				for (int k = 1; k < notPointsList.size(); k++) {
-					finalROI = linkShapes(finalROI, notPointsList.get(k));
-				}
-
-				// make the union between points and complex ROI
-				finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
-			}
-
-			// Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
-			else {
-				for (int k = 1; k < roi.size(); k++) {
-					// make a complex roi by applying XOR operation between shapes
-					finalROI = linkShapes(finalROI, roi.get(k));
-				}
-			}
-			return finalROI;
-		}
-		return null;
-	}
-
-	/**
-	 * convert Omero ROIs To QuPath ROIs.
-	 *
-	 * *********************** BE CAREFUL *****************************
-	 * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
-	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
-	 * ****************************************************************
-	 *
-	 * @param roiData
-	 * @return list of QuPath ROIs
-	 */
-	private static List<ROI> convertOmeroROIsToQuPathROIs(ROIData roiData){
-		// get the ROI
-		Roi omeROI = (Roi) roiData.asIObject();
-
-		// get the shapes contained in the ROI (i.e. holes or something else)
-		List<Shape> shapes = omeROI.copyShapes();
-		List<ROI> list = new ArrayList<>();
-
-		// Iterate on shapes, select the correct instance and create the corresponding QuPath ROI
-		for (Shape shape:shapes) {
-
-			if(shape instanceof Rectangle){
-				RectangleData s = new RectangleData(shape);
-				list.add(ROIs.createRectangleROI(s.getX(),s.getY(),s.getWidth(),s.getHeight(),ImagePlane.getPlaneWithChannel(s.getC(), Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Ellipse){
-				EllipseData s = new EllipseData(shape);
-				list.add(ROIs.createEllipseROI(s.getX()-s.getRadiusX(),s.getY()-s.getRadiusY(),s.getRadiusX()*2, s.getRadiusY()*2,ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Point){
-				PointData s = new PointData(shape);
-				list.add(ROIs.createPointsROI(s.getX(),s.getY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Polyline){
-				PolylineData s = new PolylineData(shape);
-				list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
-												s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
-												ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-
-			}else if(shape instanceof Polygon){
-				PolygonData s = new PolygonData(shape);
-				list.add(ROIs.createPolygonROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
-											   s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
-											   ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Label){
-				logger.warn("No ROIs created (requested label shape is unsupported)");
-				//s=new TextData(shape);
-
-			}else if(shape instanceof Line){
-				LineData s = new LineData(shape);
-				list.add(ROIs.createLineROI(s.getX1(),s.getY1(),s.getX2(),s.getY2(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Mask){
-				logger.warn("No ROIs created (requested Mask shape is not supported yet)");
-				//s=new MaskData(shape);
-			}else{
-				logger.warn("Unsupported shape ");
-			}
-		}
-
-		return list;
-	}
-
-
-	/**
-	 * Output the ROI result of the XOR operation between the 2 input ROIs
-	 *
-	 * 	 * *********************** BE CAREFUL *****************************
-	 * 	 * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
-	 * 	 * the new composite ROI are set on the lowest c/z/t plane
-	 * 	 * ****************************************************************
-	 *
-	 * @param roi1
-	 * @param roi2
-	 * @return ROI resulting of the XOR operation
-	 */
-	private static ROI linkShapes(ROI roi1, ROI roi2){
-		// get the area of the first roi
-		Area a1 = new Area(roi1.getShape());
-
-		// get the area of the second roi
-		Area a2 = new Area(roi2.getShape());
-
-		// Apply a xor operation on both area to combine them (ex. make a hole)
-		a1.exclusiveOr(a2);
-
-		// get the area of the newly created area
-		java.awt.Rectangle r = a1.getBounds();
-
-		// Assign the new ROI to the lowest valid plan of the stack
-		return ROIs.createAreaROI(a1, ImagePlane.getPlaneWithChannel(Math.min(roi1.getC(), roi2.getC()),
-																	 Math.min(roi1.getZ(), roi2.getZ()),
-																	 Math.min(roi1.getT(), roi2.getT())));
-	}
-
-	/**
-	 * Read the comment attach to the current ROI in OMERO. If the ROI has more than one shape, the first comment is
-	 * taken as reference. A warning is displayed to the user because all comments in the nested hierarchy should be
-	 * the same.
-	 *
-	 * @param roiData
-	 * @return list of QuPath ROIs
-	 */
-	private static String[] getROIComment(ROIData roiData){
-		// get the ROI
-		Roi omeROI = (Roi) roiData.asIObject();
-
-		// get the shapes contained in the ROI (i.e. holes or something else)
-		List<Shape> shapes = omeROI.copyShapes();
-		List<String> list = new ArrayList<>();
-
-		// Iterate on shapes, select the correct instance and get the comment attached to it.
-		for (Shape shape:shapes) {
-			if(shape instanceof Rectangle){
-				RectangleData s = new RectangleData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Ellipse){
-				EllipseData s = new EllipseData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Point){
-				PointData s = new PointData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Polyline){
-				PolylineData s = new PolylineData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Polygon){
-				PolygonData s = new PolygonData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Label){
-				logger.warn("No ROIs created (requested label shape is unsupported)");
-				//s=new TextData(shape);
-			}else if(shape instanceof Line){
-				LineData s = new LineData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Mask){
-				logger.warn("No ROIs created (requested Mask shape is not supported yet)");
-				//s=new MaskData(shape);
-			}else{
-				logger.warn("Unsupported shape ");
-			}
-		}
-
-		// get the first comment
-		String pathClass = "";
-		if(!list.isEmpty()) {
-			pathClass = list.get(0);
-			for (int i = 0; i < list.size() - 1; i++) {
-				if (!(list.get(i).equals(list.get(i + 1)))) {
-					logger.warn("Different classes are set for two shapes link to the same parent");
-					logger.warn("The following class will be assigned for all child object -> "+pathClass);
-				}
-			}
-		}
-
-		String roiClass = "NoClass";
-		String roiType = "Annotation";
-		String roiParent =  "0";
-		String roiID =  "-"+roiData.hashCode();
-
-		// Parse the string and get object information
-		String[] tokens = (pathClass.isBlank() || pathClass.isEmpty()) ? null : pathClass.split(":");
-		if(tokens== null)
-			return new String[]{roiType, roiClass, roiID, roiParent};
-
-		if (tokens.length > 0)
-			if (tokens[0].equals("Detection") || tokens[0].equals("detection"))
-				roiType = "Detection";
-
-		if(tokens.length > 1)
-			roiClass = tokens[1];
-
-		if(tokens.length > 2) {
-			try {
-				Double.parseDouble(tokens[2]);
-				roiID = tokens[2];
-			} catch (NumberFormatException e) {
-				roiID = "-"+roiData.hashCode();
-			}
-		}
-
-		if(tokens.length > 3) {
-			try {
-				Double.parseDouble(tokens[3]);
-				roiParent = tokens[3];
-			} catch (NumberFormatException e) {
-				roiParent = "0";
-			}
-		}
-
-		return new String[]{roiType, roiClass, roiID, roiParent};
+		return OmeroRawTools.createPathObjectsFromOmeroROIs(roiData);
 	}
 
 

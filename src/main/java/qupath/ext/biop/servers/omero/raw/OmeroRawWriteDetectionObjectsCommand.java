@@ -158,7 +158,7 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
             objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
 
             // send detections to OMERO
-            OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
+            boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
 
             if(!onlyDetections) {
                 // get detection measurements
@@ -168,10 +168,12 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
             }
 
             objs.forEach(pathObject -> pathObject.setName(null));
-            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
-                    objs.size(),
-                    objectString,
-                    (objs.size() == 1 ? "was" : "were")));
+
+            if(hasBeenSaved)
+                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
+                        objs.size(),
+                        objectString,
+                        (objs.size() == 1 ? "was" : "were")));
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
             objs.forEach(pathObject -> pathObject.setName(null));
             throw new RuntimeException(e);

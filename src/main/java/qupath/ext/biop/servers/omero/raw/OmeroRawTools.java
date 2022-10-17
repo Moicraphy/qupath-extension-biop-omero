@@ -22,6 +22,8 @@
 package qupath.ext.biop.servers.omero.raw;
 
 import java.awt.*;
+import java.awt.geom.Area;
+import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -47,7 +49,11 @@ import omero.gateway.facility.*;
 import omero.gateway.model.*;
 import omero.model.*;
 import omero.model.Image;
-import org.apache.commons.lang3.StringUtils;
+import omero.model.Label;
+import omero.model.Point;
+import omero.model.Polygon;
+import omero.model.Rectangle;
+import omero.model.Shape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +71,12 @@ import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.io.GsonTools;
 import qupath.lib.objects.PathObject;
+import qupath.lib.objects.PathObjects;
+import qupath.lib.objects.classes.PathClassFactory;
+import qupath.lib.regions.ImagePlane;
+import qupath.lib.roi.ROIs;
+import qupath.lib.roi.RoiTools;
+import qupath.lib.roi.interfaces.ROI;
 import qupath.lib.scripting.QP;
 
 import javax.imageio.ImageIO;
@@ -668,10 +680,8 @@ public final class OmeroRawTools {
      * Write PathObject collection to OMERO server. This will delete the existing
      * ROIs present on the OMERO server if the user asked for.
      *
-     * @param pathObjects
-     * @param server
      */
-    public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server, boolean toDelete) throws ExecutionException, DSOutOfServiceException, DSAccessException {// throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+   /* public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server, boolean toDelete) throws ExecutionException, DSOutOfServiceException, DSAccessException {// throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
@@ -721,7 +731,210 @@ public final class OmeroRawTools {
         } else {
             Dialogs.showInfoNotification("Upload annotations","There is no Annotations to upload on OMERO");
         }
+    }*/
+
+    /**
+     * Convert a collection of pathObjects to a list of OMERO ROIs
+     * @param pathObjects
+     * @return
+     */
+    public static List<ROIData> createOmeroROIsFromPathObjects(Collection<PathObject> pathObjects){
+        List<ROIData> omeroRois = new ArrayList<>();
+        Map<PathObject,String> idObjectMap = new HashMap<>();
+
+        // create unique ID for each object
+        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()));
+
+        pathObjects.forEach(pathObject -> {
+            // computes OMERO-readable ROIs
+            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent() == null ? "NoParent" : idObjectMap.get(pathObject.getParent()));
+            if (!(shapes == null) && !(shapes.isEmpty())) {
+                // set the ROI color according to the class assigned to the corresponding PathObject
+                shapes.forEach(shape -> {
+                    shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.YELLOW : new Color(pathObject.getPathClass().getColor()));
+                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathObject.getPathClass() == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathObject.getPathClass().getColor())));
+                });
+                ROIData roiData = new ROIData();
+                shapes.forEach(roiData::addShapeData);
+                omeroRois.add(roiData);
+            }
+        });
+
+        return omeroRois;
     }
+
+    /**
+     * Convert a list of OMERO ROIs to a collection of pathObjects
+     * @param roiData
+     * @return
+     */
+    public static Collection<PathObject> createPathObjectsFromOmeroROIs(List<ROIData> roiData){
+        Map<Double,Double> idParentIdMap = new HashMap<>();
+        Map<Double,PathObject> idObjectMap = new HashMap<>();
+
+        for (ROIData roiDatum : roiData) {
+            // get the comment attached to OMERO ROIs
+            List<String> roiCommentsList = getROIComment(roiDatum);
+
+            // check that all comments are identical for all the shapes attached to the same ROI.
+            // if there are different, a warning is thrown because they should be identical.
+            String roiComment = "";
+            if(!roiCommentsList.isEmpty()) {
+                roiComment = roiCommentsList.get(0);
+                for (int i = 0; i < roiCommentsList.size() - 1; i++) {
+                    if (!(roiCommentsList.get(i).equals(roiCommentsList.get(i + 1)))) {
+                        logger.warn("Different classes are set for two shapes link to the same parent");
+                        logger.warn("The following class will be assigned for all child object -> "+roiComment);
+                    }
+                }
+            }
+
+            // get the type, class, id and parent id of thu current ROI
+            String[] roiCommentParsed = parseROIComment(roiComment);
+            for(String st : roiCommentParsed){System.out.println(st);}
+            String roiType = roiCommentParsed[0];
+            String roiClass = roiCommentParsed[1];
+            double roiId = Double.parseDouble(roiCommentParsed[2]);
+            double parentId = Double.parseDouble(roiCommentParsed[3]);
+
+            // convert OMERO ROIs to QuPath ROIs
+            ROI qpROI = OmeroRawShapes.convertOmeroROIsToQuPathROIs(roiDatum);
+
+            // convert QuPath ROI to QuPath Annotation or detection Object (according to type).
+            idObjectMap.put(roiId, OmeroRawShapes.createPathObjectFromQuPathRoi(qpROI, roiType, roiClass));
+
+            // populate parent map with current_object/parent ids
+            idParentIdMap.put(roiId,parentId);
+        }
+
+        // set the parent/child hierarchy and add objects without any parent to the final list
+        List<PathObject> pathObjects = new ArrayList<>();
+
+        idParentIdMap.keySet().forEach(objID->{
+            // if the current object has a valid id and has a parent
+            if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID)) == null))
+                idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
+            else
+                // if no valid id for object or if the object has no parent
+                pathObjects.add(idObjectMap.get(objID));
+        });
+
+        return pathObjects;
+    }
+
+    /**
+     * Get the comment attached to one shape of the OMERO ROI.
+     *
+     * @param shape
+     * @return
+     */
+    public static String getROIComment(Shape shape){
+        if(shape instanceof Rectangle){
+            RectangleData s = new RectangleData(shape);
+            return s.getText();
+        }else if(shape instanceof Ellipse){
+            EllipseData s = new EllipseData(shape);
+            return s.getText();
+        }else if(shape instanceof Point){
+            PointData s = new PointData(shape);
+            return s.getText();
+        }else if(shape instanceof Polyline){
+            PolylineData s = new PolylineData(shape);
+            return s.getText();
+        }else if(shape instanceof Polygon){
+            PolygonData s = new PolygonData(shape);
+            return s.getText();
+        }else if(shape instanceof Label){
+            logger.warn("No ROIs created (requested label shape is unsupported)");
+            //s=new TextData(shape);
+        }else if(shape instanceof Line){
+            LineData s = new LineData(shape);
+            return s.getText();
+        }else if(shape instanceof Mask){
+            logger.warn("No ROIs created (requested Mask shape is not supported yet)");
+            //s=new MaskData(shape);
+        }else{
+            logger.warn("Unsupported shape ");
+        }
+
+        return null;
+    }
+
+    /**
+     * Read the comments attach to the current ROI in OMERO (i.e. read each comment attached to each shape)
+     *
+     * @param roiData
+     * @return
+     */
+    public static List<String> getROIComment(ROIData roiData) {
+        // get the ROI
+        Roi omeROI = (Roi) roiData.asIObject();
+
+        // get the shapes contained in the ROI (i.e. holes or something else)
+        List<Shape> shapes = omeROI.copyShapes();
+        List<String> list = new ArrayList<>();
+
+        // Iterate on shapes, select the correct instance and get the comment attached to it.
+        for (Shape shape : shapes) {
+            String comment = getROIComment(shape);
+            if (comment != null)
+                list.add(comment);
+        }
+
+        return list;
+    }
+
+    /**
+     * Parse the comment based on the standardization introduced in "OmeroRawShapes.setRoiComment()"
+     *
+     * @param comment
+     * @return
+     */
+    public static String[] parseROIComment(String comment) {
+        // default parsing
+        String roiClass = "NoClass";
+        String roiType = "annotation";
+        String roiParent =  "0";
+        String roiID =  "-"+System.nanoTime();
+
+        // split the string
+        String[] tokens = (comment.isBlank() || comment.isEmpty()) ? null : comment.split(":");
+        if(tokens == null)
+            return new String[]{roiType, roiClass, roiID, roiParent};
+
+        // get ROI type
+        if (tokens.length > 0)
+            roiType = tokens[0];
+
+        // get the class
+        if(tokens.length > 1)
+            roiClass = tokens[1];
+
+        // get the ROI id
+        if(tokens.length > 2) {
+            try {
+                Double.parseDouble(tokens[2]);
+                roiID = tokens[2];
+            } catch (NumberFormatException e) {
+                roiID = "-"+System.nanoTime();
+            }
+        }
+
+        // get the parent ROI id
+        if(tokens.length > 3) {
+            try {
+                Double.parseDouble(tokens[3]);
+                roiParent = tokens[3];
+            } catch (NumberFormatException e) {
+                roiParent = "0";
+            }
+        }
+
+        return new String[]{roiType, roiClass, roiID, roiParent};
+    }
+
+
+
 
 
     /**
@@ -814,6 +1027,71 @@ public final class OmeroRawTools {
                 .collect(Collectors.toList());
     }
 
+    public static boolean writeOmeroROIs(OmeroRawClient client, long imageId, List<ROIData> omeroRois, boolean toDelete) {
+        boolean roiSaved = false;
+
+        // delete existing ROIs on OMERO
+        if(toDelete) {
+            try {
+                // get existing OMERO ROIs
+                List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
+
+                // extract ROIData
+                List<IObject> roiData = new ArrayList<>();
+                roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
+
+                // delete ROis
+                client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
+
+                Dialogs.showInfoNotification("ROI deletion","ROIs successfully deleted");
+            } catch (DSOutOfServiceException | DSAccessException | ExecutionException e){
+                Dialogs.showErrorMessage("ROI deletion","Could not delete existing ROIs on OMERO.");
+                logger.error("" + e);
+                throw new RuntimeException(e);
+            }
+        }
+
+        // import ROIs on OMERO
+        if (!(omeroRois.isEmpty())) {
+            try {
+                // save ROIs
+                client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), imageId, client.getGateway().getLoggedInUser().getId(), omeroRois);
+                roiSaved = true;
+            } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
+                Dialogs.showErrorMessage("ROI Saving","Error during saving ROIs on OMERO.");
+                logger.error("" + e);
+                throw new RuntimeException(e);
+            }
+
+        } else {
+            Dialogs.showInfoNotification("Upload annotations","There is no Annotations to upload on OMERO");
+        }
+
+        return roiSaved;
+    }
+
+
+    public static List<ROIData> readOmeroROIs(OmeroRawClient client, long imageId){
+        List<ROIResult> roiList;
+
+        // get ROIs from OMERO
+        try {
+            roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
+        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
+        if(roiList == null || roiList.isEmpty())
+            return new ArrayList<>();
+
+        // Convert them into ROIData
+        List<ROIData> roiData = new ArrayList<>();
+        for (ROIResult roiResult : roiList) {
+            roiData.addAll(roiResult.getROIs());
+        }
+
+        return roiData;
+    }
 
     /**
      * Try to solve an error in OMERO regarding the creation keys.

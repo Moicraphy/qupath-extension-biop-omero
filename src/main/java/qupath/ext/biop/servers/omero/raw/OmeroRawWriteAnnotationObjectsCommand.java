@@ -119,14 +119,16 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         // Write path object(s)
         try {
             // give to each pathObject a unique name
+            //TODO remove this unique id in qupath 0.4.0
             objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
 
             // send annotations to OMERO
-            OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
-            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
-                    objs.size(),
-                    objectString,
-                    (objs.size() == 1 ? "was" : "were")));
+            boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
+            if(hasBeenSaved)
+                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
+                        objs.size(),
+                        objectString,
+                        (objs.size() == 1 ? "was" : "were")));
 
             if(annotationMap) {
                 // send annotation measurements
@@ -154,6 +156,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             }
 
             // remove the name to not interfere with QuPath ROI display.
+            //TODO remove this unique id in qupath 0.4.0
             objs.forEach(pathObject -> pathObject.setName(null));
 
             if(detectionMap || annotationMap)
@@ -161,6 +164,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                         detectionMap && annotationMap ? 4 : 2));
 
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
+            //TODO remove this unique id in qupath 0.4.0
             objs.forEach(pathObject -> pathObject.setName(null));
             Dialogs.showErrorMessage("Could not send objects", e.getLocalizedMessage());
             throw new RuntimeException(e);
