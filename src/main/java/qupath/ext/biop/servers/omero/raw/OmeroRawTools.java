@@ -516,24 +516,11 @@ public final class OmeroRawTools {
         }
     }
 
-
     /**
-     * This method creates an instance of {@code fr.igred.omero.Client} object to get access to the full
-     * simple-omero-client API, developed by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
-     *
-     * @return the Client object
+     * ************************************************************************************************************
      */
-    public static Client getSimpleOmeroClientInstance() throws DSOutOfServiceException {
-        // get the current OmeroRawClient
-        ImageServer<?> server = QP.getCurrentServer();
-        OmeroRawClient omerorawclient = OmeroRawClients.getClientFromImageURI(server.getURIs().iterator().next());
 
-        // build the simple-omero-client using the ID of the current session
-        Client simpleClient = new Client();
-        simpleClient.connect(omerorawclient.getServerURI().getHost(), omerorawclient.getServerURI().getPort(), omerorawclient.getGateway().getSessionId(omerorawclient.getGateway().getLoggedInUser()));
 
-        return simpleClient;
-    }
 
 
     /**

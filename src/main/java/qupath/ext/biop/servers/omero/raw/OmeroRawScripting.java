@@ -1,5 +1,7 @@
 package qupath.ext.biop.servers.omero.raw;
 
+import fr.igred.omero.Client;
+import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.model.ROIData;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
@@ -10,6 +12,24 @@ import java.util.Date;
 import java.util.List;
 
 public class OmeroRawScripting {
+
+    /**
+     * This method creates an instance of {@code fr.igred.omero.Client} object to get access to the full
+     * simple-omero-client API, developed by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
+     *
+     * @return the Client object
+     */
+    public static Client getSimpleOmeroClientInstance(OmeroRawImageServer server) throws DSOutOfServiceException {
+        // get the current OmeroRawClient
+        OmeroRawClient omerorawclient = server.getClient();
+
+        // build the simple-omero-client using the ID of the current session
+        Client simpleClient = new Client();
+        simpleClient.connect(omerorawclient.getServerURI().getHost(), omerorawclient.getServerURI().getPort(), omerorawclient.getGateway().getSessionId(omerorawclient.getGateway().getLoggedInUser()));
+
+        return simpleClient;
+    }
+
 
     /**
      * Read ROIs from OMERO and add them to the current image
