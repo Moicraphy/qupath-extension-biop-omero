@@ -171,8 +171,12 @@ public class OmeroRawScripting {
         OmeroRawClient client = imageServer.getClient();
         long imageId = imageServer.getId();
 
+        // delete ROIs
+        if(deleteROIsOnOMERO)
+            OmeroRawTools.deleteOmeroROIs(client,imageId);
+
         // send to OMERO
-        return OmeroRawTools.writeOmeroROIs(client, imageId, omeroROIs, deleteROIsOnOMERO);
+        return OmeroRawTools.writeOmeroROIs(client, imageId, omeroROIs);
     }
 
 

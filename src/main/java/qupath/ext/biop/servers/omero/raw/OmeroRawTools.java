@@ -125,14 +125,8 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Return the raw client used for the specified OMERO server.
-     *
-     * @param server
-     * @return client
+     * **************************** Methods used in the OMERO browser ********************************************
      */
-    public static OmeroRawClient getRawClient(OmeroRawImageServer server) {
-        return server.getClient();
-    }
 
 
     /**
@@ -233,66 +227,6 @@ public final class OmeroRawTools {
 
         return list;
     }
-
-//	/**
-//	 * Get all the orphaned images in the given server.
-//	 *
-//	 * @param uri
-//	 * @return list of orphaned images
-//	 * @see #populateOrphanedImageList(URI, OrphanedFolder)
-//	 */
-//	public static List<OmeroObject> readOrphanedImages(URI uri) {
-//		List<OmeroObject> list = new ArrayList<>();
-//
-//		// Requesting orphaned images can time-out the JSON API on OMERO side if too many,
-//		// so we go through the webclient, whose response comes in a different format.
-//		try {
-//			var map = OmeroRequests.requestWebClientObjectList(uri.getScheme(), uri.getHost(), OmeroObjectType.IMAGE);
-//
-//        	// Send requests in separate threads, this is not a great design
-//        	// TODO: Clean up this code, which now does:
-//        	// 1. Send request for each image in the list of orphaned images in the executor
-//        	// 2. Terminate the executor after 5 seconds
-//        	// 3. Checks if there are still requests that weren't processed and gives log error if so
-//        	// Solution: Give a time-out for the request in readPaginated() :::
-//        	//
-//        	// URLConnection con = url.openConnection();
-//        	// con.setConnectTimeout(connectTimeout);
-//        	// con.setReadTimeout(readTimeout);
-//        	// InputStream in = con.getInputStream();
-//        	//
-//    		ExecutorService executorRequests = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("orphaned-image-requests", true));
-//    		List<Future<?>> futures = new ArrayList<Future<?>>();
-//
-//    		map.get("images").getAsJsonArray().forEach(e -> {
-//    			// To keep track of the completed requests, keep a Future variable
-//    			Future<?> future = executorRequests.submit(() -> {
-//    				try {
-//    					var id = Integer.parseInt(e.getAsJsonObject().get("id").toString());
-//        				var omeroObj = readOmeroObject(uri.getScheme(), uri.getHost(), id, OmeroObjectType.IMAGE);
-//        				list.add(omeroObj);
-//    				} catch (IOException ex) {
-//						logger.error("Could not fetch information for image id: " + e.getAsJsonObject().get("id"));
-//					}
-//    			});
-//    			futures.add(future);
-//        	});
-//    		executorRequests.shutdown();
-//    		try {
-//    			// Wait 10 seconds to terminate tasks
-//    			executorRequests.awaitTermination(10L, TimeUnit.SECONDS);
-//    			long nPending = futures.parallelStream().filter(e -> !e.isDone()).count();
-//    			if (nPending > 0)
-//    				logger.warn("Too many orphaned images in " + uri.getHost() + ". Ignored " + nPending + " orphaned image(s).");
-//    		} catch (InterruptedException ex) {
-//    			logger.debug("InterrupedException occurred while interrupting requests.");
-//    			Thread.currentThread().interrupt();
-//    		}
-//        } catch (IOException ex) {
-//        	logger.error(ex.getLocalizedMessage());
-//        }
-//		return list;
-//	}
 
     /**
      * return the Owner object corresponding to the logged in user
@@ -522,7 +456,6 @@ public final class OmeroRawTools {
 
 
 
-
     /**
      * Write MeasurementTable to OMERO server. It converts it to an OMERO.table
      * and add the new table as attachment on OMERO.
@@ -664,61 +597,90 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Write PathObject collection to OMERO server. This will delete the existing
-     * ROIs present on the OMERO server if the user asked for.
+     * Delete all existing ROIs on OMERO that are linked to the current image
      *
+     * @param client
+     * @param imageId
      */
-   /* public static void writePathObjects(Collection<PathObject> pathObjects, OmeroRawImageServer server, boolean toDelete) throws ExecutionException, DSOutOfServiceException, DSAccessException {// throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
-        //TODO: What to do if token expires?
-        //TODO: What if we have more object than the limit accepted by the OMERO API?
+    public static void deleteOmeroROIs(OmeroRawClient client, long imageId) {
+        try {
+            // get existing OMERO ROIs
+            List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
 
-        // get the current OMERO-RAW client
-        OmeroRawClient client = server.getClient();
+            // extract ROIData
+            List<IObject> roiData = new ArrayList<>();
+            roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
 
-        Collection<ROIData> omeroRois = new ArrayList<>();
-        Map<PathObject,String> idObjectMap = new HashMap<>();
+            // delete ROis
+            client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
 
-        // create unique ID for each object
-        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()));
-
-        pathObjects.forEach(pathObject -> {
-            // computes OMERO-readable ROIs
-            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent() == null ?"NoParent":idObjectMap.get(pathObject.getParent()));
-            if (!(shapes == null) && !(shapes.isEmpty())) {
-                // set the ROI color according to the class assigned to the corresponding PathObject
-                shapes.forEach(shape -> {
-                    shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.YELLOW : new Color(pathObject.getPathClass().getColor()));
-                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathObject.getPathClass() == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathObject.getPathClass().getColor())));
-                });
-                ROIData roiData = new ROIData();
-                shapes.forEach(roiData::addShapeData);
-                omeroRois.add(roiData);
-            }
-        });
-
-        // delete existing ROIs on OMERO
-        if(toDelete) {
-            try {
-                // get existing OMERO ROIs
-                List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), server.getId());
-                List<IObject> roiData = new ArrayList<>();
-                roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
-
-                // delete ROis
-                client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
-                logger.info("ROIs successfully deleted");
-            }catch(DSOutOfServiceException | DSAccessException | ExecutionException e){
-                Dialogs.showErrorMessage("ROI Deletion","Could not delete existing ROIs on OMERO");
-            }
+            Dialogs.showInfoNotification("ROI deletion","ROIs successfully deleted");
+        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e){
+            Dialogs.showErrorMessage("ROI deletion","Could not delete existing ROIs on OMERO.");
+            logger.error("" + e);
+            throw new RuntimeException(e);
         }
+    }
+
+
+    /**
+     * Save ROIs to OMERO, to the current image.
+     *
+     * @param client
+     * @param imageId
+     * @param omeroRois
+     * @return
+     */
+    public static boolean writeOmeroROIs(OmeroRawClient client, long imageId, List<ROIData> omeroRois) {
+        boolean roiSaved = false;
 
         // import ROIs on OMERO
         if (!(omeroRois.isEmpty())) {
-            client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), server.getId(), client.getGateway().getLoggedInUser().getId(), omeroRois);
+            try {
+                // save ROIs
+                client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), imageId, client.getGateway().getLoggedInUser().getId(), omeroRois);
+                roiSaved = true;
+            } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
+                Dialogs.showErrorMessage("ROI Saving","Error during saving ROIs on OMERO.");
+                logger.error("" + e);
+                throw new RuntimeException(e);
+            }
+
         } else {
             Dialogs.showInfoNotification("Upload annotations","There is no Annotations to upload on OMERO");
         }
-    }*/
+
+        return roiSaved;
+    }
+
+    /**
+     * Read ROIs from OMERO, from the current image
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
+    public static List<ROIData> readOmeroROIs(OmeroRawClient client, long imageId){
+        List<ROIResult> roiList;
+
+        // get ROIs from OMERO
+        try {
+            roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
+        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
+        if(roiList == null || roiList.isEmpty())
+            return new ArrayList<>();
+
+        // Convert them into ROIData
+        List<ROIData> roiData = new ArrayList<>();
+        for (ROIResult roiResult : roiList) {
+            roiData.addAll(roiResult.getROIs());
+        }
+
+        return roiData;
+    }
 
     /**
      * Convert a collection of pathObjects to a list of OMERO ROIs
@@ -1014,71 +976,6 @@ public final class OmeroRawTools {
                 .collect(Collectors.toList());
     }
 
-    public static boolean writeOmeroROIs(OmeroRawClient client, long imageId, List<ROIData> omeroRois, boolean toDelete) {
-        boolean roiSaved = false;
-
-        // delete existing ROIs on OMERO
-        if(toDelete) {
-            try {
-                // get existing OMERO ROIs
-                List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
-
-                // extract ROIData
-                List<IObject> roiData = new ArrayList<>();
-                roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
-
-                // delete ROis
-                client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
-
-                Dialogs.showInfoNotification("ROI deletion","ROIs successfully deleted");
-            } catch (DSOutOfServiceException | DSAccessException | ExecutionException e){
-                Dialogs.showErrorMessage("ROI deletion","Could not delete existing ROIs on OMERO.");
-                logger.error("" + e);
-                throw new RuntimeException(e);
-            }
-        }
-
-        // import ROIs on OMERO
-        if (!(omeroRois.isEmpty())) {
-            try {
-                // save ROIs
-                client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), imageId, client.getGateway().getLoggedInUser().getId(), omeroRois);
-                roiSaved = true;
-            } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
-                Dialogs.showErrorMessage("ROI Saving","Error during saving ROIs on OMERO.");
-                logger.error("" + e);
-                throw new RuntimeException(e);
-            }
-
-        } else {
-            Dialogs.showInfoNotification("Upload annotations","There is no Annotations to upload on OMERO");
-        }
-
-        return roiSaved;
-    }
-
-
-    public static List<ROIData> readOmeroROIs(OmeroRawClient client, long imageId){
-        List<ROIResult> roiList;
-
-        // get ROIs from OMERO
-        try {
-            roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
-        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
-
-        if(roiList == null || roiList.isEmpty())
-            return new ArrayList<>();
-
-        // Convert them into ROIData
-        List<ROIData> roiData = new ArrayList<>();
-        for (ROIResult roiResult : roiList) {
-            roiData.addAll(roiResult.getROIs());
-        }
-
-        return roiData;
-    }
 
     /**
      * Try to solve an error in OMERO regarding the creation keys.
