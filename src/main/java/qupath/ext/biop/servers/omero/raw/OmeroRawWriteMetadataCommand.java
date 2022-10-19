@@ -4,8 +4,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
-import omero.gateway.exception.DSAccessException;
-import omero.gateway.exception.DSOutOfServiceException;
 import org.apache.commons.lang3.StringUtils;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
@@ -14,7 +12,6 @@ import qupath.lib.projects.ProjectImageEntry;
 
 import java.awt.image.BufferedImage;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
 
 /**
@@ -73,7 +70,7 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
         // get user choice
         boolean replaceMetadata = rbReplaceMetadata.isSelected();
         boolean deleteMetadata = rbDeleteMetadata.isSelected();
-
+        boolean keepMetadata = rbKeepMetadata.isSelected();
 
         // get keys
         ProjectImageEntry<BufferedImage> entry = this.qupath.getProject().getEntry(this.qupath.getImageData());
@@ -101,18 +98,19 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
 
         // send metadata to OMERO
         String objectString = "key-value" + (keys.size() == 1 ? "" : "s");
-        try {
-            boolean uniqueKeys = OmeroRawTools.writeMetadata(keyValues, (OmeroRawImageServer)imageServer, deleteMetadata, replaceMetadata);
-            if(uniqueKeys)
-                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
-                        keys.size(),
-                        objectString,
-                        (keys.size() == 1 ? "was" : "were")));
-            else
-                Dialogs.showErrorMessage(StringUtils.capitalize(objectString),"There is at least two identical keys on OMERO. Please, make all keys unique. Metadata has not been modified.");
-        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            Dialogs.showErrorNotification("Could not send " + objectString, e.getLocalizedMessage());
-            throw new RuntimeException(e);
-        }
+        boolean uniqueKeys = true;
+
+        if(deleteMetadata)
+            OmeroRawScripting.saveMetadataOnOmeroAndDeleteKeyValues(keyValues,(OmeroRawImageServer)imageServer);
+        if(keepMetadata)
+            uniqueKeys = OmeroRawScripting.saveMetadataOnOmero(keyValues,(OmeroRawImageServer)imageServer);
+        if(replaceMetadata)
+            uniqueKeys = OmeroRawScripting.saveMetadataAndUpdateKeyValues(keyValues,(OmeroRawImageServer)imageServer);
+
+        if(uniqueKeys)
+            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
+                    keys.size(),
+                    objectString,
+                    (keys.size() == 1 ? "was" : "were")));
     }
 }

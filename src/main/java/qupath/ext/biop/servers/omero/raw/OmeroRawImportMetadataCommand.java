@@ -74,73 +74,52 @@ public class OmeroRawImportMetadataCommand implements Runnable{
         // read keyValue from QuPath
         ProjectImageEntry<BufferedImage> entry = this.qupath.getProject().getEntry(this.qupath.getImageData());
 
-
-        // get key values in OMERO
-        List<MapAnnotationData> annotationData;
-        boolean uniqueOmeroKeys;
-        try {
-            annotationData = OmeroRawTools.readKeyValues((OmeroRawImageServer) imageServer);
-            uniqueOmeroKeys = OmeroRawTools.checkUniqueKeyInAnnotationMap(annotationData);
-        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            throw new RuntimeException(e);
-        }
-
-        if (annotationData.isEmpty()) {
-            Dialogs.showWarningNotification(title, "The current image does not have any KeyValues on OMERO");
-            return;
-        }
-
-        if (!uniqueOmeroKeys) {
-            Dialogs.showErrorMessage(title, "There is at least two identical keys on OMERO. Please, make all keys unique. Metadata has not been modified.");
-            return;
-        }
-
-        List<NamedValue> keyValues = new ArrayList<>();
-        annotationData.forEach(annotation -> {
-            keyValues.addAll((List<NamedValue>) annotation.getContent());
-        });
-
-        int nQuPathKV = entry.getMetadataKeys().size();
-        // delete metadata
-        if (deleteMetadata)
-            entry.clearMetadata();
-
-
-        Map<String, String> currentKV = entry.getMetadataMap();
-        AtomicInteger nExistingKV = new AtomicInteger();
-
-        keyValues.forEach(pair -> {
-            boolean existingKeyValue = false;
-            ArrayList<String> existingKeys = new ArrayList<>(currentKV.keySet());
-
-            // check if the key-value already exists in QuPath
-            for (String existingKey : existingKeys) {
-                if (pair.name.equals(existingKey)) {
-                    existingKeyValue = true;
-                    nExistingKV.getAndIncrement();
-                    break;
-                }
-            }
-
-            // add key values to qupath metadata
-            if (!existingKeyValue || replaceMetadata)
-                entry.putMetadataValue(pair.name, pair.value);
-        });
-
         // inform user if some key-values already exists in QuPath
-        if (keepMetadata)
-            Dialogs.showInfoNotification(title, String.format("Keep %d %s and add %d new %s", nQuPathKV,
-                    (nQuPathKV <= 1 ? "key-value" : "key-values"),
-                    keyValues.size()-nExistingKV.get(),
-                    (keyValues.size()-nExistingKV.get() <= 1 ? "key-value" : "key-values")));
-        if(replaceMetadata)
-            Dialogs.showInfoNotification(title, String.format("Update %d %s and add %d new %s", nExistingKV.get(),
-                    (nExistingKV.get() <= 1 ? "key-value" : "key-values"),
-                    keyValues.size()-nExistingKV.get(),
-                    (keyValues.size()-nExistingKV.get() <= 1 ? "key-value" : "key-values")));
-        if(deleteMetadata)
-            Dialogs.showInfoNotification(title, String.format("Delete %d previous key-values and add %d new %s", nQuPathKV, keyValues.size(),
-                    (keyValues.size() <= 1 ? "key-value" : "key-values")));
+        if (keepMetadata) {
+            // get the initial number of key values
+            int nExistingKV = entry.getMetadataKeys().size();
+
+            // add new keyValues from omero
+            OmeroRawScripting.addOmeroKeyValues((OmeroRawImageServer) imageServer);
+
+            // get the number of new key values
+            int nQuPathKVAfterAdding = entry.getMetadataKeys().size();
+            int nNewKV = nQuPathKVAfterAdding - nExistingKV;
+
+            Dialogs.showInfoNotification(title, String.format("Keep %d %s and add %d new %s", nExistingKV,
+                    (nExistingKV <= 1 ? "key-value" : "key-values"),
+                    nNewKV,
+                    (nNewKV <= 1 ? "key-value" : "key-values")));
+        }
+        if(replaceMetadata) {
+            // get the initial number of key values
+            int nExistingKV = entry.getMetadataKeys().size();
+
+            // add new keyValues from omero
+            OmeroRawScripting.addOmeroKeyValuesAndUpdateMetadata((OmeroRawImageServer) imageServer);
+
+            // get the number of new key values
+            int nQuPathKVAfterAdding = entry.getMetadataKeys().size();
+            int nNewKV = nQuPathKVAfterAdding - nExistingKV;
+
+            Dialogs.showInfoNotification(title, String.format("Update %d %s and add %d new %s", nExistingKV,
+                    (nExistingKV <= 1 ? "key-value" : "key-values"),
+                    nNewKV,
+                    (nNewKV <= 1 ? "key-value" : "key-values")));
+        }
+        if(deleteMetadata) {
+            // get the number of new key values
+            int nExistingKV = entry.getMetadataKeys().size();
+
+            // add new keyValues from omero
+            OmeroRawScripting.addOmeroKeyValuesAndDeleteMetadata((OmeroRawImageServer) imageServer);
+
+            // get the number of new key values
+            int nNewKV = entry.getMetadataKeys().size();
+
+            Dialogs.showInfoNotification(title, String.format("Delete %d previous key-values and add %d new %s", nExistingKV, nNewKV,
+                    (nNewKV <= 1 ? "key-value" : "key-values")));
+        }
     }
 
 }
