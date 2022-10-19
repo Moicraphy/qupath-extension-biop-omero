@@ -6,6 +6,7 @@ import omero.gateway.model.MapAnnotationData;
 import omero.gateway.model.ROIData;
 import omero.model.NamedValue;
 import qupath.lib.gui.dialogs.Dialogs;
+import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.projects.ProjectImageEntry;
@@ -194,16 +195,24 @@ public class OmeroRawScripting {
         List<Map<String,String> > splitKeyValues = OmeroRawTools.filterExistingKeyValues(omeroKeyValuePairs, qpMetadata);
         Map<String,String>  newKV = splitKeyValues.get(1);
 
+        System.out.println(newKV);
+
         // convert key value pairs to omero-compatible format
         List<NamedValue> newNV = new ArrayList<>();
         newKV.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
-        // set annotation map
-        MapAnnotationData omeroKeyValues = new MapAnnotationData();
-        omeroKeyValues.setContent(newNV);
-        omeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+        if(newNV.isEmpty()) {
+            Dialogs.showInfoNotification("Save metadata on OMERO", "All metadata already exist on OMERO");
+            return false;
+        }
 
-        OmeroRawTools.addKeyValuesOnOmero(omeroKeyValues, imageServer.getClient(), imageServer.getId());
+        // set annotation map
+        MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
+        newOmeroAnnotationMap.setContent(newNV);
+        newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+
+        OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+
         return true;
     }
 
@@ -249,7 +258,7 @@ public class OmeroRawScripting {
         omeroKeyValuePairs.forEach((keyToUpdate, valueToUpdate) -> {
             for (String updated : existingKV.keySet())
                 if (keyToUpdate.equals(updated))
-                    omeroKeyValuePairs.replace(keyToUpdate, existingKV.get(keyToUpdate));
+                    omeroKeyValuePairs.replace(keyToUpdate, valueToUpdate, existingKV.get(keyToUpdate));
         });
 
         // convert key value pairs to omero-compatible format
@@ -274,7 +283,8 @@ public class OmeroRawScripting {
 
     public static boolean addMetadata(Map<String,String> keyValues) {
         // get project entry
-        ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
+        ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
+
 
         // get qupath metadata
         Map<String, String> qpMetadata = entry.getMetadataMap();
@@ -299,7 +309,7 @@ public class OmeroRawScripting {
 
     public static boolean addAndUpdateMetadata(Map<String,String> keyValues) {
         // get project entry
-        ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
+        ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
 
         // get qupath metadata
         Map<String, String> qpMetadata = entry.getMetadataMap();
@@ -308,17 +318,23 @@ public class OmeroRawScripting {
         List<Map<String,String>> splitKeyValues = OmeroRawTools.filterExistingKeyValues(qpMetadata, keyValues);
         Map<String,String> newKV = splitKeyValues.get(1);
         Map<String,String> existingKV = splitKeyValues.get(0);
+        Map<String,String> updatedKV = new HashMap<>();
 
         qpMetadata.forEach((keyToUpdate, valueToUpdate) -> {
-            for (String updated : existingKV.keySet())
-                if (keyToUpdate.equals(updated))
-                    qpMetadata.replace(keyToUpdate, existingKV.get(keyToUpdate));
+            String newValue = valueToUpdate;
+            for (String updated : existingKV.keySet()) {
+                if (keyToUpdate.equals(updated)) {
+                    newValue = existingKV.get(keyToUpdate);
+                    break;
+                }
+            }
+            updatedKV.put(keyToUpdate, newValue);
         });
 
         // delete metadata
         entry.clearMetadata();
 
-        qpMetadata.forEach(entry::putMetadataValue);
+        updatedKV.forEach(entry::putMetadataValue);
         newKV.forEach(entry::putMetadataValue);
 
         return true;
@@ -344,7 +360,7 @@ public class OmeroRawScripting {
 
     public static boolean addAndDeleteMetadata(Map<String,String> keyValues) {
         // get project entry
-        ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
+        ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
 
         // delete metadata
         entry.clearMetadata();
