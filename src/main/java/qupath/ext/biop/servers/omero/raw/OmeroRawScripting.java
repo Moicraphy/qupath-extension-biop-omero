@@ -185,22 +185,29 @@ public class OmeroRawScripting {
     }
 
 
+    /**
+     * Save on OMERO some key-values contained in a Map. It does not delete any of the existing key value pairs.
+     * Moreover, if keys already exist on OMERO, it does not update them neither adding the new ones.
+     *
+     * @param qpMetadata
+     * @param imageServer
+     * @return
+     */
     public static boolean saveMetadataOnOmero(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
+        // read OMERO key-values and check if they are unique
         Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
-
-        if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
+        if(omeroKeyValuePairs == null)
             return false;
 
         // split QuPath metadata into those that already exist on OMERO and those that need to be added
         List<Map<String,String> > splitKeyValues = OmeroRawTools.filterExistingKeyValues(omeroKeyValuePairs, qpMetadata);
         Map<String,String>  newKV = splitKeyValues.get(1);
 
-        System.out.println(newKV);
-
-        // convert key value pairs to omero-compatible format
+        // convert key value pairs to omero-compatible object NamedValue
         List<NamedValue> newNV = new ArrayList<>();
         newKV.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
+        // if all keys already exist, do not write an empty list
         if(newNV.isEmpty()) {
             Dialogs.showInfoNotification("Save metadata on OMERO", "All metadata already exist on OMERO");
             return false;
@@ -211,43 +218,59 @@ public class OmeroRawScripting {
         newOmeroAnnotationMap.setContent(newNV);
         newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
 
-        OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
-
-        return true;
+        // add key value on OMERO
+        return OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
     }
 
-    public static void saveMetadataOnOmeroAndDeleteKeyValues(Map<String, String> qpKeyValues, OmeroRawImageServer imageServer) {
+    /**
+     * Delete all existing key value pairs attach to the current image on OMERO
+     * and save some new key-values contained in the Map.
+     *
+     * @param qpMetadata
+     * @param imageServer
+     */
+    public static boolean saveMetadataOnOmeroAndDeleteKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read current key-value on OMERO ==> used for the later deletion
         List<MapAnnotationData> omeroAnnotationMaps = OmeroRawTools.readKeyValues(imageServer.getClient(), imageServer.getId());
 
+        // read OMERO key-values and check if they are unique
         Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
+        if(omeroKeyValuePairs == null)
+            return false;
 
-        if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
-            return;
-
-        // convert key value pairs to omero-compatible format
+        // convert key value pairs to omero-compatible object NamedValue
         List<NamedValue> newNV = new ArrayList<>();
-        qpKeyValues.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
+        qpMetadata.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
         // set annotation map
         MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
         newOmeroAnnotationMap.setContent(newNV);
         newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
 
-        // get the current keyValue On OMERO
-        OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+        // add key value pairs On OMERO
+        boolean wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
 
         // delete current keyValues
-        OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
+        boolean wasDeleted = OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
+
+        return (wasDeleted && wasAdded);
     }
 
-    public static boolean saveMetadataAndUpdateKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
+
+    /**
+     * Update existing key value pairs on OMERO with new values from the metadata and save new ones.
+     *
+     * @param qpMetadata
+     * @param imageServer
+     * @return
+     */
+    public static boolean saveMetadataOnOmeroAndUpdateKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read current key-value on OMERO ==> used for the later deletion
         List<MapAnnotationData> omeroAnnotationMaps = OmeroRawTools.readKeyValues(imageServer.getClient(), imageServer.getId());
 
+        // read OMERO key-values and check if they are unique
         Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
-
-        if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
+        if(omeroKeyValuePairs == null)
             return false;
 
         // split QuPath metadata into those that already exist on OMERO and those that need to be added
@@ -261,65 +284,84 @@ public class OmeroRawScripting {
                     omeroKeyValuePairs.replace(keyToUpdate, valueToUpdate, existingKV.get(keyToUpdate));
         });
 
-        // convert key value pairs to omero-compatible format
+        // convert key value pairs to omero-compatible object NamedValue
         List<NamedValue> newNV = new ArrayList<>();
         omeroKeyValuePairs.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
         newKV.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
         // set annotation map
-        MapAnnotationData omeroKeyValues = new MapAnnotationData();
-        omeroKeyValues.setContent(newNV);
-        omeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+        MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
+        newOmeroAnnotationMap.setContent(newNV);
+        newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
 
-        // get the current keyValue On OMERO
-        OmeroRawTools.addKeyValuesOnOmero(omeroKeyValues, imageServer.getClient(), imageServer.getId());
+        // add key value pairs On OMERO
+        boolean wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
 
         // delete current keyValues
-        OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
+        boolean wasDeleted = OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
 
-        return true;
+        return (wasDeleted && wasAdded);
     }
 
 
-    public static boolean addMetadata(Map<String,String> keyValues) {
+    /**
+     * Add metadata to the current image in the QuPath project
+     *
+     * @param keyValues
+     * @return
+     */
+    public static void addMetadata(Map<String,String> keyValues) {
         // get project entry
         ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
-
 
         // get qupath metadata
         Map<String, String> qpMetadata = entry.getMetadataMap();
 
-        // split QuPath metadata into those that already exist on OMERO and those that need to be added
+        // split key value pairs into those that already exist in QuPath and those that need to be added
         List<Map<String,String>> splitKeyValues = OmeroRawTools.filterExistingKeyValues(qpMetadata, keyValues);
         Map<String,String> newKV = splitKeyValues.get(1);
 
+        // add metadata
         newKV.forEach(entry::putMetadataValue);
-        return true;
     }
 
-    public static boolean addOmeroKeyValues(OmeroRawImageServer imageServer) {
+
+    /**
+     * Add OMERO key value pairs as metadata to the current image in the QuPath project
+     *
+     * @param imageServer
+     */
+    public static void addOmeroKeyValues(OmeroRawImageServer imageServer) {
+        // read OMERO key-values and check if they are unique. If not, stop the process
         Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
-
         if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
-            return false;
+            return;
 
-        return addMetadata(omeroKeyValuePairs);
+        // add metadata
+        addMetadata(omeroKeyValuePairs);
     }
 
 
-    public static boolean addAndUpdateMetadata(Map<String,String> keyValues) {
+    /**
+     * Add metadata to the current image in QuPath. Update existing metadata with new values and add new ones.
+     *
+     * @param keyValues
+     * @return
+     */
+    public static void addAndUpdateMetadata(Map<String,String> keyValues) {
         // get project entry
         ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
 
         // get qupath metadata
         Map<String, String> qpMetadata = entry.getMetadataMap();
 
-        // split QuPath metadata into those that already exist on OMERO and those that need to be added
+        // split key value pairs metadata into those that already exist in QuPath and those that need to be added
         List<Map<String,String>> splitKeyValues = OmeroRawTools.filterExistingKeyValues(qpMetadata, keyValues);
         Map<String,String> newKV = splitKeyValues.get(1);
         Map<String,String> existingKV = splitKeyValues.get(0);
         Map<String,String> updatedKV = new HashMap<>();
 
+        // update metadata
         qpMetadata.forEach((keyToUpdate, valueToUpdate) -> {
             String newValue = valueToUpdate;
             for (String updated : existingKV.keySet()) {
@@ -334,31 +376,51 @@ public class OmeroRawScripting {
         // delete metadata
         entry.clearMetadata();
 
+        // add metadata
         updatedKV.forEach(entry::putMetadataValue);
         newKV.forEach(entry::putMetadataValue);
-
-        return true;
     }
 
-    public static boolean addOmeroKeyValuesAndUpdateMetadata(OmeroRawImageServer imageServer) {
+    /**
+     * Add OMERO key value pairs to the current image in QuPath. Update existing metadata with new values and add new ones.
+     *
+     * @param imageServer
+     */
+    public static void addOmeroKeyValuesAndUpdateMetadata(OmeroRawImageServer imageServer) {
+        // read OMERO key-values and check if they are unique. If not, stop the process
         Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
 
         if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
-            return false;
+            return;
 
-        return addAndUpdateMetadata(omeroKeyValuePairs);
+        // add and update metadata
+        addAndUpdateMetadata(omeroKeyValuePairs);
     }
 
-    public static boolean addOmeroKeyValuesAndDeleteMetadata(OmeroRawImageServer imageServer) {
+    /**
+     * Delete all current metadata and add OMERO key value pairs to the current image in QuPath.
+     *
+     * @param imageServer
+     * @return
+     */
+    public static void addOmeroKeyValuesAndDeleteMetadata(OmeroRawImageServer imageServer) {
+        // read OMERO key-values and check if they are unique. If not, stop the process
         Map<String,String> omeroKeyValues = getOmeroKeyValues(imageServer);
 
         if(omeroKeyValues == null || omeroKeyValues.isEmpty())
-            return false;
+            return;
 
-        return addAndDeleteMetadata(omeroKeyValues);
+        // add and delete metadata
+        addAndDeleteMetadata(omeroKeyValues);
     }
 
-    public static boolean addAndDeleteMetadata(Map<String,String> keyValues) {
+    /**
+     * Delete all current metadata and add key value pairs to the current image in QuPath.
+     *
+     * @param keyValues
+     * @return
+     */
+    public static void addAndDeleteMetadata(Map<String,String> keyValues) {
         // get project entry
         ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
 
@@ -367,17 +429,21 @@ public class OmeroRawScripting {
 
         // add new metadata
         keyValues.forEach(entry::putMetadataValue);
-
-        return true;
     }
 
+    /**
+     * read key value pairs from OMERO and check if all keys are unique
+     *
+     * @param imageServer
+     * @return
+     */
     public static Map<String,String> getOmeroKeyValues(OmeroRawImageServer imageServer) {
         // read current key-value on OMERO
         List<NamedValue> currentOmeroKeyValues = OmeroRawTools.readKeyValuesAsNamedValue(imageServer.getClient(), imageServer.getId());
 
         if (currentOmeroKeyValues.isEmpty()) {
             Dialogs.showWarningNotification("Read key values on OMERO", "The current image does not have any KeyValues on OMERO");
-            return null;
+            return new HashMap<>();
         }
 
         // check unique keys

@@ -876,132 +876,47 @@ public final class OmeroRawTools {
     }
 
 
-
-
-
     /**
-     * Write metadata collection to OMERO server. This will not delete the existing
-     * key-value pairs present on the OMERO server. Rather, it will simply add the new ones.
+     * Splits the "target" map into two : one containing key/values that are referenced in the "reference" map and
+     * the other containing remaining key/values that are not referenced in the "reference".
      *
-    // * @param qpKeyValues
-   //  * @param imageServer
-     * @throws ExecutionException
-     * @throws DSOutOfServiceException
-     * @throws DSAccessException
+     * @param reference
+     * @param target
+     * @return
      */
-  /*  public static boolean writeMetadata(Map<String,String> qpKeyValues, OmeroRawImageServer imageServer, boolean deleteAll, boolean replace) throws ExecutionException, DSOutOfServiceException, DSAccessException {
-        // read current key-value on OMERO
-        List<MapAnnotationData> currentOmeroAnnotationData = readKeyValues(imageServer.getClient(), imageServer.getId());
-
-        List<NamedValue> currentOmeroKeyValues = new ArrayList<>();
-        currentOmeroAnnotationData.forEach(annotation->{
-            currentOmeroKeyValues.addAll((List<NamedValue>)annotation.getContent());
-        });
-
-        // check unique keys
-        boolean uniqueOmeroKeys = checkUniqueKeyInAnnotationMap(currentOmeroKeyValues);
-
-        if(!uniqueOmeroKeys)
-            return false;
-
-        // build OMERO-compatible key-value pairs
-        List<NamedValue> qpNamedValues = new ArrayList<>();
-        for (String key : qpKeyValues.keySet()) {
-            qpNamedValues.add(new NamedValue(key, qpKeyValues.get(key)));
-        }
-
-        List<NamedValue> existingKVP = new ArrayList<>();
-        qpNamedValues.forEach(e->existingKVP.addAll(currentOmeroKeyValues.stream().filter(f->f.name.equals(e.name)).collect(Collectors.toList())));
-
-        List<NamedValue> newKVP = qpNamedValues;
-
-        // update current OMERO key-values
-        existingKVP.forEach(pair-> {
-            // check if the key-value already exists in QuPath
-            for (NamedValue keyvalue : newKVP) {
-                if (pair.name.equals(keyvalue.name)) {
-                    newKVP.remove(keyvalue);
-                    break;
-                }
-            }
-        });
-
-        // delete all current if asked
-        if(!deleteAll)
-            qpNamedValues.addAll(currentOmeroKeyValues);
-
-        // set annotation map
-        MapAnnotationData omeroKeyValues = new MapAnnotationData();
-        omeroKeyValues.setContent(qpNamedValues);
-        omeroKeyValues.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
-
-        // get OMERO client
-        OmeroRawClient client = imageServer.getClient();
-        ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageServer.getId());
-
-        // send key-values to OMERO
-        client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(),omeroKeyValues,imageData);
-
-        // remove previous key-values
-        client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(),currentOmeroAnnotationData.stream().map(MapAnnotationData::asIObject).collect(Collectors.toList()));
-
-        return true;
-    }*/
-
-
-    public static List<List<NamedValue>> filterExistingKeyValues(List<NamedValue> toSearchIn, List<NamedValue> toSplit){
-        List<NamedValue> existingKVP = new ArrayList<>();
-        toSearchIn.forEach(e->existingKVP.addAll(toSplit.stream().filter(f->f.name.equals(e.name)).collect(Collectors.toList())));
-
-        // update current OMERO key-values
-        existingKVP.forEach(pair-> {
-            // check if the key-value already exists in QuPath
-            for (NamedValue keyvalue : toSplit) {
-                if (pair.name.equals(keyvalue.name)) {
-                    toSplit.remove(keyvalue);
-                    break;
-                }
-            }
-        });
-
-        List<List<NamedValue>> results = new ArrayList<>();
-        results.add(existingKVP);
-        results.add(toSplit);
-
-        return results;
-    }
-
-    public static List<Map<String, String>> filterExistingKeyValues(Map<String, String> toSearchIn, Map<String, String> toSplit){
+    public static List<Map<String, String>> filterExistingKeyValues(Map<String, String> reference, Map<String, String> target){
         Map<String, String> existingKVP = new HashMap<>();
 
-        toSearchIn.forEach((key, value) -> existingKVP.putAll(toSplit.keySet()
+        // filter key/values that are contained in the reference
+        reference.forEach((key, value) -> existingKVP.putAll(target.keySet()
                 .stream()
                 .filter(f -> f.equals(key))
-                .collect(Collectors.toMap(e->key,e->toSplit.get(key)))));
+                .collect(Collectors.toMap(e->key,e->target.get(key)))));
 
-        // update current OMERO key-values
+        // filter key/values that are not contained in the reference
         existingKVP.forEach((key, value)-> {
-            // check if the key-value already exists in QuPath
-            for (String keyToUpdate : toSplit.keySet()) {
+            for (String keyToUpdate : target.keySet()) {
+                // remove duplicate keys
                 if (key.equals(keyToUpdate)) {
-                    toSplit.remove(keyToUpdate);
+                    target.remove(keyToUpdate);
                     break;
                 }
             }
         });
 
+        // add the two separate maps to a list.
         List<Map<String, String>> results = new ArrayList<>();
         results.add(existingKVP);
-        results.add(toSplit);
+        results.add(target);
 
         return results;
     }
 
 
     /**
-     * Read Key Values from OMERO server.
+     * Read key value pairs from OMERO server.
      *
-     * Code partially taken from Pierre Pouchin, from his simple-omero-client project
+     * Code partially taken from Pierre Pouchin, from his "simple-omero-client" project
      *
      * @param client
      * @param imageId
@@ -1011,69 +926,105 @@ public final class OmeroRawTools {
      */
     public static List<MapAnnotationData> readKeyValues(OmeroRawClient client, long imageId) {
         List<AnnotationData> annotations;
-        // read key-values from OMERO
+
         try {
+            // get current image from OMERO
             ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+
+            // read annotations linked to the image
             annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), imageData);
+
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
             Dialogs.showErrorMessage("Reading Omero KeyValues", "Cannot get key values from OMERO");
             logger.error("" + e);
             throw new RuntimeException(e);
         }
 
+        // filter key values
         return annotations.stream()
                 .filter(MapAnnotationData.class::isInstance)
                 .map(MapAnnotationData.class::cast)
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Read key value pairs from OMERO and convert them into NamedValues. This OMERO-compatible object is more flexible
+     * than a Map<String, String> and therefore allows for two identical keys (Name).
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
     public static List<NamedValue> readKeyValuesAsNamedValue(OmeroRawClient client, long imageId) {
         return readKeyValues(client, imageId).stream()
                 .flatMap(e->((List<NamedValue>)(e.getContent())).stream())
                 .collect(Collectors.toList());
     }
 
-    public static Map<String, String> readKeyValuesAsMap(OmeroRawClient client, long imageId) {
-        return readKeyValues(client, imageId).stream()
-                .flatMap(e->((List<NamedValue>)(e.getContent())).stream())
-                .collect(Collectors.toMap(e->e.name,e->e.value));
-    }
 
-    public static void addKeyValuesOnOmero(MapAnnotationData keyValuePairs, OmeroRawClient client, long imageId) {
+    /**
+     * Add new key value pairs to an image on OMERO.
+     *
+     * @param keyValuePairs
+     * @param client
+     * @param imageId
+     */
+    public static boolean addKeyValuesOnOmero(MapAnnotationData keyValuePairs, OmeroRawClient client, long imageId) {
+        boolean wasAdded = true;
         try {
             // get current image from OMERO
             ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
 
             // send key-values to OMERO
             client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(), keyValuePairs, imageData);
+
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
             Dialogs.showErrorMessage("Adding Omero KeyValues", "Cannot add new key values on OMERO");
             logger.error("" + e);
+            wasAdded = false;
             //throw new RuntimeException(e);
         }
+        return wasAdded;
     }
 
-    public static void updateKeyValuesOnOmero(List<MapAnnotationData> keyValuePairs, OmeroRawClient client) {
-        // get OMERO client
+    /**
+     * Update specified key value pairs on OMERO
+     *
+     * @param keyValuePairs
+     * @param client
+     */
+    public static boolean updateKeyValuesOnOmero(List<MapAnnotationData> keyValuePairs, OmeroRawClient client) {
+        boolean wasUpdated = true;
         try {
-            // send key-values to OMERO
+            // update key-values to OMERO
             client.getGateway().getFacility(DataManagerFacility.class).updateObjects(client.getContext(), keyValuePairs.stream().map(MapAnnotationData::asIObject).collect(Collectors.toList()),null);
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
             Dialogs.showErrorMessage("Omero KeyValues update", "Cannot update existing key values on OMERO");
             logger.error("" + e);
+            wasUpdated = false;
             //throw new RuntimeException(e);
         }
+        return wasUpdated;
     }
 
-    public static void deleteKeyValuesOnOmero(List<MapAnnotationData> keyValuePairs, OmeroRawClient client) {
+    /**
+     * Delete specified key value pairs on OMERO
+     *
+     * @param keyValuePairs
+     * @param client
+     */
+    public static boolean deleteKeyValuesOnOmero(List<MapAnnotationData> keyValuePairs, OmeroRawClient client) {
+        boolean wasDeleted = true;
         try {
-            // remove previous key-values
+            // remove current key-values
             client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(),keyValuePairs.stream().map(MapAnnotationData::asIObject).collect(Collectors.toList()));
         } catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
             Dialogs.showErrorMessage("Omero KeyValues deletion", "Cannot delete existing key values on OMERO");
             logger.error("" + e);
+            wasDeleted = false;
             //throw new RuntimeException(e);
         }
+        return wasDeleted;
     }
 
 
@@ -1083,10 +1034,11 @@ public final class OmeroRawTools {
      * On OMERO, it is possible to have two identical keys with a different value. This should normally never append.
      * This method check if all keys are unique and output false if there is at least two identical keys.
      *
+     *
      * @param keyValues
      * @return
      */
-    public static boolean checkUniqueKeyInAnnotationMap(List<NamedValue> keyValues){
+    public static boolean checkUniqueKeyInAnnotationMap(List<NamedValue> keyValues){ // not possible to have a map because it allows only unique keys
         boolean uniqueKey = true;
 
         for(int i = 0; i < keyValues.size()-1;i++){
@@ -1101,7 +1053,6 @@ public final class OmeroRawTools {
         }
         return uniqueKey;
     }
-
 
 
 

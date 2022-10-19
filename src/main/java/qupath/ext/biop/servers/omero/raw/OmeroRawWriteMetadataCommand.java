@@ -91,23 +91,22 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
 
         // build a map of key and values from metadata
         Map<String,String> keyValues = new HashMap<>();
-
         for (String key : keys) {
             keyValues.put(key, entry.getMetadataValue(key));
         }
 
-        // send metadata to OMERO
         String objectString = "key-value" + (keys.size() == 1 ? "" : "s");
-        boolean uniqueKeys = true;
+        boolean wasSaved = true;
 
+        // send metadata to OMERO
         if(deleteMetadata)
-            OmeroRawScripting.saveMetadataOnOmeroAndDeleteKeyValues(keyValues,(OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.saveMetadataOnOmeroAndDeleteKeyValues(keyValues,(OmeroRawImageServer)imageServer);
         if(keepMetadata)
-            uniqueKeys = OmeroRawScripting.saveMetadataOnOmero(keyValues,(OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.saveMetadataOnOmero(keyValues,(OmeroRawImageServer)imageServer);
         if(replaceMetadata)
-            uniqueKeys = OmeroRawScripting.saveMetadataAndUpdateKeyValues(keyValues,(OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.saveMetadataOnOmeroAndUpdateKeyValues(keyValues,(OmeroRawImageServer)imageServer);
 
-        if(uniqueKeys)
+        if(wasSaved)
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     keys.size(),
                     objectString,
