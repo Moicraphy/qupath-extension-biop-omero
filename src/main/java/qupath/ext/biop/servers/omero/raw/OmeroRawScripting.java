@@ -1,7 +1,7 @@
 package qupath.ext.biop.servers.omero.raw;
 
-import fr.igred.omero.Client;
-import omero.gateway.exception.DSOutOfServiceException;
+//import fr.igred.omero.Client;
+//import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.model.MapAnnotationData;
 import omero.gateway.model.ROIData;
 import omero.model.NamedValue;
@@ -24,7 +24,7 @@ public class OmeroRawScripting {
      *
      * @return the Client object
      */
-    public static Client getSimpleOmeroClientInstance(OmeroRawImageServer server) throws DSOutOfServiceException {
+    /*public static Client getSimpleOmeroClientInstance(OmeroRawImageServer server) throws DSOutOfServiceException {
         // get the current OmeroRawClient
         OmeroRawClient omerorawclient = server.getClient();
 
@@ -33,7 +33,7 @@ public class OmeroRawScripting {
         simpleClient.connect(omerorawclient.getServerURI().getHost(), omerorawclient.getServerURI().getPort(), omerorawclient.getGateway().getSessionId(omerorawclient.getGateway().getLoggedInUser()));
 
         return simpleClient;
-    }
+    }*/
 
 
     /**

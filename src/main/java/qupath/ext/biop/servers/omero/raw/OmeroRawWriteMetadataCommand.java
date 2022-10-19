@@ -74,13 +74,15 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
 
         // get keys
         ProjectImageEntry<BufferedImage> entry = this.qupath.getProject().getEntry(this.qupath.getImageData());
-        Collection<String> keys = entry.getMetadataKeys();
 
-        if (keys.size() > 0) {
+        // build a map of key and values from metadata
+        Map<String,String> keyValues = entry.getMetadataMap();
+
+        if (keyValues.keySet().size() > 0) {
             // Ask user if he/she wants to send all annotations
             boolean confirm = Dialogs.showConfirmDialog(title, String.format("Do you want to send all metadata as key-values ? (%d %s)",
-                    keys.size(),
-                    (keys.size() == 1 ? "object" : "objects")));
+                    keyValues.keySet().size(),
+                    (keyValues.keySet().size() == 1 ? "object" : "objects")));
 
             if (!confirm)
                 return;
@@ -89,13 +91,7 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
             return;
         }
 
-        // build a map of key and values from metadata
-        Map<String,String> keyValues = new HashMap<>();
-        for (String key : keys) {
-            keyValues.put(key, entry.getMetadataValue(key));
-        }
-
-        String objectString = "key-value" + (keys.size() == 1 ? "" : "s");
+        String objectString = "key-value" + (keyValues.keySet().size() == 1 ? "" : "s");
         boolean wasSaved = true;
 
         // send metadata to OMERO
@@ -108,8 +104,8 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
 
         if(wasSaved)
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
-                    keys.size(),
+                    keyValues.keySet().size(),
                     objectString,
-                    (keys.size() == 1 ? "was" : "were")));
+                    (keyValues.keySet().size() == 1 ? "was" : "were")));
     }
 }

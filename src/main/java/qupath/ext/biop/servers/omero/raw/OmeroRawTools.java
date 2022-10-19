@@ -51,7 +51,6 @@ import omero.model.Point;
 import omero.model.Polygon;
 import omero.model.Rectangle;
 import omero.model.Shape;
-import org.bytedeco.opencv.presets.opencv_core;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -893,12 +892,14 @@ public final class OmeroRawTools {
                 .filter(f -> f.equals(key))
                 .collect(Collectors.toMap(e->key,e->target.get(key)))));
 
+        Map<String,String> updatedKV = target.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
         // filter key/values that are not contained in the reference
         existingKVP.forEach((key, value)-> {
             for (String keyToUpdate : target.keySet()) {
                 // remove duplicate keys
                 if (key.equals(keyToUpdate)) {
-                    target.remove(keyToUpdate);
+                    updatedKV.remove(keyToUpdate);
                     break;
                 }
             }
@@ -907,7 +908,7 @@ public final class OmeroRawTools {
         // add the two separate maps to a list.
         List<Map<String, String>> results = new ArrayList<>();
         results.add(existingKVP);
-        results.add(target);
+        results.add(updatedKV);
 
         return results;
     }
