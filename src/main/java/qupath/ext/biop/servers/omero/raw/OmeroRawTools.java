@@ -883,7 +883,7 @@ public final class OmeroRawTools {
      * @param target
      * @return
      */
-    public static List<Map<String, String>> filterExistingKeyValues(Map<String, String> reference, Map<String, String> target){
+    public static List<Map<String, String>> splitNewAndExistingKeyValues(Map<String, String> reference, Map<String, String> target){
         Map<String, String> existingKVP = new HashMap<>();
 
         // filter key/values that are contained in the reference
@@ -892,18 +892,9 @@ public final class OmeroRawTools {
                 .filter(f -> f.equals(key))
                 .collect(Collectors.toMap(e->key,e->target.get(key)))));
 
+        // filter the new key values
         Map<String,String> updatedKV = target.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        // filter key/values that are not contained in the reference
-        existingKVP.forEach((key, value)-> {
-            for (String keyToUpdate : target.keySet()) {
-                // remove duplicate keys
-                if (key.equals(keyToUpdate)) {
-                    updatedKV.remove(keyToUpdate);
-                    break;
-                }
-            }
-        });
+        existingKVP.forEach(updatedKV::remove);
 
         // add the two separate maps to a list.
         List<Map<String, String>> results = new ArrayList<>();
