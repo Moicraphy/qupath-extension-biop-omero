@@ -96,11 +96,11 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
 
         // send metadata to OMERO
         if(deleteMetadata)
-            wasSaved = OmeroRawScripting.saveMetadataOnOmeroAndDeleteKeyValues(keyValues,(OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendMetadataOnOmeroAndDeleteKeyValues(keyValues,(OmeroRawImageServer)imageServer);
         if(keepMetadata)
-            wasSaved = OmeroRawScripting.saveMetadataOnOmero(keyValues,(OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendMetadataOnOmero(keyValues,(OmeroRawImageServer)imageServer);
         if(replaceMetadata)
-            wasSaved = OmeroRawScripting.saveMetadataOnOmeroAndUpdateKeyValues(keyValues,(OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendMetadataOnOmeroAndUpdateKeyValues(keyValues,(OmeroRawImageServer)imageServer);
 
         if(wasSaved)
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",

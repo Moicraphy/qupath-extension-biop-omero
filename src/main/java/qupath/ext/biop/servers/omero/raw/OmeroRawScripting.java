@@ -194,9 +194,9 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static boolean saveMetadataOnOmero(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
+    public static boolean sendMetadataOnOmero(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique
-        Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
+        Map<String,String> omeroKeyValuePairs = importOmeroKeyValues(imageServer);
         if(omeroKeyValuePairs == null)
             return false;
 
@@ -230,12 +230,12 @@ public class OmeroRawScripting {
      * @param qpMetadata
      * @param imageServer
      */
-    public static boolean saveMetadataOnOmeroAndDeleteKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
+    public static boolean sendMetadataOnOmeroAndDeleteKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read current key-value on OMERO ==> used for the later deletion
         List<MapAnnotationData> omeroAnnotationMaps = OmeroRawTools.readKeyValues(imageServer.getClient(), imageServer.getId());
 
         // read OMERO key-values and check if they are unique
-        Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
+        Map<String,String> omeroKeyValuePairs = importOmeroKeyValues(imageServer);
         if(omeroKeyValuePairs == null)
             return false;
 
@@ -265,12 +265,12 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static boolean saveMetadataOnOmeroAndUpdateKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
+    public static boolean sendMetadataOnOmeroAndUpdateKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read current key-value on OMERO ==> used for the later deletion
         List<MapAnnotationData> omeroAnnotationMaps = OmeroRawTools.readKeyValues(imageServer.getClient(), imageServer.getId());
 
         // read OMERO key-values and check if they are unique
-        Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
+        Map<String,String> omeroKeyValuePairs = importOmeroKeyValues(imageServer);
         if(omeroKeyValuePairs == null)
             return false;
 
@@ -334,7 +334,7 @@ public class OmeroRawScripting {
      */
     public static void addOmeroKeyValues(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
-        Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
+        Map<String,String> omeroKeyValuePairs = importOmeroKeyValues(imageServer);
         if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
             return;
 
@@ -389,7 +389,7 @@ public class OmeroRawScripting {
      */
     public static void addOmeroKeyValuesAndUpdateMetadata(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
-        Map<String,String> omeroKeyValuePairs = getOmeroKeyValues(imageServer);
+        Map<String,String> omeroKeyValuePairs = importOmeroKeyValues(imageServer);
 
         if(omeroKeyValuePairs == null || omeroKeyValuePairs.isEmpty())
             return;
@@ -406,7 +406,7 @@ public class OmeroRawScripting {
      */
     public static void addOmeroKeyValuesAndDeleteMetadata(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
-        Map<String,String> omeroKeyValues = getOmeroKeyValues(imageServer);
+        Map<String,String> omeroKeyValues = importOmeroKeyValues(imageServer);
 
         if(omeroKeyValues == null || omeroKeyValues.isEmpty())
             return;
@@ -438,7 +438,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static Map<String,String> getOmeroKeyValues(OmeroRawImageServer imageServer) {
+    public static Map<String,String> importOmeroKeyValues(OmeroRawImageServer imageServer) {
         // read current key-value on OMERO
         List<NamedValue> currentOmeroKeyValues = OmeroRawTools.readKeyValuesAsNamedValue(imageServer.getClient(), imageServer.getId());
 
@@ -465,7 +465,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return list of read tags
      */
-    public static List<String> getOmeroTags(OmeroRawImageServer imageServer) {
+    public static List<String> importOmeroTags(OmeroRawImageServer imageServer) {
         // read tags
         List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
 
@@ -482,7 +482,7 @@ public class OmeroRawScripting {
      */
     public static boolean sendTagsToOmero(List<String> tags, OmeroRawImageServer imageServer){
         // get current OMERO tags
-        List<String> currentTags = getOmeroTags(imageServer);
+        List<String> currentTags = importOmeroTags(imageServer);
 
         // remove all existing tags
         tags.removeAll(currentTags);
@@ -513,7 +513,7 @@ public class OmeroRawScripting {
      */
     public static boolean sendTagToOmero(String tag, OmeroRawImageServer imageServer){
         // get current OMERO tags
-        List<String> currentTags = getOmeroTags(imageServer);
+        List<String> currentTags = importOmeroTags(imageServer);
 
         // check if the tag exists
         if(currentTags.contains(tag)) {
