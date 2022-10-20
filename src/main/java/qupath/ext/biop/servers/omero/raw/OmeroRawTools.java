@@ -440,78 +440,14 @@ public final class OmeroRawTools {
         }
     }
 
-    /**
-     * ************************************************************************************************************
-     */
-
-
 
     /**
-     * Write MeasurementTable to OMERO server. It converts it to an OMERO.table
-     * and add the new table as attachment on OMERO.
+     * Convert a QuPath measurement table to an OMERO table
      *
      * @param pathObjects
      * @param ob
-   //  * @param qpprojName
-   //  * @param server
-     * @throws ExecutionException
-     * @throws DSOutOfServiceException
-     * @throws DSAccessException
+     * @return
      */
-   /* public static void writeMeasurementTableData(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException {
-        //TODO: What to do if token expires?
-        //TODO: What if we have more object than the limit accepted by the OMERO API?
-
-        // get the current OMERO-RAW client
-        OmeroRawClient client = server.getClient();
-
-        List<TableDataColumn> columns = new ArrayList<>();
-        List<List<Object>> measurements = new ArrayList<>();
-        int i = 0;
-
-        // create formatted Lists of measurements to be compatible with omero.tables
-        for (String col : ob.getAllNames()) {
-            if (ob.isNumericMeasurement(col)) {
-                // feature name
-                columns.add(new TableDataColumn(col.replace("/","-"), i++, Double.class)); // OMERO table does not support "/"
-
-                //feature value for each pathObject
-                List<Object> feature = new ArrayList<>();
-                for (PathObject pathObject : pathObjects) {
-                    feature.add(ob.getNumericValue(pathObject, col));
-                }
-                measurements.add(feature);
-            }
-
-            if (ob.isStringMeasurement(col)) {
-                // feature name
-                columns.add(new TableDataColumn(col.replace("/","-"), i++, String.class)); // OMERO table does not support "/"
-
-                //feature value for each pathObject
-                List<Object> feature = new ArrayList<>();
-                for (PathObject pathObject : pathObjects) {
-                    feature.add(ob.getStringValue(pathObject, col));
-                }
-                measurements.add(feature);
-            }
-        }
-
-        // create omero Table
-        TableData omeroTable = new TableData(columns, measurements);
-
-        // get the current image to attach the omero.table to
-        ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
-
-        // attach the omero.table to the image
-        String type;
-        if(pathObjects.iterator().next().isAnnotation())
-            type = "annotation";
-        else
-            type = "detection";
-        client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(),image,"QP "+type+" table_"+qpprojName+"_"+new Date(), omeroTable);
-    }*/
-
-
     public static TableData convertMeasurementTableToOmeroTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob) {
         List<TableDataColumn> columns = new ArrayList<>();
         List<List<Object>> measurements = new ArrayList<>();
@@ -548,6 +484,15 @@ public final class OmeroRawTools {
         return new TableData(columns, measurements);
     }
 
+    /**
+     * Send an OMERO.table to OMERO
+     *
+     * @param table
+     * @param name
+     * @param client
+     * @param imageId
+     * @return
+     */
     public static boolean addTableToOmero(TableData table, String name, OmeroRawClient client, long imageId) {
         boolean wasAdded = true;
         try{
@@ -566,14 +511,41 @@ public final class OmeroRawTools {
         return wasAdded;
     }
 
+    /**
+     * Send an attachment to OMERO
+     *
+     * @param file
+     * @param client
+     * @param imageId
+     * @return
+     */
     public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId) {
         return addAttachmentToOmero(file, client, imageId, null,"");
     }
 
+    /**
+     *  Send an attachment to OMERO, specifying the mimetype
+     *
+     * @param file
+     * @param client
+     * @param imageId
+     * @param miemtype
+     * @return
+     */
     public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId, String miemtype) {
         return addAttachmentToOmero(file, client, imageId, miemtype,"");
     }
 
+    /**
+     * Send an attachment to OMERO, specifying the mimetype and description
+     *
+     * @param file
+     * @param client
+     * @param imageId
+     * @param miemtype
+     * @param description
+     * @return
+     */
     public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId, String miemtype, String description) {
         boolean wasAdded = true;
         try{
@@ -581,7 +553,7 @@ public final class OmeroRawTools {
             ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
 
             // attach the omero.table to the image
-            client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, null, "", file.getName(), image).get();
+            client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, miemtype, description, file.getName(), image).get();
 
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException | InterruptedException e){
             Dialogs.showErrorMessage("File Saving","Error during saving file on OMERO.");
@@ -593,17 +565,16 @@ public final class OmeroRawTools {
     }
 
 
-        /**
-         * Write MeasurementTable to OMERO server. It converts it to a csv file
-         * and add the new file as attachment on OMERO.
-         *
-         * @param pathObjects
-         * @param ob
-         * @param path
-         * @throws ExecutionException
-         * @throws DSOutOfServiceException
-         * @throws DSAccessException
-         */
+    /**
+     * write the measurement table as a csv file
+     *
+     * @param pathObjects
+     * @param ob
+     * @param path
+     * @throws ExecutionException
+     * @throws DSOutOfServiceException
+     * @throws DSAccessException
+     */
     public static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String name, String path) {
         StringBuilder tableString = new StringBuilder();
 
