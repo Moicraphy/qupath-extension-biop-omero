@@ -51,6 +51,7 @@ public class OmeroRawScripting {
         return importOmeroROIsToQuPath(imageServer, true);
     }
 
+
     /**
      * Read ROIs from OMERO and add them to the current image
      *
@@ -77,6 +78,7 @@ public class OmeroRawScripting {
         return pathObjects;
     }
 
+
     /**
      * Send all pathObjects (annotations and detections) to OMERO and deletes ROIs already stored on OMERO
      * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
@@ -87,6 +89,7 @@ public class OmeroRawScripting {
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer) {
         return sendPathObjectsToOmero(imageServer, true);
     }
+
 
     /**
      * Send all pathObjects (annotations and detections) to OMERO. The user can choose
@@ -102,6 +105,7 @@ public class OmeroRawScripting {
         pathObjects.addAll(QP.getDetectionObjects());
         return sendPathObjectsToOmero(imageServer, pathObjects, deleteROIsOnOMERO);
     }
+
 
     /**
      * Send all annotations to OMERO without deleting existing ROIs.
@@ -126,6 +130,7 @@ public class OmeroRawScripting {
         return sendPathObjectsToOmero(imageServer, annotations, deleteROIsOnOMERO);
     }
 
+
     /**
      * Send all detections to OMERO without deleting existing ROIs.
      *
@@ -135,6 +140,7 @@ public class OmeroRawScripting {
     public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer) {
         return sendDetectionsToOmero(imageServer, false);
     }
+
 
     /**
      * Send all detections to OMERO. The user can choose if he wants to delete existing ROIs or not.
@@ -148,6 +154,7 @@ public class OmeroRawScripting {
         return sendPathObjectsToOmero(imageServer, detections, deleteROIsOnOMERO);
     }
 
+
     /**
      * Send a collection of PathObjects to OMERO, without deleting existing ROIs
      *
@@ -158,6 +165,7 @@ public class OmeroRawScripting {
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> annotations) {
         return sendPathObjectsToOmero(imageServer, annotations, false);
     }
+
 
     /**
      * Send a collection of pathObjects to OMERO.
@@ -226,6 +234,7 @@ public class OmeroRawScripting {
         // add key value on OMERO
         return OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
     }
+
 
     /**
      * Delete all existing key value pairs attach to the current image on OMERO
@@ -386,6 +395,7 @@ public class OmeroRawScripting {
         newKV.forEach(entry::putMetadataValue);
     }
 
+
     /**
      * Add OMERO key value pairs to the current image in QuPath. Update existing metadata with new values and add new ones.
      *
@@ -401,6 +411,7 @@ public class OmeroRawScripting {
         // add and update metadata
         addAndUpdateMetadata(omeroKeyValuePairs);
     }
+
 
     /**
      * Delete all current metadata and add OMERO key value pairs to the current image in QuPath.
@@ -419,6 +430,7 @@ public class OmeroRawScripting {
         addAndDeleteMetadata(omeroKeyValues);
     }
 
+
     /**
      * Delete all current metadata and add key value pairs to the current image in QuPath.
      *
@@ -435,6 +447,7 @@ public class OmeroRawScripting {
         // add new metadata
         keyValues.forEach(entry::putMetadataValue);
     }
+
 
     /**
      * read key value pairs from OMERO and check if all keys are unique
@@ -477,6 +490,7 @@ public class OmeroRawScripting {
         return omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
     }
 
+
     /**
      * send a list of tags to OMERO
      *
@@ -508,6 +522,7 @@ public class OmeroRawScripting {
         return wasAdded;
     }
 
+
     /**
      * send a tag to OMERO
      *
@@ -532,31 +547,79 @@ public class OmeroRawScripting {
         return OmeroRawTools.addTagsOnOmero(newOmeroTagAnnotation, imageServer.getClient(), imageServer.getId());
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to the specified pathObjects as an OMERO.table
+     *
+     * @param pathObjects
+     * @param imageServer
+     * @param imageData
+     * @param tableName
+     * @return
+     */
     private static boolean sendMeasurementTableToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName){
+        // get the measurement table
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
         ob.setImageData(imageData, pathObjects);
 
+        // convert the table to OMERO.table
         TableData table = OmeroRawTools.convertMeasurementTableToOmeroTable(pathObjects, ob);
 
+        // send the table to OMERO
         return OmeroRawTools.addTableToOmero(table, tableName, imageServer.getClient(), imageServer.getId());
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to all annotation objects as an OMERO.table
+     *
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendAnnotationMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendAnnotationMeasurementTable(QP.getAnnotationObjects(), imageServer, imageData);
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to specified annotation objects as an OMERO.table
+     *
+     * @param annotationObjects
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendAnnotationMeasurementTable(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        // set the table name
         String qpprojName = QPEx.getQuPath().getProject().getName().split("/")[0];
         String name = "QP annotation table_"+qpprojName+"_"+new Date().toString().replace(":", "-");
 
         return sendMeasurementTableToOmero(annotationObjects, imageServer, imageData, name);
     }
 
+    /**
+     * Send to OMERO the measurement table corresponding to all detection objects as an OMERO.table
+     *
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendDetectionMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendDetectionMeasurementTable(QP.getDetectionObjects(), imageServer, imageData);
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to specified detection objects as an OMERO.table
+     *
+     * @param detectionObjects
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendDetectionMeasurementTable(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        // set the table name
         String qpprojName =  QPEx.getQuPath().getProject().getName().split("/")[0];
         String name = "QP detection table_"+qpprojName+"_"+new Date().toString().replace(":", "-");
 
@@ -564,44 +627,91 @@ public class OmeroRawScripting {
     }
 
 
-
-
-
-
-
-
+    /**
+     * Send to OMERO the measurement table corresponding to all annotation objects as a csv file
+     *
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendAnnotationMeasurementTableAsCSV(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendAnnotationMeasurementTableAsCSV(QP.getAnnotationObjects(), imageServer, imageData);
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to specified annotation objects as a csv file
+     *
+     * @param annotationObjects
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendAnnotationMeasurementTableAsCSV(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        // set the file name
         String qpprojName = QPEx.getQuPath().getProject().getName().split("/")[0];
         String name = "QP annotation table_" + qpprojName + "_" + new Date().toString().replace(":", "-"); // replace ":" to be Windows compatible
 
         return sendMeasurementTableAsCSVToOmero(annotationObjects, imageServer, imageData, name);
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to all detection objects as a csv file
+     *
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendDetectionMeasurementTableAsCSV(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendDetectionMeasurementTableAsCSV(QP.getDetectionObjects(), imageServer, imageData);
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to specified detection objects as a csv file
+     *
+     * @param detectionObjects
+     * @param imageServer
+     * @param imageData
+     * @return
+     */
     public static boolean sendDetectionMeasurementTableAsCSV(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        // set the file name
         String qpprojName = QPEx.getQuPath().getProject().getName().split("/")[0];
         String name = "QP detection table_" + qpprojName + "_" + new Date().toString().replace(":", "-"); // replace ":" to be Windows compatible
 
         return sendMeasurementTableAsCSVToOmero(detectionObjects, imageServer, imageData, name);
     }
 
+
+    /**
+     * Send to OMERO the measurement table corresponding to the specified pathObjects as a csv file
+     *
+     * @param pathObjects
+     * @param imageServer
+     * @param imageData
+     * @param filename
+     * @return
+     */
     private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename){
+        // get the measurement table
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
         ob.setImageData(imageData, pathObjects);
 
+        // get the path
         String path = QPEx.getQuPath().getProject().getPath().getParent().toString();
+
+        // build the csv file from the measurement table
         File file = OmeroRawTools.buildCSVFileFromMeasurementTable(pathObjects, ob, filename, path);
 
         if (file.exists()) {
+            // add the csv file to OMERO
             boolean wasAdded = OmeroRawTools.addAttachmentToOmero(file, imageServer.getClient(), imageServer.getId());
+
+            // delete the temporary file
             file.delete();
+
             return wasAdded;
         }
         else return false;
