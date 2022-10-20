@@ -452,13 +452,13 @@ public final class OmeroRawTools {
      *
      * @param pathObjects
      * @param ob
-     * @param qpprojName
-     * @param server
+   //  * @param qpprojName
+   //  * @param server
      * @throws ExecutionException
      * @throws DSOutOfServiceException
      * @throws DSAccessException
      */
-    public static void writeMeasurementTableData(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException {
+   /* public static void writeMeasurementTableData(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException {
         //TODO: What to do if token expires?
         //TODO: What if we have more object than the limit accepted by the OMERO API?
 
@@ -509,22 +509,102 @@ public final class OmeroRawTools {
         else
             type = "detection";
         client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(),image,"QP "+type+" table_"+qpprojName+"_"+new Date(), omeroTable);
+    }*/
+
+
+    public static TableData convertMeasurementTableToOmeroTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob) {
+        List<TableDataColumn> columns = new ArrayList<>();
+        List<List<Object>> measurements = new ArrayList<>();
+        int i = 0;
+
+        // create formatted Lists of measurements to be compatible with omero.tables
+        for (String col : ob.getAllNames()) {
+            if (ob.isNumericMeasurement(col)) {
+                // feature name
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, Double.class)); // OMERO table does not support "/"
+
+                //feature value for each pathObject
+                List<Object> feature = new ArrayList<>();
+                for (PathObject pathObject : pathObjects) {
+                    feature.add(ob.getNumericValue(pathObject, col));
+                }
+                measurements.add(feature);
+            }
+
+            if (ob.isStringMeasurement(col)) {
+                // feature name
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, String.class)); // OMERO table does not support "/"
+
+                //feature value for each pathObject
+                List<Object> feature = new ArrayList<>();
+                for (PathObject pathObject : pathObjects) {
+                    feature.add(ob.getStringValue(pathObject, col));
+                }
+                measurements.add(feature);
+            }
+        }
+
+        // create omero Table
+        return new TableData(columns, measurements);
     }
 
-    /**
-     * Write MeasurementTable to OMERO server. It converts it to a csv file
-     * and add the new file as attachment on OMERO.
-     *
-     * @param pathObjects
-     * @param ob
-     * @param qpprojName
-     * @param path
-     * @param server
-     * @throws ExecutionException
-     * @throws DSOutOfServiceException
-     * @throws DSAccessException
-     */
-    public static void writeMeasurementTableDataAsCSV(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String qpprojName, String path, OmeroRawImageServer server) throws ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static boolean addTableToOmero(TableData table, String name, OmeroRawClient client, long imageId) {
+        boolean wasAdded = true;
+        try{
+            // get the current image to attach the omero.table to
+            ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+
+            // attach the omero.table to the image
+            client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(), image, name, table);
+
+        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
+            Dialogs.showErrorMessage("Table Saving","Error during saving table on OMERO.");
+            logger.error("" + e);
+            wasAdded = false;
+            //throw new RuntimeException(e);
+        }
+        return wasAdded;
+    }
+
+    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId) {
+        return addAttachmentToOmero(file, client, imageId, null,"");
+    }
+
+    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId, String miemtype) {
+        return addAttachmentToOmero(file, client, imageId, miemtype,"");
+    }
+
+    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId, String miemtype, String description) {
+        boolean wasAdded = true;
+        try{
+            // get the current image to attach the omero.table to
+            ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+
+            // attach the omero.table to the image
+            client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, null, "", file.getName(), image).get();
+
+        } catch (ExecutionException | DSOutOfServiceException | DSAccessException | InterruptedException e){
+            Dialogs.showErrorMessage("File Saving","Error during saving file on OMERO.");
+            logger.error("" + e);
+            wasAdded = false;
+            //throw new RuntimeException(e);
+        }
+        return wasAdded;
+    }
+
+
+        /**
+         * Write MeasurementTable to OMERO server. It converts it to a csv file
+         * and add the new file as attachment on OMERO.
+         *
+         * @param pathObjects
+         * @param ob
+         * @param path
+         * @throws ExecutionException
+         * @throws DSOutOfServiceException
+         * @throws DSAccessException
+         */
+    public static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String name, String path) {
         StringBuilder tableString = new StringBuilder();
 
         // get the header
@@ -546,44 +626,22 @@ public final class OmeroRawTools {
             tableString.append("\n");
         }
 
-        // get pathObject type
-        String type;
-        if(pathObjects.iterator().next().isAnnotation())
-            type = "annotation";
-        else
-            type = "detection";
-
         // create the file locally
-        File file = new File(path + File.separator + "QP " + type + " table_" + qpprojName + "_" + new Date().toString().replace(":", "-") + ".csv"); // replace ":" to be Windows compatible
-        try {
-           try {
-               BufferedWriter buffer = new BufferedWriter(new FileWriter(file));
-               buffer.write(tableString + "\n");
-               buffer.close();
+        File file = new File(path + File.separator + name + ".csv");
 
-           } catch (IOException ex) {
-               Dialogs.showErrorMessage("Write CSV file", "An error has occurred when trying to save the csv file");
-           }
+       try {
+           // write the file
+           BufferedWriter buffer = new BufferedWriter(new FileWriter(file));
+           buffer.write(tableString + "\n");
 
-           // get the current OMERO-RAW client
-           OmeroRawClient client = server.getClient();
+           // close the file
+           buffer.close();
 
-           // get the current image to attach the omero.table to
-           //TODO see if the try/catch statement still allows to throw error for getFacility and getImage in the parent call
-           ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), server.getId());
+       } catch (IOException ex) {
+           Dialogs.showErrorMessage("Write CSV file", "An error has occurred when trying to save the csv file");
+       }
 
-           try {
-               // attach the file to the image on OMERO
-               client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, null, "", file.getName(), image).get();
-           } catch (InterruptedException e) {
-               Dialogs.showErrorMessage("Upload CSV file", "An error has occurred when trying to upload the csv file on OMERO");
-               throw new RuntimeException(e);
-           }
-        }finally{
-           // delete the temporary csv file
-           if (file.exists())
-               file.delete();
-        }
+       return file;
     }
 
     /**

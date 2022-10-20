@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import javafx.scene.control.CheckBox;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
+import omero.gateway.model.TableData;
 import org.apache.commons.lang3.StringUtils;
 
 import javafx.scene.control.Label;
@@ -38,6 +39,7 @@ import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.objects.PathObject;
+import qupath.lib.scripting.QP;
 
 
 /**
@@ -117,57 +119,47 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             return;
 
         // Write path object(s)
-        try {
-            // give to each pathObject a unique name
-            //TODO remove this unique id in qupath 0.4.0
-            objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
+        // give to each pathObject a unique name
+        //TODO remove this unique id in qupath 0.4.0
+        objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
 
-            // send annotations to OMERO
-            boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
-            if(hasBeenSaved)
-                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
-                        objs.size(),
-                        objectString,
-                        (objs.size() == 1 ? "was" : "were")));
+        // send annotations to OMERO
+        boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
+        if(hasBeenSaved)
+            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
+                    objs.size(),
+                    objectString,
+                    (objs.size() == 1 ? "was" : "were")));
 
-            if(annotationMap) {
-                // send annotation measurements
-                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
-                ob.setImageData(qupath.getImageData(), objs);
-                OmeroRawTools.writeMeasurementTableData(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer);
+        if(annotationMap) {
+            // send table to OMERO
+            OmeroRawScripting.sendAnnotationMeasurementTable(objs, omeroServer, qupath.getImageData());
+
+            // send the corresponding csv file
+            OmeroRawScripting.sendAnnotationMeasurementTableAsCSV(objs, omeroServer, qupath.getImageData());
+        }
+        if(detectionMap){
+            // get detection objects
+            Collection<PathObject> detections = viewer.getHierarchy().getDetectionObjects();
+
+            // send detection measurement map
+            if(detections.size() > 0) {
+                // send table to OMERO
+                OmeroRawScripting.sendDetectionMeasurementTable(detections, omeroServer, qupath.getImageData());
 
                 // send the corresponding csv file
-                OmeroRawTools.writeMeasurementTableDataAsCSV(objs, ob, qupath.getProject().getName().split("/")[0], qupath.getProject().getPath().getParent().toString(), omeroServer);
+                OmeroRawScripting.sendDetectionMeasurementTableAsCSV(detections, omeroServer, qupath.getImageData());
             }
-            if(detectionMap){
-                // get detection objects
-                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
-                Collection<PathObject> detections = viewer.getHierarchy().getDetectionObjects();
-
-                // send detection measurement map
-                if(detections.size() > 0) {
-                    ob.setImageData(qupath.getImageData(), detections);
-                    OmeroRawTools.writeMeasurementTableData(detections, ob, qupath.getProject().getName().split("/")[0], omeroServer);
-
-                    // send the corresponding csv file
-                    OmeroRawTools.writeMeasurementTableDataAsCSV(detections, ob, qupath.getProject().getName().split("/")[0], qupath.getProject().getPath().getParent().toString(), omeroServer);
-                }
-                else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
-            }
-
-            // remove the name to not interfere with QuPath ROI display.
-            //TODO remove this unique id in qupath 0.4.0
-            objs.forEach(pathObject -> pathObject.setName(null));
-
-            if(detectionMap || annotationMap)
-                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully written to OMERO server",
-                        detectionMap && annotationMap ? 4 : 2));
-
-        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            //TODO remove this unique id in qupath 0.4.0
-            objs.forEach(pathObject -> pathObject.setName(null));
-            Dialogs.showErrorMessage("Could not send objects", e.getLocalizedMessage());
-            throw new RuntimeException(e);
+            else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
         }
+
+        // remove the name to not interfere with QuPath ROI display.
+        //TODO remove this unique id in qupath 0.4.0
+        objs.forEach(pathObject -> pathObject.setName(null));
+
+        if(detectionMap || annotationMap)
+            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully written to OMERO server",
+                    detectionMap && annotationMap ? 4 : 2));
+
     }
 }

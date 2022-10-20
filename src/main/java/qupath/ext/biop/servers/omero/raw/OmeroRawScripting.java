@@ -4,16 +4,20 @@ package qupath.ext.biop.servers.omero.raw;
 //import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.model.MapAnnotationData;
 import omero.gateway.model.ROIData;
+import omero.gateway.model.TableData;
 import omero.gateway.model.TagAnnotationData;
 import omero.model.NamedValue;
 import qupath.lib.gui.dialogs.Dialogs;
+import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.scripting.QPEx;
+import qupath.lib.images.ImageData;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.projects.ProjectImageEntry;
 import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -526,6 +530,81 @@ public class OmeroRawScripting {
 
         // send tag to OMERO
         return OmeroRawTools.addTagsOnOmero(newOmeroTagAnnotation, imageServer.getClient(), imageServer.getId());
+    }
+
+    private static boolean sendMeasurementTableToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName){
+        ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+        ob.setImageData(imageData, pathObjects);
+
+        TableData table = OmeroRawTools.convertMeasurementTableToOmeroTable(pathObjects, ob);
+
+        return OmeroRawTools.addTableToOmero(table, tableName, imageServer.getClient(), imageServer.getId());
+    }
+
+    public static boolean sendAnnotationMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        return sendAnnotationMeasurementTable(QP.getAnnotationObjects(), imageServer, imageData);
+    }
+
+    public static boolean sendAnnotationMeasurementTable(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        String qpprojName = QPEx.getQuPath().getProject().getName().split("/")[0];
+        String name = "QP annotation table_"+qpprojName+"_"+new Date().toString().replace(":", "-");
+
+        return sendMeasurementTableToOmero(annotationObjects, imageServer, imageData, name);
+    }
+
+    public static boolean sendDetectionMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        return sendDetectionMeasurementTable(QP.getDetectionObjects(), imageServer, imageData);
+    }
+
+    public static boolean sendDetectionMeasurementTable(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        String qpprojName =  QPEx.getQuPath().getProject().getName().split("/")[0];
+        String name = "QP detection table_"+qpprojName+"_"+new Date().toString().replace(":", "-");
+
+        return sendMeasurementTableToOmero(detectionObjects, imageServer, imageData, name);
+    }
+
+
+
+
+
+
+
+
+    public static boolean sendAnnotationMeasurementTableAsCSV(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        return sendAnnotationMeasurementTableAsCSV(QP.getAnnotationObjects(), imageServer, imageData);
+    }
+
+    public static boolean sendAnnotationMeasurementTableAsCSV(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        String qpprojName = QPEx.getQuPath().getProject().getName().split("/")[0];
+        String name = "QP annotation table_" + qpprojName + "_" + new Date().toString().replace(":", "-"); // replace ":" to be Windows compatible
+
+        return sendMeasurementTableAsCSVToOmero(annotationObjects, imageServer, imageData, name);
+    }
+
+    public static boolean sendDetectionMeasurementTableAsCSV(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        return sendDetectionMeasurementTableAsCSV(QP.getDetectionObjects(), imageServer, imageData);
+    }
+
+    public static boolean sendDetectionMeasurementTableAsCSV(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
+        String qpprojName = QPEx.getQuPath().getProject().getName().split("/")[0];
+        String name = "QP detection table_" + qpprojName + "_" + new Date().toString().replace(":", "-"); // replace ":" to be Windows compatible
+
+        return sendMeasurementTableAsCSVToOmero(detectionObjects, imageServer, imageData, name);
+    }
+
+    private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename){
+        ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+        ob.setImageData(imageData, pathObjects);
+
+        String path = QPEx.getQuPath().getProject().getPath().getParent().toString();
+        File file = OmeroRawTools.buildCSVFileFromMeasurementTable(pathObjects, ob, filename, path);
+
+        if (file.exists()) {
+            boolean wasAdded = OmeroRawTools.addAttachmentToOmero(file, imageServer.getClient(), imageServer.getId());
+            file.delete();
+            return wasAdded;
+        }
+        else return false;
     }
 
 }
