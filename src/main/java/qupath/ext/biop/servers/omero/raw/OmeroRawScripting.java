@@ -4,6 +4,7 @@ package qupath.ext.biop.servers.omero.raw;
 //import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.model.MapAnnotationData;
 import omero.gateway.model.ROIData;
+import omero.gateway.model.TagAnnotationData;
 import omero.model.NamedValue;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.scripting.QPEx;
@@ -455,6 +456,76 @@ public class OmeroRawScripting {
         }
 
         return currentOmeroKeyValues.stream().collect(Collectors.toMap(e->e.name, e->e.value));
+    }
+
+
+    /**
+     * get all tags linked to the current image on OMERO
+     *
+     * @param imageServer
+     * @return list of read tags
+     */
+    public static List<String> getOmeroTags(OmeroRawImageServer imageServer) {
+        // read tags
+        List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
+
+        // collect and convert to list
+        return omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
+    }
+
+    /**
+     * send a list of tags to OMERO
+     *
+     * @param tags
+     * @param imageServer
+     * @return if tags has been added
+     */
+    public static boolean sendTagsToOmero(List<String> tags, OmeroRawImageServer imageServer){
+        // get current OMERO tags
+        List<String> currentTags = getOmeroTags(imageServer);
+
+        // remove all existing tags
+        tags.removeAll(currentTags);
+
+        if(tags.isEmpty()) {
+            Dialogs.showInfoNotification("Sending tags", "All tags are already existing on OMERO.");
+            return false;
+        }
+
+        boolean wasAdded = true;
+        for(String tag:tags) {
+            // create new omero-compatible tag
+            TagAnnotationData newOmeroTagAnnotation = new TagAnnotationData(tag);
+
+            // send tag to OMERO
+            wasAdded = wasAdded && OmeroRawTools.addTagsOnOmero(newOmeroTagAnnotation, imageServer.getClient(), imageServer.getId());
+        }
+
+        return wasAdded;
+    }
+
+    /**
+     * send a tag to OMERO
+     *
+     * @param tag
+     * @param imageServer
+     * @return if tags has been added
+     */
+    public static boolean sendTagToOmero(String tag, OmeroRawImageServer imageServer){
+        // get current OMERO tags
+        List<String> currentTags = getOmeroTags(imageServer);
+
+        // check if the tag exists
+        if(currentTags.contains(tag)) {
+            Dialogs.showInfoNotification("Sending tags", "The tag "+tag+"  already exists.");
+            return false;
+        }
+
+        // create new omero-compatible tag
+        TagAnnotationData newOmeroTagAnnotation = new TagAnnotationData(tag);
+
+        // send tag to OMERO
+        return OmeroRawTools.addTagsOnOmero(newOmeroTagAnnotation, imageServer.getClient(), imageServer.getId());
     }
 
 }

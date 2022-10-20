@@ -936,7 +936,7 @@ public final class OmeroRawTools {
             annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), imageData);
 
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            Dialogs.showErrorMessage("Reading Omero KeyValues", "Cannot get key values from OMERO");
+            Dialogs.showErrorMessage("Reading OMERO key value pairs", "Cannot get key values from OMERO");
             logger.error("" + e);
             throw new RuntimeException(e);
         }
@@ -980,7 +980,7 @@ public final class OmeroRawTools {
             client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(), keyValuePairs, imageData);
 
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            Dialogs.showErrorMessage("Adding Omero KeyValues", "Cannot add new key values on OMERO");
+            Dialogs.showErrorMessage("Adding OMERO KeyValues", "Cannot add new key values on OMERO");
             logger.error("" + e);
             wasAdded = false;
             //throw new RuntimeException(e);
@@ -1000,7 +1000,7 @@ public final class OmeroRawTools {
             // update key-values to OMERO
             client.getGateway().getFacility(DataManagerFacility.class).updateObjects(client.getContext(), keyValuePairs.stream().map(MapAnnotationData::asIObject).collect(Collectors.toList()),null);
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            Dialogs.showErrorMessage("Omero KeyValues update", "Cannot update existing key values on OMERO");
+            Dialogs.showErrorMessage("OMERO KeyValues update", "Cannot update existing key values on OMERO");
             logger.error("" + e);
             wasUpdated = false;
             //throw new RuntimeException(e);
@@ -1020,7 +1020,7 @@ public final class OmeroRawTools {
             // remove current key-values
             client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(),keyValuePairs.stream().map(MapAnnotationData::asIObject).collect(Collectors.toList()));
         } catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            Dialogs.showErrorMessage("Omero KeyValues deletion", "Cannot delete existing key values on OMERO");
+            Dialogs.showErrorMessage("OMERO KeyValues deletion", "Cannot delete existing key values on OMERO");
             logger.error("" + e);
             wasDeleted = false;
             //throw new RuntimeException(e);
@@ -1056,6 +1056,62 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * Read tags from OMERO server.
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
+    public static List<TagAnnotationData> readTags(OmeroRawClient client, long imageId) {
+        List<AnnotationData> annotations;
+
+        try {
+            // get current image from OMERO
+            ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+
+            // read annotations linked to the image
+            annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), imageData);
+
+        }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
+            Dialogs.showErrorMessage("Reading OMERO Tags", "Cannot get tags from OMERO");
+            logger.error("" + e);
+            throw new RuntimeException(e);
+        }
+
+        // filter tags
+        return annotations.stream()
+                .filter(TagAnnotationData.class::isInstance)
+                .map(TagAnnotationData.class::cast)
+                .collect(Collectors.toList());
+    }
+
+
+    /**
+     *  Add a new tag to an image on OMERO.
+     *
+     * @param tags
+     * @param client
+     * @param imageId
+     * @return
+     */
+    public static boolean addTagsOnOmero(TagAnnotationData tags, OmeroRawClient client, long imageId) {
+        boolean wasAdded = true;
+        try {
+            // get current image from OMERO
+            ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+
+            // send key-values to OMERO
+            client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(), tags, imageData);
+
+        }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
+            Dialogs.showErrorMessage("Adding OMERO tags", "Cannot add new tags on OMERO");
+            logger.error("" + e);
+            wasAdded = false;
+            //throw new RuntimeException(e);
+        }
+        return wasAdded;
+    }
 
     /**
      * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.
