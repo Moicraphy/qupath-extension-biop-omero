@@ -19,6 +19,7 @@ import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.projects.ProjectImageEntry;
 import qupath.lib.scripting.QP;
 
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -843,5 +844,45 @@ public class OmeroRawScripting {
         return OmeroRawTools.updateObjectsOnOmero(imageServer.getClient(), omeroChannels.stream().map(ChannelData::asIObject).collect(Collectors.toList()));
     }
 
+
+
+    public static boolean sendChannelColorToOmero(OmeroRawImageServer imageServer){
+        // get the OMERO rendering settings to get channel info
+        RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
+
+        // get the number of the channels in OMERO
+        int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
+
+        // check if both images has the same number of channels
+        if(omeroNChannels != imageServer.nChannels()){
+            Dialogs.showWarningNotification("Channel settings", "The image on QuPath has not the same number of channels ("+imageServer.nChannels()+" as the one in OMERO ("+omeroNChannels+")");
+            return false;
+        }
+
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
+        for(int c = 0; c < imageServer.nChannels(); c++) {
+            // get min/max display
+            Integer colorInt = qpChannels.get(c).getColor();
+            Color color = new Color(colorInt);
+
+            // set the rendering settings with new min/max values
+            ChannelBinding binding = renderingSettings.getChannelBinding(c);
+            binding.setBlue(rtypes.rint(color.getBlue()));
+            binding.setRed(rtypes.rint(color.getRed()));
+            binding.setGreen(rtypes.rint(color.getGreen()));
+            binding.setAlpha(rtypes.rint(color.getAlpha()));
+        }
+
+        // update the image on OMERO first
+        boolean updateImageDisplay = OmeroRawTools.updateObjectOnOmero(imageServer.getClient(), renderingSettings);
+
+        // update the image thumbnail on OMERO
+        boolean updateThumbnail = OmeroRawTools.updateOmeroThumbnail(imageServer.getClient(),imageServer.getId(),renderingSettings.getId().getValue());
+
+        return updateImageDisplay && updateThumbnail;
+    }
+    
 
 }

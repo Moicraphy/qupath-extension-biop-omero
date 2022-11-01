@@ -69,8 +69,8 @@ public class OmeroRawWriteDisplaySettings implements Runnable {
             wasSaved = OmeroRawScripting.sendChannelNamesToOmero((OmeroRawImageServer)imageServer);
         if(channelDisplayRange)
             wasSaved = OmeroRawScripting.sendDisplayRangeToOmero((OmeroRawImageServer)imageServer);
-        if(channelColor);
-            //wasSaved = OmeroRawScripting.sendChannelColorToOmero((OmeroRawImageServer)imageServer);
+        if(channelColor)
+            wasSaved = OmeroRawScripting.sendChannelColorToOmero((OmeroRawImageServer)imageServer);
 
         if(wasSaved)
             Dialogs.showInfoNotification(" Image update successfully", "Display settings have been successfully updated");

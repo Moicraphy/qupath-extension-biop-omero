@@ -607,11 +607,18 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * update a list of object on OMERO
+     *
+     * @param client
+     * @param objects
+     * @return
+     */
     public static boolean updateObjectsOnOmero(OmeroRawClient client, List<IObject> objects){
        boolean wasAdded = true;
 
         for(IObject object: objects)
-            wasAdded = wasAdded && updateObjectOnOmero(client,object);
+            wasAdded = wasAdded && updateObjectOnOmero(client, object);
 
         return wasAdded;
     }
