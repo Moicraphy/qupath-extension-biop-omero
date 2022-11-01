@@ -9,6 +9,7 @@ import omero.model.NamedValue;
 import omero.model.RenderingDef;
 import omero.rtypes;
 import qupath.lib.display.ChannelDisplayInfo;
+import qupath.lib.gui.commands.ProjectCommands;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.scripting.QPEx;
@@ -20,6 +21,7 @@ import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -739,6 +741,7 @@ public class OmeroRawScripting {
             return;
         }
 
+        ImageData<BufferedImage> imageData = QPEx.getQuPath().getImageData();
         for(int c = 0; c < imageServer.nChannels(); c++) {
             // get the min-max per channel from OMERO
             ChannelBinding binding = renderingSettings.getChannelBinding(c);
@@ -746,8 +749,23 @@ public class OmeroRawScripting {
             double maxDynamicRange = binding.getInputEnd().getValue();
 
             // set the dynamic range
-            QPEx.setChannelDisplayRange(QPEx.getQuPath().getImageData(), c, minDynamicRange, maxDynamicRange);
+            QPEx.setChannelDisplayRange(imageData, c, minDynamicRange, maxDynamicRange);
         }
+
+        // Update the thumbnail
+        //TODO make it work
+        try {
+            ImageData<BufferedImage> newImageData = QPEx.getQuPath().getViewer().getImageDisplay().getImageData();
+            BufferedImage thumbnail = ProjectCommands.getThumbnailRGB(newImageData.getServer());
+            ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(newImageData);
+            entry.setThumbnail(thumbnail);
+            entry.saveImageData(newImageData);
+            QPEx.getQuPath().getProject().syncChanges();
+        }catch (IOException e){
+            throw new RuntimeException(e);
+        }
+
+
     }
 
     /**
