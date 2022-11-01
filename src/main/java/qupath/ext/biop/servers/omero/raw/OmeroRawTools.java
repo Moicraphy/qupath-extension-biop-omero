@@ -70,6 +70,7 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.roi.interfaces.ROI;
 
 import javax.imageio.ImageIO;
+import javax.xml.crypto.Data;
 
 import static omero.rtypes.rint;
 
@@ -604,6 +605,17 @@ public final class OmeroRawTools {
         }
         return wasAdded;
     }
+
+
+    public static boolean updateObjectsOnOmero(OmeroRawClient client, List<IObject> objects){
+       boolean wasAdded = true;
+
+        for(IObject object: objects)
+            wasAdded = wasAdded && updateObjectOnOmero(client,object);
+
+        return wasAdded;
+    }
+
 
     /**
      * update an existing object on OMERO.

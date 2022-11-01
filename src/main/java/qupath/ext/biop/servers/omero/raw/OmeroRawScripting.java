@@ -811,5 +811,37 @@ public class OmeroRawScripting {
         return updateImageDisplay && updateThumbnail;
     }
 
+    /**
+     * Set the name for each channel on OMERO, based on QuPath settings.
+     * Channel indices are taken as reference.
+     *
+     * @param imageServer
+     * @return
+     */
+    public static boolean sendChannelNamesToOmero(OmeroRawImageServer imageServer){
+        // get the number of the channels in OMERO
+        List<ChannelData> omeroChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId());
+
+        // check if both images has the same number of channels
+        if(omeroChannels.size() != imageServer.nChannels()){
+            Dialogs.showWarningNotification("Channel settings", "The image on QuPath has not the same number of channels ("+imageServer.nChannels()+" as the one in OMERO ("+omeroChannels.size()+")");
+            return false;
+        }
+
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
+        for(int c = 0; c < imageServer.nChannels(); c++) {
+            // get min/max display
+            String qpChName = qpChannels.get(c).getName();
+
+            // set the rendering settings with new min/max values
+            omeroChannels.get(c).setName(qpChName);
+        }
+
+        // update the image on OMERO first
+        return OmeroRawTools.updateObjectsOnOmero(imageServer.getClient(), omeroChannels.stream().map(ChannelData::asIObject).collect(Collectors.toList()));
+    }
+
 
 }
