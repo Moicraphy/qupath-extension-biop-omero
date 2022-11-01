@@ -442,6 +442,47 @@ public final class OmeroRawTools {
 
 
     /**
+     * read rendering settings of an image to get access to channel information
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
+    public static RenderingDef readOmeroRenderingSettings(OmeroRawClient client, long imageId){
+        try {
+            // get pixel id
+            long id = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
+
+            // get rendering settings
+            return client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(id);
+        }catch(ExecutionException | DSOutOfServiceException| DSAccessException | ServerError e){
+            Dialogs.showErrorMessage("Rendering def reading","Could not read rendering settings on OMERO.");
+            logger.error("" + e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    /**
+     * read image channels
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
+    public static List<ChannelData> readOmeroChannels(OmeroRawClient client, long imageId){
+        try {
+            // get channels
+            return client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(),imageId);
+        }catch(ExecutionException | DSOutOfServiceException| DSAccessException e){
+            Dialogs.showErrorMessage("Channel reading","Could not read image channel on OMERO.");
+            logger.error("" + e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    /**
      * Convert a QuPath measurement table to an OMERO table
      *
      * @param pathObjects
@@ -761,7 +802,6 @@ public final class OmeroRawTools {
 
             // get the type, class, id and parent id of thu current ROI
             String[] roiCommentParsed = parseROIComment(roiComment);
-            for(String st : roiCommentParsed){System.out.println(st);}
             String roiType = roiCommentParsed[0];
             String roiClass = roiCommentParsed[1];
             double roiId = Double.parseDouble(roiCommentParsed[2]);

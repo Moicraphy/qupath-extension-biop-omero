@@ -297,8 +297,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			} else if (pixelType.isUnsignedInteger()) {
 				maxValue = (int) (Math.pow(2, bpp) - 1);
 			}
-			/*System.out.println("minValue : "+minValue);
-			System.out.println("maxValue : "+maxValue);*/
 
 			// Try to read the default display colors for each channel from the file
 			List<ChannelData> channelMetadata = client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(), imageID);

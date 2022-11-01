@@ -2,11 +2,16 @@ package qupath.ext.biop.servers.omero.raw;
 
 //import fr.igred.omero.Client;
 //import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.model.MapAnnotationData;
-import omero.gateway.model.ROIData;
-import omero.gateway.model.TableData;
-import omero.gateway.model.TagAnnotationData;
+import omero.ServerError;
+import omero.gateway.exception.DSAccessException;
+import omero.gateway.exception.DSOutOfServiceException;
+import omero.gateway.facility.BrowseFacility;
+import omero.gateway.model.*;
+import omero.model.ChannelBinding;
 import omero.model.NamedValue;
+import omero.model.RenderingDef;
+import qupath.lib.display.ChannelDisplayInfo;
+import qupath.lib.display.ImageDisplay;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.scripting.QPEx;
@@ -19,7 +24,9 @@ import qupath.lib.scripting.QP;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class OmeroRawScripting {
 
@@ -715,6 +722,37 @@ public class OmeroRawScripting {
             return wasAdded;
         }
         else return false;
+    }
+
+
+    /**
+     * Set the minimum and maximum display range value for each channel o QuPath, based on OMERO settings.
+     * Channel indices are taken as reference.
+     *
+     * @param imageServer
+     */
+    public static void setOmeroDisplaySettings(OmeroRawImageServer imageServer) {
+        // get the OMERO rendering settings to get channel info
+        RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
+
+        // get the number of the channels in OMERO
+        int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
+
+        // check if both images has the same number of channels
+        if(omeroNChannels != imageServer.nChannels()){
+            Dialogs.showWarningNotification("Channel settings", "The image on OMERO has not the same number of channels ("+omeroNChannels+" as the one in QuPath ("+imageServer.nChannels()+")");
+            return;
+        }
+
+        for(int c = 0; c < imageServer.nChannels(); c++) {
+            // get the min-max per channel from OMERO
+            ChannelBinding binding = renderingSettings.getChannelBinding(c);
+            double minDynamicRange = binding.getInputStart().getValue();
+            double maxDynamicRange = binding.getInputEnd().getValue();
+
+            // set the dynamic range
+            QPEx.setChannelDisplayRange(QPEx.getQuPath().getImageData(), c, minDynamicRange, maxDynamicRange);
+        }
     }
 
 }
