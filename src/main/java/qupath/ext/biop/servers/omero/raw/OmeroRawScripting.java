@@ -2,16 +2,13 @@ package qupath.ext.biop.servers.omero.raw;
 
 //import fr.igred.omero.Client;
 //import omero.gateway.exception.DSOutOfServiceException;
-import omero.ServerError;
-import omero.gateway.exception.DSAccessException;
-import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.BrowseFacility;
+import javafx.collections.ObservableList;
 import omero.gateway.model.*;
 import omero.model.ChannelBinding;
 import omero.model.NamedValue;
 import omero.model.RenderingDef;
+import omero.rtypes;
 import qupath.lib.display.ChannelDisplayInfo;
-import qupath.lib.display.ImageDisplay;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.scripting.QPEx;
@@ -24,9 +21,7 @@ import qupath.lib.scripting.QP;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public class OmeroRawScripting {
 
@@ -726,12 +721,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Set the minimum and maximum display range value for each channel o QuPath, based on OMERO settings.
+     * Set the minimum and maximum display range value for each channel on QuPath, based on OMERO settings.
      * Channel indices are taken as reference.
      *
      * @param imageServer
      */
-    public static void setOmeroDisplaySettings(OmeroRawImageServer imageServer) {
+    public static void setDisplayRange(OmeroRawImageServer imageServer) {
         // get the OMERO rendering settings to get channel info
         RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
 
@@ -754,5 +749,49 @@ public class OmeroRawScripting {
             QPEx.setChannelDisplayRange(QPEx.getQuPath().getImageData(), c, minDynamicRange, maxDynamicRange);
         }
     }
+
+    /**
+     * Set the minimum and maximum display range value for each channel on OMERO, based on QuPath settings.
+     * Channel indices are taken as reference.
+     *
+     * @param imageServer
+     * @return
+     */
+    public static boolean sendDisplayRangeToOmero(OmeroRawImageServer imageServer){
+        // get the OMERO rendering settings to get channel info
+        RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
+
+        // get the number of the channels in OMERO
+        int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
+
+        // check if both images has the same number of channels
+        if(omeroNChannels != imageServer.nChannels()){
+            Dialogs.showWarningNotification("Channel settings", "The image on QuPath has not the same number of channels ("+imageServer.nChannels()+" as the one in OMERO ("+omeroNChannels+")");
+            return false;
+        }
+
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
+        for(int c = 0; c < imageServer.nChannels(); c++) {
+            // get min/max display
+            double minDisplayRange = qpChannels.get(c).getMinDisplay();
+            double maxDisplayRange = qpChannels.get(c).getMaxDisplay();
+
+            // set the rendering settings with new min/max values
+            ChannelBinding binding = renderingSettings.getChannelBinding(c);
+            binding.setInputStart(rtypes.rdouble(minDisplayRange));
+            binding.setInputEnd(rtypes.rdouble(maxDisplayRange));
+        }
+
+        // update the image on OMERO first
+        boolean updateImageDisplay = OmeroRawTools.updateObjectOnOmero(imageServer.getClient(), renderingSettings);
+
+        // update the image thumbnail on OMERO
+        boolean updateThumbnail = OmeroRawTools.updateOmeroThumbnail(imageServer.getClient(),imageServer.getId(),renderingSettings.getId().getValue());
+
+        return updateImageDisplay && updateThumbnail;
+    }
+
 
 }

@@ -605,6 +605,67 @@ public final class OmeroRawTools {
         return wasAdded;
     }
 
+    /**
+     * update an existing object on OMERO.
+     *
+     * @param client
+     * @param object
+     * @return
+     */
+    public static boolean updateObjectOnOmero(OmeroRawClient client, IObject object){
+        boolean wasAdded = true;
+        try{
+            // update the object on OMERO
+            client.getGateway().getFacility(DataManagerFacility.class).updateObject(client.getContext(), object, null);
+        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
+            Dialogs.showErrorMessage("Update object","Error during updating object on OMERO.");
+            logger.error("" + e);
+            wasAdded = false;
+            //throw new RuntimeException(e);
+        }
+        return wasAdded;
+    }
+
+    /**
+     * update thumbnail image on OMERO giving the ID of the updated RenderingDef object.
+     * Be careful : the object should already have an OMERO Id.
+     *
+     * @param client
+     * @param imageId
+     * @param objectId
+     * @return
+     */
+    public static boolean updateOmeroThumbnail(OmeroRawClient client, long imageId, long objectId){
+        boolean wasAdded = true;
+
+        // get the pixel id to retrieve the correct thumbnail
+        long pixelId;
+        try {
+            pixelId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
+        }catch(ExecutionException | DSOutOfServiceException | DSAccessException e){
+            Dialogs.showErrorMessage( "Error retrieving image and pixels for thumbnail :","" +e);
+            return false;
+        }
+
+        try {
+            // get thumbnail factory
+            ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
+            // get current thumbnail
+            store.setPixelsId(pixelId);
+            //set the new settings
+            store.setRenderingDefId(objectId);
+            // update the thumbnail
+            store.createThumbnails();
+            // close the factory
+            store.close();
+        } catch (DSOutOfServiceException | ServerError e) {
+            Dialogs.showErrorMessage( "Error when updating thumbnail :","" +e);
+            wasAdded = false;
+        }
+
+        return wasAdded;
+    }
+
 
     /**
      * write the measurement table as a csv file
