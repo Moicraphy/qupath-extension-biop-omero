@@ -23,7 +23,7 @@ import java.util.*;
  */
 public class OmeroRawWriteMetadataCommand  implements Runnable{
 
-    private final String title = "Send metadata";
+    private final String title = "Sending metadata";
     private QuPathGUI qupath;
     public OmeroRawWriteMetadataCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
@@ -56,7 +56,7 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
         rbDeleteMetadata.setToggleGroup(group);
 
         int row = 0;
-        pane.add(new Label("Select import options"), 0, row++, 2, 1);
+        pane.add(new Label("Select sending options"), 0, row++, 2, 1);
         pane.add(rbKeepMetadata, 0, row++);
         pane.add(rbReplaceMetadata, 0, row++);
         pane.add(rbDeleteMetadata, 0, row);
@@ -103,7 +103,7 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
             wasSaved = OmeroRawScripting.sendMetadataOnOmeroAndUpdateKeyValues(keyValues,(OmeroRawImageServer)imageServer);
 
         if(wasSaved)
-            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
+            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully sent to OMERO server",
                     keyValues.keySet().size(),
                     objectString,
                     (keyValues.keySet().size() == 1 ? "was" : "were")));

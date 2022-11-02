@@ -24,22 +24,16 @@ package qupath.ext.biop.servers.omero.raw;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Date;
-import java.util.concurrent.ExecutionException;
 
 import javafx.scene.control.CheckBox;
-import omero.gateway.exception.DSAccessException;
-import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.model.TableData;
 import org.apache.commons.lang3.StringUtils;
 
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
-import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.objects.PathObject;
-import qupath.lib.scripting.QP;
 
 
 /**
@@ -51,7 +45,7 @@ import qupath.lib.scripting.QP;
  */
 public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
-    private final String title = "Select OMERO import options";
+    private final String title = "Sending annotations";
 
     private QuPathGUI qupath;
 
@@ -73,17 +67,17 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         // build the GUI for import options
         GridPane pane = new GridPane();
 
-        CheckBox cbAnnotationsMap = new CheckBox("Annotations table");
+        CheckBox cbAnnotationsMap = new CheckBox("Annotation measurements");
         cbAnnotationsMap.setSelected(false);
 
-        CheckBox cbDetectionsMap = new CheckBox("Detections table");
+        CheckBox cbDetectionsMap = new CheckBox("Detection measurements");
         cbDetectionsMap.setSelected(false);
 
-        CheckBox cbDeleteRois = new CheckBox("Delete existing ROIs");
+        CheckBox cbDeleteRois = new CheckBox("Delete existing annotations on OMERO");
         cbDeleteRois.setSelected(false);
 
         int row = 0;
-        pane.add(new Label("Import annotations with : "), 0, row++, 2, 1);
+        pane.add(new Label("Send all annotations with : "), 0, row++, 2, 1);
         pane.add(cbAnnotationsMap, 0, row++);
         pane.add(cbDetectionsMap, 0, row++);
         pane.add(cbDeleteRois, 0, ++row);
@@ -158,7 +152,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         objs.forEach(pathObject -> pathObject.setName(null));
 
         if(detectionMap || annotationMap)
-            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully written to OMERO server",
+            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully sent to OMERO server",
                     detectionMap && annotationMap ? 4 : 2));
 
     }

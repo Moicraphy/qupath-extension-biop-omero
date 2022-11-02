@@ -44,10 +44,10 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
         // build the GUI for import options
         GridPane pane = new GridPane();
 
-        CheckBox cbRemoveAnnotations = new CheckBox("Remove current annotations");
+        CheckBox cbRemoveAnnotations = new CheckBox("Delete current annotations");
         cbRemoveAnnotations.setSelected(true);
 
-        CheckBox cbRemoveDetections = new CheckBox("Remove current detections");
+        CheckBox cbRemoveDetections = new CheckBox("Delete current detections");
         cbRemoveDetections.setSelected(true);
 
         int row = 0;

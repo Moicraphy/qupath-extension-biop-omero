@@ -10,7 +10,7 @@ import qupath.lib.images.servers.ImageServer;
 import java.awt.image.BufferedImage;
 
 public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
-    private final String title = "Send display settings";
+    private final String title = "Sending view settings";
     private QuPathGUI qupath;
     public OmeroRawWriteDisplaySettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
@@ -41,7 +41,7 @@ public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
         cbChannelColor.setSelected(false);
 
         int row = 0;
-        pane.add(new Label("Select update options"), 0, row++, 2, 1);
+        pane.add(new Label("Select view settings options"), 0, row++, 2, 1);
         pane.add(cbChannelNames, 0, row++);
         pane.add(cbChannelDisplayRange, 0, row++);
         pane.add(cbChannelColor, 0, row);
@@ -68,6 +68,6 @@ public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
             wasSaved = OmeroRawScripting.sendChannelNamesToOmero((OmeroRawImageServer)imageServer);
 
         if(wasSaved)
-            Dialogs.showInfoNotification(" Image update successfully", "Display settings have been successfully updated");
+            Dialogs.showInfoNotification(" Image update successfully", "View settings have been successfully updated");
     }
 }
