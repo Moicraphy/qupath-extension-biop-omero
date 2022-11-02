@@ -3,6 +3,7 @@ package qupath.ext.biop.servers.omero.raw;
 //import fr.igred.omero.Client;
 //import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
+import omero.RInt;
 import omero.gateway.model.*;
 import omero.model.ChannelBinding;
 import omero.model.NamedValue;
@@ -765,9 +766,84 @@ public class OmeroRawScripting {
         }catch (IOException e){
             throw new RuntimeException(e);
         }
-
-
     }
+
+
+    /**
+     * Set the color for each channel on QuPath, based on OMERO settings.
+     * Channel indices are taken as reference.
+     *
+     * @param imageServer
+     * @return
+     */
+    public static void setChannelColorFromOmeroChannel(OmeroRawImageServer imageServer){
+        // get the OMERO rendering settings to get channel info
+        RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
+
+        // get the number of the channels in OMERO
+        int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
+
+        // check if both images has the same number of channels
+        if(omeroNChannels != imageServer.nChannels()){
+            Dialogs.showWarningNotification("Channel settings", "The image on OMERO has not the same number of channels ("+omeroNChannels+" as the one in QuPath ("+imageServer.nChannels()+")");
+            return;
+        }
+
+        List<Integer> colors = new ArrayList<>();
+
+        for(int c = 0; c < imageServer.nChannels(); c++) {
+            ChannelBinding binding = renderingSettings.getChannelBinding(c);
+            // get OMERO channels color
+            colors.add(new Color(binding.getRed().getValue(),binding.getGreen().getValue(), binding.getBlue().getValue(), binding.getAlpha().getValue()).getRGB());
+        }
+
+        // set QuPath channels color
+        QPEx.setChannelColors(QPEx.getQuPath().getImageData(), colors.toArray(new Integer[0]));
+
+        // Update the thumbnail
+        //TODO make it work
+        try {
+            ImageData<BufferedImage> newImageData = QPEx.getQuPath().getViewer().getImageDisplay().getImageData();
+            BufferedImage thumbnail = ProjectCommands.getThumbnailRGB(newImageData.getServer());
+            ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(newImageData);
+            entry.setThumbnail(thumbnail);
+            entry.saveImageData(newImageData);
+            QPEx.getQuPath().getProject().syncChanges();
+        }catch (IOException e){
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    /**
+     * Set the name for each channel on QuPath, based on OMERO settings.
+     * Channel indices are taken as reference.
+     *
+     * @param imageServer
+     * @return
+     */
+    public static void setChannelNameFromOmeroChannel(OmeroRawImageServer imageServer){
+        // get the number of the channels in OMERO
+        List<ChannelData> omeroChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId());
+
+        // check if both images has the same number of channels
+        if(omeroChannels.size() != imageServer.nChannels()){
+            Dialogs.showWarningNotification("Channel settings", "The image on OMERO has not the same number of channels ("+omeroChannels.size()+" as the one in QuPath ("+imageServer.nChannels()+")");
+            return;
+        }
+
+        List<String> names = new ArrayList<>();
+
+        for(int c = 0; c < imageServer.nChannels(); c++) {
+            // get OMERO channels name
+            names.add(omeroChannels.get(c).getName());
+        }
+
+        // set QuPath channels name
+        QPEx.setChannelNames(QPEx.getQuPath().getImageData(), names.toArray(new String[0]));
+    }
+
+
 
     /**
      * Set the minimum and maximum display range value for each channel on OMERO, based on QuPath settings.
