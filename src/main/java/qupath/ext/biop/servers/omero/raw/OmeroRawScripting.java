@@ -829,12 +829,9 @@ public class OmeroRawScripting {
             return false;
         }
 
-        // get current channels from QuPath
-        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
-
         for(int c = 0; c < imageServer.nChannels(); c++) {
             // get min/max display
-            String qpChName = qpChannels.get(c).getName();
+            String qpChName = imageServer.getChannel(c).getName();
 
             // set the rendering settings with new min/max values
             omeroChannels.get(c).setName(qpChName);
@@ -845,7 +842,13 @@ public class OmeroRawScripting {
     }
 
 
-
+    /**
+     * Set the color for each channel on OMERO, based on QuPath settings.
+     * Channel indices are taken as reference.
+     *
+     * @param imageServer
+     * @return
+     */
     public static boolean sendChannelColorToOmero(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
         RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());

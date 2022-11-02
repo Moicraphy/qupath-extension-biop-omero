@@ -635,7 +635,8 @@ public final class OmeroRawTools {
         boolean wasAdded = true;
         try{
             // update the object on OMERO
-            client.getGateway().getFacility(DataManagerFacility.class).updateObject(client.getContext(), object, null);
+            System.out.println(object);
+            client.getGateway().getFacility(DataManagerFacility.class).updateObject(client.getContext(), object, null).getId();
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
             Dialogs.showErrorMessage("Update object","Error during updating object on OMERO.");
             logger.error("" + e);

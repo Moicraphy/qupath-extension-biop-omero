@@ -2,22 +2,17 @@ package qupath.ext.biop.servers.omero.raw;
 
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.RadioButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
-import org.apache.commons.lang3.StringUtils;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.ImageServer;
-import qupath.lib.projects.ProjectImageEntry;
 
 import java.awt.image.BufferedImage;
-import java.util.Map;
 
-public class OmeroRawWriteDisplaySettings implements Runnable {
+public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
     private final String title = "Send display settings";
     private QuPathGUI qupath;
-    public OmeroRawWriteDisplaySettings(QuPathGUI qupath)  {
+    public OmeroRawWriteDisplaySettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }
 
@@ -64,13 +59,13 @@ public class OmeroRawWriteDisplaySettings implements Runnable {
 
         boolean wasSaved = true;
 
-        // send metadata to OMERO
-        if(channelNames)
-            wasSaved = OmeroRawScripting.sendChannelNamesToOmero((OmeroRawImageServer)imageServer);
+        // send display settings to OMERO
         if(channelDisplayRange)
             wasSaved = OmeroRawScripting.sendDisplayRangeToOmero((OmeroRawImageServer)imageServer);
         if(channelColor)
             wasSaved = OmeroRawScripting.sendChannelColorToOmero((OmeroRawImageServer)imageServer);
+        if(channelNames)
+            wasSaved = OmeroRawScripting.sendChannelNamesToOmero((OmeroRawImageServer)imageServer);
 
         if(wasSaved)
             Dialogs.showInfoNotification(" Image update successfully", "Display settings have been successfully updated");
