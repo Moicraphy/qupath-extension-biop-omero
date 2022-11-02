@@ -616,10 +616,15 @@ public final class OmeroRawTools {
      */
     public static boolean updateObjectsOnOmero(OmeroRawClient client, List<IObject> objects){
        boolean wasAdded = true;
-
-        for(IObject object: objects)
-            wasAdded = wasAdded && updateObjectOnOmero(client, object);
-
+        try{
+            // update the object on OMERO
+            client.getGateway().getFacility(DataManagerFacility.class).updateObjects(client.getContext(), objects, null);
+        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
+            Dialogs.showErrorMessage("Update objects","Error during updating objects on OMERO.");
+            logger.error("" + e);
+            wasAdded = false;
+            //throw new RuntimeException(e);
+        }
         return wasAdded;
     }
 
@@ -635,8 +640,7 @@ public final class OmeroRawTools {
         boolean wasAdded = true;
         try{
             // update the object on OMERO
-            System.out.println(object);
-            client.getGateway().getFacility(DataManagerFacility.class).updateObject(client.getContext(), object, null).getId();
+            client.getGateway().getFacility(DataManagerFacility.class).updateObject(client.getContext(), object, null);
         } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
             Dialogs.showErrorMessage("Update object","Error during updating object on OMERO.");
             logger.error("" + e);
