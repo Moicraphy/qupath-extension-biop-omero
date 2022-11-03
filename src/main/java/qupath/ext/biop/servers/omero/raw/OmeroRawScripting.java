@@ -755,17 +755,7 @@ public class OmeroRawScripting {
         }
 
         // Update the thumbnail
-        //TODO make it work
-        try {
-            ImageData<BufferedImage> newImageData = QPEx.getQuPath().getViewer().getImageDisplay().getImageData();
-            BufferedImage thumbnail = ProjectCommands.getThumbnailRGB(newImageData.getServer());
-            ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(newImageData);
-            entry.setThumbnail(thumbnail);
-            entry.saveImageData(newImageData);
-            QPEx.getQuPath().getProject().syncChanges();
-        }catch (IOException e){
-            throw new RuntimeException(e);
-        }
+        updateQuPathThumbnail();
     }
 
 
@@ -801,7 +791,14 @@ public class OmeroRawScripting {
         QPEx.setChannelColors(QPEx.getQuPath().getImageData(), colors.toArray(new Integer[0]));
 
         // Update the thumbnail
-        //TODO make it work
+        updateQuPathThumbnail();
+
+    }
+
+    /**
+     * Update thumbnail with the new view settings
+     */
+    private static void updateQuPathThumbnail(){
         try {
             ImageData<BufferedImage> newImageData = QPEx.getQuPath().getViewer().getImageDisplay().getImageData();
             BufferedImage thumbnail = ProjectCommands.getThumbnailRGB(newImageData.getServer());
@@ -813,7 +810,6 @@ public class OmeroRawScripting {
             throw new RuntimeException(e);
         }
     }
-
 
     /**
      * Set the name for each channel on QuPath, based on OMERO settings.
@@ -962,6 +958,5 @@ public class OmeroRawScripting {
 
         return updateImageDisplay && updateThumbnail;
     }
-    
 
 }

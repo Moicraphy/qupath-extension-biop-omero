@@ -78,7 +78,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		var actionRawSendDisplaySettingsObjects = ActionTools.createAction(new OmeroRawWriteDisplaySettingsCommand(qupath), "Display Settings");
 		var actionRawImportAnnotationObjects = ActionTools.createAction(new OmeroRawImportAnnotationObjectsCommand(qupath), "Annotation");
 		var actionRawImportMetadataObjects = ActionTools.createAction(new OmeroRawImportMetadataCommand(qupath), "Metadata");
-		//var actionRawImportDisplaySettingsObjects = ActionTools.createAction(new OmeroRawImportDisplaySettingsCommand(qupath), "Display Settings");
+		var actionRawImportDisplaySettingsObjects = ActionTools.createAction(new OmeroRawImportDisplaySettingsCommand(qupath), "Display Settings");
 	//	var actionRawSendDetectionObjects = ActionTools.createAction(new OmeroRawWriteDetectionObjectsCommand(qupath), "Send detections to OMERO");
 		Menu browseRawServerMenu = new Menu("Browse server...");
 
@@ -89,6 +89,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		actionRawSendMetadataObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		actionRawImportMetadataObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		actionRawSendDisplaySettingsObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		actionRawImportDisplaySettingsObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		//actionRawSendDetectionObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		MenuTools.addMenuItems(qupath.getMenu("Extensions", false),
 				MenuTools.createMenu("OMERO-RAW",
@@ -96,7 +97,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 						actionRawClients,
 						null,
 						MenuTools.createMenu("Send to OMERO", actionRawSendAnnotationObjects, actionRawSendMetadataObjects, actionRawSendDisplaySettingsObjects),
-						MenuTools.createMenu("Import from OMERO", actionRawImportAnnotationObjects, actionRawImportMetadataObjects)
+						MenuTools.createMenu("Import from OMERO", actionRawImportAnnotationObjects, actionRawImportMetadataObjects, actionRawImportDisplaySettingsObjects)
 			//			actionRawSendDetectionObjects
 				)
 		);
