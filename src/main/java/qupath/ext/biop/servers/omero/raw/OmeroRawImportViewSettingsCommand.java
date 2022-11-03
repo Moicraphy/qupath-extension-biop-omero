@@ -9,10 +9,11 @@ import qupath.lib.images.servers.ImageServer;
 
 import java.awt.image.BufferedImage;
 
-public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
-    private final String title = "Sending view settings";
+public class OmeroRawImportViewSettingsCommand implements Runnable{
+
+    private final String title = "Import view settings from OMERO";
     private QuPathGUI qupath;
-    public OmeroRawWriteDisplaySettingsCommand(QuPathGUI qupath)  {
+    public OmeroRawImportViewSettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }
 
@@ -28,7 +29,7 @@ public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
             return;
         }
 
-        // build the GUI for import options
+        // build the GUI for view settings options
         GridPane pane = new GridPane();
 
         CheckBox cbChannelNames = new CheckBox("Channel names");
@@ -57,17 +58,15 @@ public class OmeroRawWriteDisplaySettingsCommand implements Runnable {
         boolean channelDisplayRange = cbChannelDisplayRange.isSelected();
         boolean channelColor = cbChannelColor.isSelected();
 
-        boolean wasSaved = true;
-
-        // send display settings to OMERO
+        // set OMERO display settings on QuPath image
         if(channelDisplayRange)
-            wasSaved = OmeroRawScripting.sendDisplayRangeToOmero((OmeroRawImageServer)imageServer);
+            OmeroRawScripting.setDisplayRange((OmeroRawImageServer)imageServer);
         if(channelColor)
-            wasSaved = OmeroRawScripting.sendChannelColorToOmero((OmeroRawImageServer)imageServer);
+            OmeroRawScripting.setChannelColorFromOmeroChannel((OmeroRawImageServer)imageServer);
         if(channelNames)
-            wasSaved = OmeroRawScripting.sendChannelNamesToOmero((OmeroRawImageServer)imageServer);
+            OmeroRawScripting.setChannelNameFromOmeroChannel((OmeroRawImageServer)imageServer);
 
-        if(wasSaved)
-            Dialogs.showInfoNotification(" Image update successfully", "View settings have been successfully updated");
+        Dialogs.showInfoNotification("View settings import","View settings successfully set the current image");
     }
+
 }

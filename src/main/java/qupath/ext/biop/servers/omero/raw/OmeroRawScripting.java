@@ -800,11 +800,21 @@ public class OmeroRawScripting {
      */
     private static void updateQuPathThumbnail(){
         try {
+            // saved changes
+            QPEx.getQuPath().getProject().syncChanges();
+
+            // get the current image data
             ImageData<BufferedImage> newImageData = QPEx.getQuPath().getViewer().getImageDisplay().getImageData();
+
+            // generate thumbnail
             BufferedImage thumbnail = ProjectCommands.getThumbnailRGB(newImageData.getServer());
+
+            // get and save the new thumbnail
             ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(newImageData);
             entry.setThumbnail(thumbnail);
             entry.saveImageData(newImageData);
+
+            // save changes
             QPEx.getQuPath().getProject().syncChanges();
         }catch (IOException e){
             throw new RuntimeException(e);

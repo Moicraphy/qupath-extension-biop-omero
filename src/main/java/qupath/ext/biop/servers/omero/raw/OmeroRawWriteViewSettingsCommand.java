@@ -9,11 +9,10 @@ import qupath.lib.images.servers.ImageServer;
 
 import java.awt.image.BufferedImage;
 
-public class OmeroRawImportDisplaySettingsCommand implements Runnable{
-
-    private final String title = "Import view settings from OMERO";
+public class OmeroRawWriteViewSettingsCommand implements Runnable {
+    private final String title = "Sending view settings";
     private QuPathGUI qupath;
-    public OmeroRawImportDisplaySettingsCommand(QuPathGUI qupath)  {
+    public OmeroRawWriteViewSettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }
 
@@ -29,7 +28,7 @@ public class OmeroRawImportDisplaySettingsCommand implements Runnable{
             return;
         }
 
-        // build the GUI for view settings options
+        // build the GUI for import options
         GridPane pane = new GridPane();
 
         CheckBox cbChannelNames = new CheckBox("Channel names");
@@ -58,15 +57,17 @@ public class OmeroRawImportDisplaySettingsCommand implements Runnable{
         boolean channelDisplayRange = cbChannelDisplayRange.isSelected();
         boolean channelColor = cbChannelColor.isSelected();
 
-        // set OMERO display settings on QuPath image
+        boolean wasSaved = true;
+
+        // send display settings to OMERO
         if(channelDisplayRange)
-            OmeroRawScripting.setDisplayRange((OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendDisplayRangeToOmero((OmeroRawImageServer)imageServer);
         if(channelColor)
-            OmeroRawScripting.setChannelColorFromOmeroChannel((OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendChannelColorToOmero((OmeroRawImageServer)imageServer);
         if(channelNames)
-            OmeroRawScripting.setChannelNameFromOmeroChannel((OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendChannelNamesToOmero((OmeroRawImageServer)imageServer);
 
-        Dialogs.showInfoNotification("View settings import","View settings successfully set the current image");
+        if(wasSaved)
+            Dialogs.showInfoNotification(" Image update successfully", "View settings have been successfully updated");
     }
-
 }
