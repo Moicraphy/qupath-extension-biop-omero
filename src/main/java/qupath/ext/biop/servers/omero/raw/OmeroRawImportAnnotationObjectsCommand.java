@@ -69,7 +69,6 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
         Collection<PathObject> roiFromOmero;
         try {
             roiFromOmero = ((PathObjectReader) imageServer).readPathObjects();
-            OmeroRawScripting.setDisplayRange((OmeroRawImageServer)imageServer);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

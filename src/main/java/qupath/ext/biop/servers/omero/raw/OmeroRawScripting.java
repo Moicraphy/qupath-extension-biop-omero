@@ -3,7 +3,6 @@ package qupath.ext.biop.servers.omero.raw;
 //import fr.igred.omero.Client;
 //import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
-import omero.RInt;
 import omero.gateway.model.*;
 import omero.model.ChannelBinding;
 import omero.model.NamedValue;
@@ -730,7 +729,7 @@ public class OmeroRawScripting {
      *
      * @param imageServer
      */
-    public static void setDisplayRange(OmeroRawImageServer imageServer) {
+    public static void setChannelsDisplayRangeFromOmeroChannel(OmeroRawImageServer imageServer) {
         // get the OMERO rendering settings to get channel info
         RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
 
@@ -766,7 +765,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static void setChannelColorFromOmeroChannel(OmeroRawImageServer imageServer){
+    public static void setChannelsColorFromOmeroChannel(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
         RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
 
@@ -828,7 +827,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static void setChannelNameFromOmeroChannel(OmeroRawImageServer imageServer){
+    public static void setChannelsNameFromOmeroChannel(OmeroRawImageServer imageServer){
         // get the number of the channels in OMERO
         List<ChannelData> omeroChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId());
 
@@ -858,7 +857,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static boolean sendDisplayRangeToOmero(OmeroRawImageServer imageServer){
+    public static boolean sendChannelsDisplayRangeToOmero(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
         RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
 
@@ -901,7 +900,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static boolean sendChannelNamesToOmero(OmeroRawImageServer imageServer){
+    public static boolean sendChannelsNameToOmero(OmeroRawImageServer imageServer){
         // get the number of the channels in OMERO
         List<ChannelData> omeroChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId());
 
@@ -931,7 +930,7 @@ public class OmeroRawScripting {
      * @param imageServer
      * @return
      */
-    public static boolean sendChannelColorToOmero(OmeroRawImageServer imageServer){
+    public static boolean sendChannelsColorToOmero(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
         RenderingDef renderingSettings = OmeroRawTools.readOmeroRenderingSettings(imageServer.getClient(), imageServer.getId());
 

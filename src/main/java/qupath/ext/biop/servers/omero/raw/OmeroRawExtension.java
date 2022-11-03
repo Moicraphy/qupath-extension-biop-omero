@@ -75,10 +75,10 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		var actionRawClients = ActionTools.createAction(new OmeroRawClientsCommand(qupath), "Manage server connections");
 		var actionRawSendAnnotationObjects = ActionTools.createAction(new OmeroRawWriteAnnotationObjectsCommand(qupath), "Annotations");
 		var actionRawSendMetadataObjects = ActionTools.createAction(new OmeroRawWriteMetadataCommand(qupath), "Metadata");
-		var actionRawSendDisplaySettingsObjects = ActionTools.createAction(new OmeroRawWriteViewSettingsCommand(qupath), "View Settings");
+		var actionRawSendDisplaySettingsObjects = ActionTools.createAction(new OmeroRawWriteViewSettingsCommand(qupath), "View settings");
 		var actionRawImportAnnotationObjects = ActionTools.createAction(new OmeroRawImportAnnotationObjectsCommand(qupath), "Annotation");
 		var actionRawImportMetadataObjects = ActionTools.createAction(new OmeroRawImportMetadataCommand(qupath), "Metadata");
-		var actionRawImportDisplaySettingsObjects = ActionTools.createAction(new OmeroRawImportViewSettingsCommand(qupath), "View Settings");
+		var actionRawImportDisplaySettingsObjects = ActionTools.createAction(new OmeroRawImportViewSettingsCommand(qupath), "View settings");
 	//	var actionRawSendDetectionObjects = ActionTools.createAction(new OmeroRawWriteDetectionObjectsCommand(qupath), "Send detections to OMERO");
 		Menu browseRawServerMenu = new Menu("Browse server...");
 
