@@ -36,8 +36,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import ome.util.PixelData;
 import omero.RLong;
 import omero.ServerError;
+import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
@@ -264,38 +266,56 @@ public final class OmeroRawTools {
 
         // get all available groups for the current user according to his admin rights
         List<ExperimenterGroup> groups;
-        if(client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty())
-            groups = client.getGateway().getAdminService(client.getContext()).containedGroups(client.getGateway().getLoggedInUser().getId());
-        else
+        boolean isAdminUser = ! client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty();
+
+        if(isAdminUser)
             groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
+        else
+            groups = client.getGateway().getAdminService(client.getContext()).containedGroups(client.getGateway().getLoggedInUser().getId());
 
         groups.forEach(group-> {
-            // get all available users for the current group
-            List<Experimenter> users;
-            try {
-                users = client.getGateway().getAdminService(client.getContext()).containedExperimenters(group.getId().getValue());
-            } catch (ServerError | DSOutOfServiceException e) {
-                throw new RuntimeException(e);
-            }
+            // get group permissions
+            Permissions permissions = group.getDetails().getPermissions();
 
             List<OmeroRawObjects.Owner> owners = new ArrayList<>();
             OmeroRawObjects.Group userGroup = new OmeroRawObjects.Group(group.getId().getValue(), group.getName().getValue());
 
-            for (Experimenter user : users) {
+            if(permissions.isGroupAnnotate() || isAdminUser) {
+                // get all available users for the current group
+                List<Experimenter> users;
+                try {
+                    users = client.getGateway().getAdminService(client.getContext()).containedExperimenters(group.getId().getValue());
+                } catch (ServerError | DSOutOfServiceException e) {
+                    throw new RuntimeException(e);
+                }
 
-                owners.add(new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
-                        user.getFirstName()==null ? "" : user.getFirstName().getValue(),
-                        user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
-                        user.getLastName()==null ? "" : user.getLastName().getValue(),
-                        user.getEmail()==null ? "" : user.getEmail().getValue(),
-                        user.getInstitution()==null ? "" : user.getInstitution().getValue(),
-                        user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+                for (Experimenter user : users) {
+
+                    owners.add(new OmeroRawObjects.Owner(user.getId() == null ? 0 : user.getId().getValue(),
+                            user.getFirstName() == null ? "" : user.getFirstName().getValue(),
+                            user.getMiddleName() == null ? "" : user.getMiddleName().getValue(),
+                            user.getLastName() == null ? "" : user.getLastName().getValue(),
+                            user.getEmail() == null ? "" : user.getEmail().getValue(),
+                            user.getInstitution() == null ? "" : user.getInstitution().getValue(),
+                            user.getOmeName() == null ? "" : user.getOmeName().getValue()));
+                }
+
+                owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
+                map.put(userGroup, owners);
+            }else{
+                // if user is not allowed to modify data from other members
+                Experimenter user = client.getGateway().getLoggedInUser().asExperimenter();
+                owners.add(new OmeroRawObjects.Owner(user.getId() == null ? 0 : user.getId().getValue(),
+                        user.getFirstName() == null ? "" : user.getFirstName().getValue(),
+                        user.getMiddleName() == null ? "" : user.getMiddleName().getValue(),
+                        user.getLastName() == null ? "" : user.getLastName().getValue(),
+                        user.getEmail() == null ? "" : user.getEmail().getValue(),
+                        user.getInstitution() == null ? "" : user.getInstitution().getValue(),
+                        user.getOmeName() == null ? "" : user.getOmeName().getValue()));
+                map.put(userGroup, owners);
             }
-
-            owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
-            map.put(userGroup, owners);
-
         });
+
 
         return new TreeMap<>(map);
     }
@@ -444,6 +464,7 @@ public final class OmeroRawTools {
 
     /**
      * read rendering settings of an image to get access to channel information
+     * Code partially taken from Pierre Pouchin, simple-omero-client project
      *
      * @param client
      * @param imageId
@@ -452,17 +473,29 @@ public final class OmeroRawTools {
     public static RenderingDef readOmeroRenderingSettings(OmeroRawClient client, long imageId){
         try {
             // get pixel id
-            long id = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
+            long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
+            RenderingDef renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
 
-            // get rendering settings
-            return client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(id);
+            if(renderingDef == null) {
+                RenderingEnginePrx re = client.getGateway().getRenderingService(client.getContext(), pixelsId);
+                re.lookupPixels(pixelsId);
+                if (!(re.lookupRenderingDef(pixelsId))) {
+                    re.resetDefaultSettings(true);
+                    re.lookupRenderingDef(pixelsId);
+                }
+                re.load();
+                re.close();
+                return client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
+            }
+            return renderingDef;
+
         }catch(ExecutionException | DSOutOfServiceException| DSAccessException | ServerError e){
             Dialogs.showErrorMessage("Rendering def reading","Could not read rendering settings on OMERO.");
             logger.error("" + e);
             throw new RuntimeException(e);
         }
-
     }
+
 
     /**
      * read image channels
@@ -1271,30 +1304,53 @@ public final class OmeroRawTools {
      */
     public static BufferedImage getThumbnail(OmeroRawClient client, long imageId, int prefSize) {
 
-        Pixels pixel = null;
+        PixelsData pixel = null;
         try {
             ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
-            pixel = image.asImage().getPixels(0);
+            pixel = image.getDefaultPixels();//.asImage().getPixels(0);
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e){
             Dialogs.showErrorMessage( "Error retrieving image and pixels for thumbnail :","" +e);
             return null;
         }
 
-        int   sizeX  = pixel.getSizeX().getValue();
-        int   sizeY  = pixel.getSizeY().getValue();
+        int   sizeX  = pixel.getSizeX();//.getValue();
+        int   sizeY  = pixel.getSizeY();//.getValue();
         float ratioX = (float) sizeX / prefSize;
         float ratioY = (float) sizeY / prefSize;
         float ratio  = Math.max(ratioX, ratioY);
         int   width  = (int) (sizeX / ratio);
         int   height = (int) (sizeY / ratio);
 
+        System.out.println("imageId = "+imageId);
+        System.out.println("PrefSize = "+prefSize);
+        System.out.println("sizeX = "+sizeX);
+        System.out.println("sizeY = "+sizeY);
+        System.out.println("ratioX = "+ratioX);
+        System.out.println("ratioY = "+ratioY);
+        System.out.println("ratio = "+ratio);
+        System.out.println("width = "+width);
+        System.out.println("height = "+height);
+        System.out.println("pixel.getId().getValue() = "+pixel.getId());//getValue());
+
         BufferedImage thumbnail = null;
+        RenderingDef renderingSettings = readOmeroRenderingSettings(client, imageId);
         byte[] array = null;
         try {
+            System.out.println("client.getContext() = "+client.getContext());
             ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
-            store.setPixelsId(pixel.getId().getValue());
+
+            System.out.println("store = "+store);
+            store.setPixelsId(pixel.getId());//.getValue());
+            System.out.println("pixel id set");
+            System.out.println("renderingSettings : "+renderingSettings);
+            System.out.println("renderingSettings.getId() : "+renderingSettings.getId());
+            System.out.println("renderingSettings.getId().getValue() : "+renderingSettings.getId().getValue());
+            store.setRenderingDefId(renderingSettings.getId().getValue());
+            System.out.println("renderingsettings = "+store.getRenderingDefId());
             array = store.getThumbnail(rint(width), rint(height));
+            System.out.println("thumbnail got");
             store.close();
+            System.out.println("closing store");
         } catch (DSOutOfServiceException | ServerError e) {
             Dialogs.showErrorMessage( "Error retrieving thumbnail :","" +e);
         }

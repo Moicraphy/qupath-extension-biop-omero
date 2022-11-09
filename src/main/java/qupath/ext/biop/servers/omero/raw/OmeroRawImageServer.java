@@ -951,14 +951,32 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 						// if none of clients can open, ask for a sudo connection
 						if (!canConnectWithOtherClients) {
-							// create a new OmeroRawClient
-							OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
-							if(sudoClient.sudoConnection(client)){
-								image = browse.getImage(sudoClient.getContext(), imageID);
-								currentClient = sudoClient;
-								OmeroRawClients.addClient(sudoClient);
-							}else
-								return null;
+
+
+							List<ExperimenterGroup> availableGroups = client.getUserGroups();
+							for(ExperimenterGroup group:availableGroups){
+								try{
+									SecurityContext grCtx = new SecurityContext(group.getId().getValue());
+									image = browse.getImage(grCtx, imageID);
+									canConnectWithOtherClients = true;
+									currentClient.switchGroup(group.getId().getValue());
+									break;
+								}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1){
+
+								}
+							}
+
+							// if none of clients can open, ask for a sudo connection
+							if (!canConnectWithOtherClients) {
+								// create a new OmeroRawClient
+								OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
+								if (sudoClient.sudoConnection(client)) {
+									image = browse.getImage(sudoClient.getContext(), imageID);
+									currentClient = sudoClient;
+									OmeroRawClients.addClient(sudoClient);
+								} else
+									return null;
+							}
 						}
 					}else{
 						// user does not have admin rights

@@ -32,6 +32,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
+import omero.ServerError;
 import omero.gateway.Gateway;
 import omero.gateway.LoginCredentials;
 import omero.gateway.SecurityContext;
@@ -40,6 +41,7 @@ import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.AdminFacility;
 import omero.gateway.model.ExperimenterData;
 import omero.log.SimpleLogger;
+import omero.model.ExperimenterGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.gui.dialogs.Dialogs;
@@ -52,6 +54,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 /**
  * Class representing an OMERO Web Client. This class takes care of
@@ -69,6 +72,8 @@ public class OmeroRawClient {
 
     // TODO Dfine port in some optional way
     private int port = 4064;
+
+    private boolean isAdminUser = false;
 
     /**
      * List of all URIs supported by this client.
@@ -185,6 +190,8 @@ public class OmeroRawClient {
         this.securityContext = ctx;
         this.gateway = gateway;
 
+        this.isAdminUser = !this.gateway.getAdminService(this.securityContext).getCurrentAdminPrivileges().isEmpty();
+
         return gateway.isConnected();
     }
 
@@ -263,6 +270,24 @@ public class OmeroRawClient {
 
         return tfUsername.getText();
     }
+
+    public List<ExperimenterGroup> getUserGroups() throws DSOutOfServiceException, ServerError {
+        return this.gateway.getAdminService(this.securityContext).containedGroups(this.gateway.getLoggedInUser().getId());
+    }
+
+    public void switchGroup(long groupId) throws DSOutOfServiceException, ServerError {
+        List<ExperimenterGroup> groups = this.gateway.getAdminService(this.securityContext).containedGroups(this.gateway.getLoggedInUser().getId());
+
+        boolean canUserAccessGroup = groups.stream()
+                .map(ExperimenterGroup::getId)
+                .collect(Collectors.toList())
+                .stream()
+                .anyMatch(e -> e.getValue() == groupId);
+
+        if(canUserAccessGroup)
+            this.securityContext = new SecurityContext(groupId);
+    }
+
 
     Gateway getGateway() {
         return this.gateway;
@@ -390,7 +415,7 @@ public class OmeroRawClient {
             return true;
         } catch (Exception ex) {
             logger.error(ex.getLocalizedMessage());
-            Dialogs.showErrorNotification("OMERO web server", "Could not connect to OMERO raw server.\nCheck the following:\n- Valid credentials.\n- Access permission.\n- Correct URL.");
+            Dialogs.showErrorNotification("OMERO raw server", "Could not connect to OMERO raw server.\nCheck the following:\n- Valid credentials.\n- Access permission.\n- Correct URL.");
         }
         return false;
     }

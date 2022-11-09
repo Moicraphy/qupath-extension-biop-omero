@@ -58,7 +58,10 @@ dependencies {
     implementation "org.openmicroscopy:omero-gateway:5.6.5"
     implementation "org.openmicroscopy:omero-model:5.6.0"
     implementation "info.picocli:picocli:4.3.2"
-    implementation "fr.igred:simple-omero-client:5.9.2" // if new version, update all files in here : "File:\qupath\maven\repo\fr\igred\simple-omero-client\5.9.2\simple-omero-client-5.9.2.pom"
+
+    // if new version, update all files in here : "File:\qupath\maven\repo\fr\igred\simple-omero-client\5.9.2\simple-omero-client-5.9.2.pom"
+    // This is only for development ; for the user side, you need to add simple-omero-client-x.x.x in the extension folder.
+    implementation "fr.igred:simple-omero-client:5.9.2"
 }
 
 processResources {
