@@ -464,7 +464,7 @@ public final class OmeroRawTools {
 
     /**
      * read rendering settings of an image to get access to channel information
-     * Code partially taken from Pierre Pouchin, simple-omero-client project
+     * Code partially copied from Pierre Pouchin from {simple-omero-client} project, {ImageWrapper} class, {getChannelColor} method
      *
      * @param client
      * @param imageId
@@ -474,9 +474,12 @@ public final class OmeroRawTools {
         try {
             // get pixel id
             long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
+
+            // get rendering settings
             RenderingDef renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
 
             if(renderingDef == null) {
+                // load rendering settings if they were not automatically loaded
                 RenderingEnginePrx re = client.getGateway().getRenderingService(client.getContext(), pixelsId);
                 re.lookupPixels(pixelsId);
                 if (!(re.lookupRenderingDef(pixelsId))) {
@@ -1304,57 +1307,42 @@ public final class OmeroRawTools {
      */
     public static BufferedImage getThumbnail(OmeroRawClient client, long imageId, int prefSize) {
 
-        PixelsData pixel = null;
+        // get the current defaultPixel
+        PixelsData pixel;
         try {
-            ImageData image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
-            pixel = image.getDefaultPixels();//.asImage().getPixels(0);
+            pixel = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels();
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException e){
             Dialogs.showErrorMessage( "Error retrieving image and pixels for thumbnail :","" +e);
             return null;
         }
 
-        int   sizeX  = pixel.getSizeX();//.getValue();
-        int   sizeY  = pixel.getSizeY();//.getValue();
+        // set the thumbnail size
+        int   sizeX  = pixel.getSizeX();
+        int   sizeY  = pixel.getSizeY();
         float ratioX = (float) sizeX / prefSize;
         float ratioY = (float) sizeY / prefSize;
         float ratio  = Math.max(ratioX, ratioY);
         int   width  = (int) (sizeX / ratio);
         int   height = (int) (sizeY / ratio);
 
-        System.out.println("imageId = "+imageId);
-        System.out.println("PrefSize = "+prefSize);
-        System.out.println("sizeX = "+sizeX);
-        System.out.println("sizeY = "+sizeY);
-        System.out.println("ratioX = "+ratioX);
-        System.out.println("ratioY = "+ratioY);
-        System.out.println("ratio = "+ratio);
-        System.out.println("width = "+width);
-        System.out.println("height = "+height);
-        System.out.println("pixel.getId().getValue() = "+pixel.getId());//getValue());
-
         BufferedImage thumbnail = null;
+
+        // get rendering settings for the current image
         RenderingDef renderingSettings = readOmeroRenderingSettings(client, imageId);
+
+        // get thumbnail
         byte[] array = null;
         try {
-            System.out.println("client.getContext() = "+client.getContext());
             ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
-
-            System.out.println("store = "+store);
-            store.setPixelsId(pixel.getId());//.getValue());
-            System.out.println("pixel id set");
-            System.out.println("renderingSettings : "+renderingSettings);
-            System.out.println("renderingSettings.getId() : "+renderingSettings.getId());
-            System.out.println("renderingSettings.getId().getValue() : "+renderingSettings.getId().getValue());
+            store.setPixelsId(pixel.getId());
             store.setRenderingDefId(renderingSettings.getId().getValue());
-            System.out.println("renderingsettings = "+store.getRenderingDefId());
             array = store.getThumbnail(rint(width), rint(height));
-            System.out.println("thumbnail got");
             store.close();
-            System.out.println("closing store");
         } catch (DSOutOfServiceException | ServerError e) {
             Dialogs.showErrorMessage( "Error retrieving thumbnail :","" +e);
         }
 
+        // convert thumbnail into BufferedImage
         if (array != null) {
             try (ByteArrayInputStream stream = new ByteArrayInputStream(array)) {
                 //Create a buffered image to display
