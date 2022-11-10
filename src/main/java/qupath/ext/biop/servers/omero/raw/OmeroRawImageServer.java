@@ -931,40 +931,45 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				try {
 					image = browse.getImage(currentClient.getContext(), imageID);
 				}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e){
-					// if the main OmeroRawClient could not access the image, check if the user has admin rights
-					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
 
+
+
+					boolean canConnectWithOtherClients = false;
+
+					// if none of clients can open, ask for a sudo connection
+
+					List<ExperimenterGroup> availableGroups = client.getUserGroups();
+					for(ExperimenterGroup group:availableGroups){
+						try{
+							SecurityContext grCtx = new SecurityContext(group.getId().getValue());
+							image = browse.getImage(grCtx, imageID);
+							canConnectWithOtherClients = true;
+							currentClient.switchGroup(group.getId().getValue());
+							break;
+						}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1){
+
+						}
+					}
+
+					if (!canConnectWithOtherClients) {
 						List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
-						boolean canConnectWithOtherClients = false;
-
 						// browse in the list of opened OmeroRawClients and try to find one that can open the image
-						for(OmeroRawClient cli:otherClients){
-							try{
+						for (OmeroRawClient cli : otherClients) {
+							try {
 								image = browse.getImage(cli.getContext(), imageID);
 								canConnectWithOtherClients = true;
 								currentClient = cli;
 								break;
-							}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1){
+							} catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1) {
 
 							}
 						}
 
-						// if none of clients can open, ask for a sudo connection
-						if (!canConnectWithOtherClients) {
 
+					}
 
-							List<ExperimenterGroup> availableGroups = client.getUserGroups();
-							for(ExperimenterGroup group:availableGroups){
-								try{
-									SecurityContext grCtx = new SecurityContext(group.getId().getValue());
-									image = browse.getImage(grCtx, imageID);
-									canConnectWithOtherClients = true;
-									currentClient.switchGroup(group.getId().getValue());
-									break;
-								}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1){
-
-								}
-							}
+					// if the main OmeroRawClient could not access the image, check if the user has admin rights
+					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
 
 							// if none of clients can open, ask for a sudo connection
 							if (!canConnectWithOtherClients) {
@@ -977,8 +982,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 								} else
 									return null;
 							}
-						}
-					}else{
+					} else{
 						// user does not have admin rights
 						logger.error("You do not have access to this image because it is part of another group");
 						throw new RuntimeException(e);

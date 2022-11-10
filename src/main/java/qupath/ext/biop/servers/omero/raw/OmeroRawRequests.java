@@ -67,4 +67,25 @@ public class OmeroRawRequests {
 
         return orphanedDatasets;
     }
+
+
+    public static Collection<DatasetData> getOrphanedDatasetsPerOwner(OmeroRawClient client, SecurityContext groupCtx) throws DSOutOfServiceException, ServerError {
+        Collection<DatasetData> orphanedDatasets;
+
+        try {
+            List<IObject> datasetObjects = client.getGateway().getQueryService(groupCtx).findAllByQuery("select dataset from Dataset as dataset " +
+                            "where dataset.details.owner = " +
+                            "where not exists (select obl from " +
+                            "ProjectDatasetLink as obl where obl.child = dataset.id) "
+                    , null);
+
+            List<Long> datasetIds = datasetObjects.stream().map(IObject::getId).map(RLong::getValue).collect(Collectors.toList());
+            orphanedDatasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx,datasetIds);
+
+        } catch (DSOutOfServiceException | ExecutionException | DSAccessException e) {
+            throw new RuntimeException(e);
+        }
+
+        return orphanedDatasets;
+    }
 }

@@ -36,7 +36,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import ome.util.PixelData;
 import omero.RLong;
 import omero.ServerError;
 import omero.api.RenderingEnginePrx;
@@ -72,7 +71,6 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.roi.interfaces.ROI;
 
 import javax.imageio.ImageIO;
-import javax.xml.crypto.Data;
 
 import static omero.rtypes.rint;
 
@@ -133,7 +131,9 @@ public final class OmeroRawTools {
      * @return list of OmeroRawObjects
      * @throws IOException
      */
-    public static List<OmeroRawObjects.OmeroRawObject> readOmeroObjects(OmeroRawObjects.OmeroRawObject parent, OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Group group) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
+    public static List<OmeroRawObjects.OmeroRawObject> readOmeroObjects(OmeroRawObjects.OmeroRawObject parent, OmeroRawClient client,
+                                                                        SecurityContext groupCtx, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner)
+            throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
         List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
         if (parent == null)
             return list;
@@ -149,15 +149,15 @@ public final class OmeroRawTools {
         try {
             if (type == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
                 Collection<ProjectData> projects = new ArrayList<>();
-                List<GroupExperimenterMap> owners = client.getGateway().getAdminService(client.getContext()).lookupGroup(group.getName()).copyGroupExperimenterMap();
+               /* List<GroupExperimenterMap> owners = client.getGateway().getAdminService(client.getContext()).lookupGroup(group.getName()).copyGroupExperimenterMap();
 
                 owners.forEach(owner ->{
-                    try {
-                        projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx, owner.getChild().getId().getValue()));
-                    } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
+                    try {*/
+                        projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx, owner.getId()));
+            /*        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
                         throw new RuntimeException(e);
                     }
-                });
+                });*/
 
                 projects.forEach(e-> {
                     try {
@@ -214,11 +214,20 @@ public final class OmeroRawTools {
             }
         } catch (DSOutOfServiceException | DSAccessException e) {
             throw new IOException("Cannot get datasets");
-        } catch (ServerError e) {
-            throw new RuntimeException(e);
         }
 
         return list;
+    }
+
+
+    public static OmeroRawObjects.Owner getOwnerObject(Experimenter user){
+        return new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                user.getLastName()==null ? "" : user.getLastName().getValue(),
+                user.getEmail()==null ? "" : user.getEmail().getValue(),
+                user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                user.getOmeName()==null ? "" : user.getOmeName().getValue());
     }
 
     /**
@@ -228,15 +237,23 @@ public final class OmeroRawTools {
      * @throws DSOutOfServiceException
      * @throws ServerError
      */
-    public static OmeroRawObjects.Owner getDefaultOwner(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
-        Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(client.getGateway().getLoggedInUser().getId());
-        return new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
-                user.getFirstName()==null ? "" : user.getFirstName().getValue(),
-                user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
-                user.getLastName()==null ? "" : user.getLastName().getValue(),
-                user.getEmail()==null ? "" : user.getEmail().getValue(),
-                user.getInstitution()==null ? "" : user.getInstitution().getValue(),
-                user.getOmeName()==null ? "" : user.getOmeName().getValue());
+    public static OmeroRawObjects.Owner getDefaultOwnerObject(OmeroRawClient client)  {
+     //   Experimenter user = client.getGateway().getLoggedInUser().asExperimenter();//client.getGateway().getAdminService(client.getContext()).getExperimenter(client.getGateway().getLoggedInUser().getId());
+        return getOwnerObject(getOmeroDefaultUser(client));
+    }
+
+
+    public static Experimenter getOmeroDefaultUser(OmeroRawClient client){
+        return client.getGateway().getLoggedInUser().asExperimenter();
+    }
+
+
+    public static List<Experimenter> getOmeroUsersInGroup(OmeroRawClient client, long groupId){
+        try {
+            return client.getGateway().getAdminService(client.getContext()).containedExperimenters(groupId);
+        } catch (ServerError | DSOutOfServiceException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
@@ -261,61 +278,56 @@ public final class OmeroRawTools {
      * @throws DSOutOfServiceException
      * @throws ServerError
      */
-    public static Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> getAvailableGroups(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+    public static Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> getGroupUsersMapAvailableForCurrentUser(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
+        // final map
         Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> map = new HashMap<>();
 
         // get all available groups for the current user according to his admin rights
         List<ExperimenterGroup> groups;
-        boolean isAdminUser = ! client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty();
-
-        if(isAdminUser)
+        if(client.isAdminUser)
             groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
         else
-            groups = client.getGateway().getAdminService(client.getContext()).containedGroups(client.getGateway().getLoggedInUser().getId());
+            groups = client.getUserGroups();
 
         groups.forEach(group-> {
             // get group permissions
             Permissions permissions = group.getDetails().getPermissions();
 
+            // initialize lists
             List<OmeroRawObjects.Owner> owners = new ArrayList<>();
             OmeroRawObjects.Group userGroup = new OmeroRawObjects.Group(group.getId().getValue(), group.getName().getValue());
 
-            if(permissions.isGroupAnnotate() || isAdminUser) {
+            // check if the current user is owner or not
+            boolean isOwner = false;
+            if(client.getGateway().getLoggedInUser().isMemberOfGroup(group.getId().getValue())){
+                System.out.println(client.getGateway().getLoggedInUser().getGroups());
+                client.getGateway().getLoggedInUser().getGroups().forEach(e->System.out.println(e.getId()));
+                System.out.println(group.getId().getValue());
+                Set<ExperimenterData> leaders = client.getGateway().getLoggedInUser().getGroups().stream().filter(e -> e.getId() == group.getId().getValue()).collect(Collectors.toList()).get(0).getLeaders();
+                if(leaders!=null) {
+                    System.out.println("not null");
+                    isOwner = leaders.stream().anyMatch(e -> e.equals(client.getGateway().getLoggedInUser()));
+                }
+            }
+
+            System.out.println(isOwner);
+            if(permissions.isGroupAnnotate() || permissions.isGroupRead() || permissions.isGroupWrite() || isOwner || client.isAdminUser) {
                 // get all available users for the current group
-                List<Experimenter> users;
-                try {
-                    users = client.getGateway().getAdminService(client.getContext()).containedExperimenters(group.getId().getValue());
-                } catch (ServerError | DSOutOfServiceException e) {
-                    throw new RuntimeException(e);
-                }
+                List<Experimenter> users = getOmeroUsersInGroup(client, group.getId().getValue());
 
-                for (Experimenter user : users) {
+                // convert each user to qupath compatible owners object
+                for (Experimenter user : users)
+                    owners.add(getOwnerObject(user));
 
-                    owners.add(new OmeroRawObjects.Owner(user.getId() == null ? 0 : user.getId().getValue(),
-                            user.getFirstName() == null ? "" : user.getFirstName().getValue(),
-                            user.getMiddleName() == null ? "" : user.getMiddleName().getValue(),
-                            user.getLastName() == null ? "" : user.getLastName().getValue(),
-                            user.getEmail() == null ? "" : user.getEmail().getValue(),
-                            user.getInstitution() == null ? "" : user.getInstitution().getValue(),
-                            user.getOmeName() == null ? "" : user.getOmeName().getValue()));
-                }
-
+                // sort in alphabetic order
                 owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
                 map.put(userGroup, owners);
             }else{
-                // if user is not allowed to modify data from other members
-                Experimenter user = client.getGateway().getLoggedInUser().asExperimenter();
-                owners.add(new OmeroRawObjects.Owner(user.getId() == null ? 0 : user.getId().getValue(),
-                        user.getFirstName() == null ? "" : user.getFirstName().getValue(),
-                        user.getMiddleName() == null ? "" : user.getMiddleName().getValue(),
-                        user.getLastName() == null ? "" : user.getLastName().getValue(),
-                        user.getEmail() == null ? "" : user.getEmail().getValue(),
-                        user.getInstitution() == null ? "" : user.getInstitution().getValue(),
-                        user.getOmeName() == null ? "" : user.getOmeName().getValue()));
+                // if the current group is private and user non admin, only show default user
+                owners.add(getDefaultOwnerObject(client));
                 map.put(userGroup, owners);
             }
         });
-
 
         return new TreeMap<>(map);
     }

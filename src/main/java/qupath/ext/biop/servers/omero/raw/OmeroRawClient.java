@@ -73,7 +73,7 @@ public class OmeroRawClient {
     // TODO Dfine port in some optional way
     private int port = 4064;
 
-    private boolean isAdminUser = false;
+    public boolean isAdminUser = false;
 
     /**
      * List of all URIs supported by this client.
@@ -271,19 +271,34 @@ public class OmeroRawClient {
         return tfUsername.getText();
     }
 
+    /**
+     * get all the groups where the current user is member of
+     *
+     * @return
+     * @throws DSOutOfServiceException
+     * @throws ServerError
+     */
     public List<ExperimenterGroup> getUserGroups() throws DSOutOfServiceException, ServerError {
         return this.gateway.getAdminService(this.securityContext).containedGroups(this.gateway.getLoggedInUser().getId());
     }
 
+    /**
+     * switch the current group to another group where the user is also part of
+     *
+     * @param groupId
+     * @throws DSOutOfServiceException
+     * @throws ServerError
+     */
     public void switchGroup(long groupId) throws DSOutOfServiceException, ServerError {
-        List<ExperimenterGroup> groups = this.gateway.getAdminService(this.securityContext).containedGroups(this.gateway.getLoggedInUser().getId());
 
-        boolean canUserAccessGroup = groups.stream()
+        // check if the user is member of the group
+        boolean canUserAccessGroup = getUserGroups().stream()
                 .map(ExperimenterGroup::getId)
                 .collect(Collectors.toList())
                 .stream()
                 .anyMatch(e -> e.getValue() == groupId);
 
+        // if member, change the group
         if(canUserAccessGroup)
             this.securityContext = new SecurityContext(groupId);
     }
