@@ -201,8 +201,8 @@ public final class OmeroRawTools {
                     for (DatasetImageLink link : links) {
                         images.add(new ImageData(link.getChild()));
                     }
-                    Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId());
-                    ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId());
+                    Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
+                    ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
 
                     // create OmeroRawObjects from child images
                     images.forEach(e-> list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,parent, user, userGroup)));
@@ -234,38 +234,68 @@ public final class OmeroRawTools {
      * @throws ServerError
      */
     public static OmeroRawObjects.Owner getDefaultOwnerObject(OmeroRawClient client)  {
-     //   Experimenter user = client.getGateway().getLoggedInUser().asExperimenter();//client.getGateway().getAdminService(client.getContext()).getExperimenter(client.getGateway().getLoggedInUser().getId());
         return getOwnerObject(getOmeroDefaultUser(client));
     }
 
 
+    /**
+     * Retrieve the logged-in user
+     *
+     * @param client
+     * @return
+     */
     public static Experimenter getOmeroDefaultUser(OmeroRawClient client){
         return client.getGateway().getLoggedInUser().asExperimenter();
     }
 
 
-    public static Experimenter getOmeroUser(OmeroRawClient client, long userId){
+    /**
+     * Retrieve a user on OMERO based on its id
+     *
+     * @param client
+     * @param userId
+     * @param username
+     * @return
+     */
+    public static Experimenter getOmeroUser(OmeroRawClient client, long userId, String username){
         try {
             return client.getGateway().getAdminService(client.getContext()).getExperimenter(userId);
         } catch (ServerError | DSOutOfServiceException e) {
+            Dialogs.showErrorMessage("OMERO admin","Cannot read OMERO user "+username +" ; id: "+userId);
             throw new RuntimeException(e);
         }
     }
 
 
+    /**
+     * Retrieve all users within the group on OMERO
+     *
+     * @param client
+     * @param groupId
+     * @return
+     */
     public static List<Experimenter> getOmeroUsersInGroup(OmeroRawClient client, long groupId){
         try {
             return client.getGateway().getAdminService(client.getContext()).containedExperimenters(groupId);
         } catch (ServerError | DSOutOfServiceException e) {
+            Dialogs.showErrorMessage("OMERO admin","Cannot read OMERO users in group "+groupId);
             throw new RuntimeException(e);
         }
     }
 
 
-    public static ExperimenterGroup getOmeroGroup(OmeroRawClient client, long groupId){
+    /**
+     * Retrieve a group on OMERO based on its id
+     *
+     * @param client
+     * @param groupId
+     * @return
+     */
+    public static ExperimenterGroup getOmeroGroup(OmeroRawClient client, long groupId, String groupName){
         try {
             return client.getGateway().getAdminService(client.getContext()).getGroup(groupId);
         } catch (ServerError | DSOutOfServiceException e) {
+            Dialogs.showErrorMessage("OMERO admin","Cannot read OMERO group "+groupName +" ; id: "+groupId);
             throw new RuntimeException(e);
         }
     }
@@ -303,22 +333,26 @@ public final class OmeroRawTools {
         else
             groups = client.getUserGroups();
 
-        groups.forEach(group-> {
-            // initialize lists
-            List<OmeroRawObjects.Owner> owners = new ArrayList<>();
-            OmeroRawObjects.Group userGroup = new OmeroRawObjects.Group(group.getId().getValue(), group.getName().getValue());
+        // remove "system" and "user" groups
+        groups.stream()
+                .filter(group->group.getId().getValue() != 0 && group.getId().getValue() != 1)
+                .collect(Collectors.toList())
+                .forEach(group-> {
+                    // initialize lists
+                    List<OmeroRawObjects.Owner> owners = new ArrayList<>();
+                    OmeroRawObjects.Group userGroup = new OmeroRawObjects.Group(group.getId().getValue(), group.getName().getValue());
 
-            // get all available users for the current group
-            List<Experimenter> users = getOmeroUsersInGroup(client, group.getId().getValue());
+                    // get all available users for the current group
+                    List<Experimenter> users = getOmeroUsersInGroup(client, group.getId().getValue());
 
-            // convert each user to qupath compatible owners object
-            for (Experimenter user : users)
-                owners.add(getOwnerObject(user));
+                    // convert each user to qupath compatible owners object
+                    for (Experimenter user : users)
+                        owners.add(getOwnerObject(user));
 
-            // sort in alphabetic order
-            owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
-            map.put(userGroup, owners);
-        });
+                    // sort in alphabetic order
+                    owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
+                    map.put(userGroup, owners);
+                 });
 
         return new TreeMap<>(map);
     }
@@ -373,8 +407,8 @@ public final class OmeroRawTools {
 
         List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
 
-        Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId());
-        ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId());
+        Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
+        ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
 
         orphanedImages.forEach( e -> {
             OmeroRawObjects.OmeroRawObject omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, new OmeroRawObjects.Server(client.getServerURI()),user, userGroup);
