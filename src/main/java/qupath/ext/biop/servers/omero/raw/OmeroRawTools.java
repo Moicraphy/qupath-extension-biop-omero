@@ -148,45 +148,35 @@ public final class OmeroRawTools {
 
         try {
             if (type == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-                Collection<ProjectData> projects = new ArrayList<>();
-               /* List<GroupExperimenterMap> owners = client.getGateway().getAdminService(client.getContext()).lookupGroup(group.getName()).copyGroupExperimenterMap();
+                Collection<ProjectData> projects = new ArrayList<>(client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx, owner.getId()));
 
-                owners.forEach(owner ->{
-                    try {*/
-                        projects.addAll(client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx, owner.getId()));
-            /*        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-                        throw new RuntimeException(e);
-                    }
-                });*/
+                Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
+                ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
 
                 projects.forEach(e-> {
-                    try {
-                        list.add(new OmeroRawObjects.Project("",e,e.getId(),finaltype,client, parent));
-                    } catch (DSOutOfServiceException | ServerError ex) {
-                        throw new RuntimeException(ex);
-                    }
+                    list.add(new OmeroRawObjects.Project("",e,e.getId(),finaltype, parent,user, userGroup));
                 });
             }
             else if (type == OmeroRawObjects.OmeroRawObjectType.DATASET) {
                 // get the current project to have access to the child datasets
                 Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx,Collections.singletonList(parent.getId()));
                 if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
-                    List<DatasetData> datasets = new ArrayList<>();
                     List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
+                    List<Long> linksId = links.stream()
+                            .map(ProjectDatasetLink::getChild)
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .collect(Collectors.toList());
 
                     // get child datasets
-                    for (ProjectDatasetLink link : links) {
-                        Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx,Collections.singletonList(link.getChild().getId().getValue()));
-                        datasets.add(datasetColl.iterator().next());
-                    }
+                    List<DatasetData> datasets = new ArrayList<>(client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx, linksId));
+
+                    Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
+                    ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
 
                     // create OmeroRawObjects from child datasets
                     datasets.forEach(e-> {
-                        try {
-                            list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype,client,parent));
-                        } catch (DSOutOfServiceException | ServerError ex) {
-                            throw new RuntimeException(ex);
-                        }
+                        list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype, parent, user, userGroup));
                     });
                 }
             }
@@ -367,19 +357,17 @@ public final class OmeroRawTools {
      * @throws ServerError
      * @throws DSOutOfServiceException
      */
-    public static List<OmeroRawObjects.OmeroRawObject> readOrphanedDatasets(OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Owner owner) throws IOException, ServerError, DSOutOfServiceException {
+    public static List<OmeroRawObjects.OmeroRawObject> readOrphanedDatasets(OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner) throws IOException, ServerError, DSOutOfServiceException {
         List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
         Collection<DatasetData> orphanedDatasets = OmeroRawRequests.getOrphanedDatasetsPerOwner(client, groupCtx, owner);
 
+        Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
+        ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
+
         orphanedDatasets.forEach( e -> {
             OmeroRawObjects.OmeroRawObject omeroObj;
-            try {
-                omeroObj = new OmeroRawObjects.Dataset("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.DATASET, client, new OmeroRawObjects.Server(client.getServerURI()));
-                list.add(omeroObj);
-            } catch (DSOutOfServiceException | ServerError ex) {
-                throw new RuntimeException(ex);
-            }
-
+            omeroObj = new OmeroRawObjects.Dataset("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.DATASET, new OmeroRawObjects.Server(client.getServerURI()), user, userGroup);
+            list.add(omeroObj);
         });
 
         return list;
