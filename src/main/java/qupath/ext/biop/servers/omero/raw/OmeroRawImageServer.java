@@ -36,14 +36,8 @@ import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.BrowseFacility;
 import omero.gateway.facility.MetadataFacility;
-import omero.gateway.facility.ROIFacility;
 import omero.gateway.model.*;
 import omero.model.*;
-import omero.model.Label;
-import omero.model.Point;
-import omero.model.Polygon;
-import omero.model.Rectangle;
-import omero.model.Shape;
 import omero.model.enums.UnitsLength;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,16 +47,6 @@ import qupath.lib.images.servers.*;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
-import qupath.lib.objects.PathObjects;
-import qupath.lib.objects.classes.PathClassFactory;
-import qupath.lib.regions.ImagePlane;
-import qupath.lib.roi.ROIs;
-import qupath.lib.roi.RoiTools;
-import qupath.lib.roi.interfaces.ROI;
-
-import java.awt.*;
-import java.awt.geom.Area;
-import java.awt.geom.Point2D;
 
 import java.awt.image.*;
 import java.io.File;
@@ -937,8 +921,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 					boolean canConnectWithOtherClients = false;
 
 					// if none of clients can open, ask for a sudo connection
-
-					List<ExperimenterGroup> availableGroups = client.getUserGroups();
+					List<ExperimenterGroup> availableGroups = OmeroRawTools.getUserOmeroGroups(client, client.getLoggedInUser().getId().getValue());
 					for(ExperimenterGroup group:availableGroups){
 						try{
 							SecurityContext grCtx = new SecurityContext(group.getId().getValue());

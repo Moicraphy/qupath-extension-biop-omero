@@ -41,6 +41,7 @@ import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.AdminFacility;
 import omero.gateway.model.ExperimenterData;
 import omero.log.SimpleLogger;
+import omero.model.Experimenter;
 import omero.model.ExperimenterGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +74,9 @@ public class OmeroRawClient {
     // TODO Dfine port in some optional way
     private int port = 4064;
 
-    public boolean isAdminUser = false;
+    private boolean isAdminUser = false;
+
+    private Experimenter loggedInUser;
 
     /**
      * List of all URIs supported by this client.
@@ -191,6 +194,7 @@ public class OmeroRawClient {
         this.gateway = gateway;
 
         this.isAdminUser = !this.gateway.getAdminService(this.securityContext).getCurrentAdminPrivileges().isEmpty();
+        this.loggedInUser = this.gateway.getLoggedInUser().asExperimenter();
 
         return gateway.isConnected();
     }
@@ -271,16 +275,6 @@ public class OmeroRawClient {
         return tfUsername.getText();
     }
 
-    /**
-     * get all the groups where the current user is member of
-     *
-     * @return
-     * @throws DSOutOfServiceException
-     * @throws ServerError
-     */
-    public List<ExperimenterGroup> getUserGroups() throws DSOutOfServiceException, ServerError {
-        return this.gateway.getAdminService(this.securityContext).containedGroups(this.gateway.getLoggedInUser().getId());
-    }
 
     /**
      * switch the current group to another group where the user is also part of
@@ -290,22 +284,29 @@ public class OmeroRawClient {
      * @throws ServerError
      */
     public void switchGroup(long groupId) throws DSOutOfServiceException, ServerError {
-
         // check if the user is member of the group
-        boolean canUserAccessGroup = getUserGroups().stream()
+        boolean canUserAccessGroup = OmeroRawTools.getUserOmeroGroups(this, this.loggedInUser.getId().getValue()).stream()
                 .map(ExperimenterGroup::getId)
                 .collect(Collectors.toList())
                 .stream()
                 .anyMatch(e -> e.getValue() == groupId);
 
         // if member, change the group
-        if(canUserAccessGroup)
+        if(canUserAccessGroup || this.isAdminUser)
             this.securityContext = new SecurityContext(groupId);
     }
 
 
     Gateway getGateway() {
         return this.gateway;
+    }
+
+    Experimenter getLoggedInUser() {
+        return this.loggedInUser;
+    }
+
+    boolean getIsAdmin() {
+        return this.isAdminUser;
     }
 
     SecurityContext getContext() { return this.securityContext; }

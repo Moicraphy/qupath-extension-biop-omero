@@ -40,7 +40,6 @@ import omero.RLong;
 import omero.ServerError;
 import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
-import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.*;
@@ -116,130 +115,6 @@ public final class OmeroRawTools {
     }
 
     /**
-     * **************************** Methods used in the OMERO browser ********************************************
-     */
-
-
-    /**
-     * Get all the OMERO objects (inside the parent Id) present in the OMERO server with the specified
-     * URI.
-     * <p>
-     * No orphaned {@code OmeroRawObject} will be fetched.
-     *
-     * @param client
-     * @param parent
-     * @return list of OmeroRawObjects
-     * @throws IOException
-     */
-    public static List<OmeroRawObjects.OmeroRawObject> readOmeroObjects(OmeroRawObjects.OmeroRawObject parent, OmeroRawClient client,
-                                                                        SecurityContext groupCtx, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner)
-            throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
-        List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
-        if (parent == null)
-            return list;
-
-        OmeroRawObjects.OmeroRawObjectType type = OmeroRawObjects.OmeroRawObjectType.PROJECT;
-        if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT)
-            type = OmeroRawObjects.OmeroRawObjectType.DATASET;
-        else if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET)
-            type = OmeroRawObjects.OmeroRawObjectType.IMAGE;
-
-        final OmeroRawObjects.OmeroRawObjectType finaltype = type;
-
-        try {
-            if (type == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-                Collection<ProjectData> projects = new ArrayList<>(client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx, owner.getId()));
-
-                Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
-                ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
-
-                projects.forEach(e-> {
-                    list.add(new OmeroRawObjects.Project("",e,e.getId(),finaltype, parent,user, userGroup));
-                });
-            }
-            else if (type == OmeroRawObjects.OmeroRawObjectType.DATASET) {
-                // get the current project to have access to the child datasets
-                Collection<ProjectData> projectColl = client.getGateway().getFacility(BrowseFacility.class).getProjects(groupCtx,Collections.singletonList(parent.getId()));
-                if(projectColl.iterator().next().asProject().sizeOfDatasetLinks() > 0){
-                    List<ProjectDatasetLink> links = projectColl.iterator().next().asProject().copyDatasetLinks();
-                    List<Long> linksId = links.stream()
-                            .map(ProjectDatasetLink::getChild)
-                            .map(IObject::getId)
-                            .map(RLong::getValue)
-                            .collect(Collectors.toList());
-
-                    // get child datasets
-                    List<DatasetData> datasets = new ArrayList<>(client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx, linksId));
-
-                    Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
-                    ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
-
-                    // create OmeroRawObjects from child datasets
-                    datasets.forEach(e-> {
-                        list.add(new OmeroRawObjects.Dataset("",e,e.getId(),finaltype, parent, user, userGroup));
-                    });
-                }
-            }
-            else if (type == OmeroRawObjects.OmeroRawObjectType.IMAGE) {
-                // get the current dataset to have access to the child images
-                Collection<DatasetData> datasetColl = client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx,Collections.singletonList(parent.getId()));
-                if(datasetColl.iterator().next().asDataset().sizeOfImageLinks() > 0){
-                    List<ImageData> images = new ArrayList<>();
-                    List<DatasetImageLink> links = datasetColl.iterator().next().asDataset().copyImageLinks();
-
-                    // get child images
-                    for (DatasetImageLink link : links) {
-                        images.add(new ImageData(link.getChild()));
-                    }
-                    Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
-                    ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
-
-                    // create OmeroRawObjects from child images
-                    images.forEach(e-> list.add(new OmeroRawObjects.Image("",e,e.getId(),finaltype,parent, user, userGroup)));
-                }
-            }
-        } catch (DSOutOfServiceException | DSAccessException e) {
-            throw new IOException("Cannot get datasets");
-        }
-
-        return list;
-    }
-
-
-    public static OmeroRawObjects.Owner getOwnerObject(Experimenter user){
-        return new OmeroRawObjects.Owner(user.getId()==null ? 0 : user.getId().getValue(),
-                user.getFirstName()==null ? "" : user.getFirstName().getValue(),
-                user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
-                user.getLastName()==null ? "" : user.getLastName().getValue(),
-                user.getEmail()==null ? "" : user.getEmail().getValue(),
-                user.getInstitution()==null ? "" : user.getInstitution().getValue(),
-                user.getOmeName()==null ? "" : user.getOmeName().getValue());
-    }
-
-    /**
-     * return the Owner object corresponding to the logged in user
-     * @param client
-     * @return
-     * @throws DSOutOfServiceException
-     * @throws ServerError
-     */
-    public static OmeroRawObjects.Owner getDefaultOwnerObject(OmeroRawClient client)  {
-        return getOwnerObject(getOmeroDefaultUser(client));
-    }
-
-
-    /**
-     * Retrieve the logged-in user
-     *
-     * @param client
-     * @return
-     */
-    public static Experimenter getOmeroDefaultUser(OmeroRawClient client){
-        return client.getGateway().getLoggedInUser().asExperimenter();
-    }
-
-
-    /**
      * Retrieve a user on OMERO based on its id
      *
      * @param client
@@ -292,85 +167,129 @@ public final class OmeroRawTools {
 
 
     /**
-     * return the group object corresponding to the default group attributed to the logged in user
-     * @param client
+     * get all the groups where the current user is member of
+     *
      * @return
-     * @throws DSOutOfServiceException
-     * @throws ServerError
      */
-    public static OmeroRawObjects.Group getDefaultGroup(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
-        ExperimenterGroup userGroup = client.getGateway().getAdminService(client.getContext()).getDefaultGroup(client.getGateway().getLoggedInUser().getId());
-        return new OmeroRawObjects.Group(userGroup.getId().getValue(), userGroup.getName().getValue());
+    public static List<ExperimenterGroup> getUserOmeroGroups(OmeroRawClient client, long userId) {
+        try {
+            return client.getGateway().getAdminService(client.getContext()).containedGroups(userId);
+        }catch(DSOutOfServiceException | ServerError e){
+            Dialogs.showErrorMessage("OMERO admin","Cannot retrieve OMERO groups for user "+userId);
+            throw new RuntimeException(e);
+        }
     }
 
 
     /**
-     * return a map of available groups with its attached users.
+     * get all the groups on OMERO server (only for admin people)
+     *
+     * @return
+     */
+    public static List<ExperimenterGroup> getAllOmeroGroups(OmeroRawClient client) {
+        try {
+            if(client.getIsAdmin())
+                return client.getGateway().getAdminService(client.getContext()).lookupGroups();
+            else {
+                Dialogs.showWarningNotification("OMERO admin", "You are not allowed to see all OMERO groups. Only available groups for you are loaded");
+                return getUserOmeroGroups(client, client.getLoggedInUser().getId().getValue());
+            }
+        }catch(DSOutOfServiceException | ServerError e){
+            Dialogs.showErrorMessage("OMERO admin", "Cannot retrieve all OMERO groups");
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    /**
+     * return the default {@link ExperimenterGroup} object of a certain user
      *
      * @param client
      * @return
-     * @throws DSOutOfServiceException
-     * @throws ServerError
      */
-    public static Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> getGroupUsersMapAvailableForCurrentUser(OmeroRawClient client) throws DSOutOfServiceException, ServerError {
-        // final map
-        Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> map = new HashMap<>();
-
-        // get all available groups for the current user according to his admin rights
-        List<ExperimenterGroup> groups;
-        if(client.isAdminUser)
-            groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
-        else
-            groups = client.getUserGroups();
-
-        // remove "system" and "user" groups
-        groups.stream()
-                .filter(group->group.getId().getValue() != 0 && group.getId().getValue() != 1)
-                .collect(Collectors.toList())
-                .forEach(group-> {
-                    // initialize lists
-                    List<OmeroRawObjects.Owner> owners = new ArrayList<>();
-                    OmeroRawObjects.Group userGroup = new OmeroRawObjects.Group(group.getId().getValue(), group.getName().getValue());
-
-                    // get all available users for the current group
-                    List<Experimenter> users = getOmeroUsersInGroup(client, group.getId().getValue());
-
-                    // convert each user to qupath compatible owners object
-                    for (Experimenter user : users)
-                        owners.add(getOwnerObject(user));
-
-                    // sort in alphabetic order
-                    owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
-                    map.put(userGroup, owners);
-                 });
-
-        return new TreeMap<>(map);
+    public static ExperimenterGroup getDefaultOmeroGroup(OmeroRawClient client, long userId) {
+        try {
+            return client.getGateway().getAdminService(client.getContext()).getDefaultGroup(userId);
+        } catch (ServerError | DSOutOfServiceException e) {
+            Dialogs.showErrorMessage("OMERO admin","Cannot read the default OMERO group for the user "+userId);
+            throw new RuntimeException(e);
+        }
     }
 
+
+
     /**
-     * Get all the orphaned {@code OmeroRawObject}s of type Dataset from the server.
+     * get all the orphaned datasets from the OMERO server for a certain user.
      *
-     * @param client the client {@code OmeroRawClient} object
-     * @param groupCtx security context of the current group
+     * @param client the client {@link OmeroRawClient} object
      * @return list of orphaned datasets
-     * @throws IOException
-     * @throws ServerError
-     * @throws DSOutOfServiceException
      */
-    public static List<OmeroRawObjects.OmeroRawObject> readOrphanedDatasets(OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner) throws IOException, ServerError, DSOutOfServiceException {
-        List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
-        Collection<DatasetData> orphanedDatasets = OmeroRawRequests.getOrphanedDatasetsPerOwner(client, groupCtx, owner);
+    public static Collection<DatasetData> readOmeroOrphanedDatasetsPerOwner(OmeroRawClient client, long userId) {
+        try {
+            // query orphaned dataset
+            List<IObject> datasetObjects = client.getGateway().getQueryService(client.getContext()).findAllByQuery("select dataset from Dataset as dataset " +
+                    "join fetch dataset.details.owner as o " +
+                    "where o.id = "+ userId +
+                    "and not exists (select obl from " +
+                    "ProjectDatasetLink as obl where obl.child = dataset.id) ", null);
 
-        Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
-        ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
+            // get orphaned dataset ids
+            List<Long> datasetIds = datasetObjects.stream()
+                    .map(IObject::getId)
+                    .map(RLong::getValue)
+                    .collect(Collectors.toList());
 
-        orphanedDatasets.forEach( e -> {
-            OmeroRawObjects.OmeroRawObject omeroObj;
-            omeroObj = new OmeroRawObjects.Dataset("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.DATASET, new OmeroRawObjects.Server(client.getServerURI()), user, userGroup);
-            list.add(omeroObj);
-        });
+            // get orphaned datasets
+            return client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(), datasetIds);
 
-        return list;
+        } catch (DSOutOfServiceException | ExecutionException | ServerError e) {
+            Dialogs.showErrorMessage("Orphaned datasets","Cannot retrieved orphaned datasets for user "+userId);
+            logger.error("" + e);
+            return Collections.emptyList();
+        } catch (DSAccessException e){
+            Dialogs.showErrorMessage("Orphaned datasets","You don't have the right to access to orphaned dataset of the user "+userId);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }
+    }
+
+
+    /**
+     * get all the orphaned datasets from the OMERO server for the current group (contained in the security context of the current client).
+     *
+     * @param client
+     * @return
+     */
+    public static Collection<DatasetData> readOmeroOrphanedDatasets(OmeroRawClient client)  {
+        Collection<DatasetData> orphanedDatasets;
+
+        try {
+            // query orphaned dataset
+            List<IObject> datasetObjects = client.getGateway().getQueryService(client.getContext()).findAllByQuery("select dataset from Dataset as dataset " +
+                            "left outer join fetch dataset.details.owner " +
+                            "where not exists (select obl from " +
+                            "ProjectDatasetLink as obl where obl.child = dataset.id) ", null);
+
+            // get orphaned dataset ids
+            List<Long> datasetIds = datasetObjects.stream()
+                    .map(IObject::getId)
+                    .map(RLong::getValue)
+                    .collect(Collectors.toList());
+
+            // get orphaned datasets
+            orphanedDatasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(), datasetIds);
+
+        } catch (DSOutOfServiceException | ExecutionException | ServerError e) {
+            Dialogs.showErrorMessage("Orphaned datasets","Cannot retrieved orphaned datasets");
+            logger.error("" + e);
+            return Collections.emptyList();
+        } catch (DSAccessException e){
+            Dialogs.showErrorMessage("Orphaned datasets","You don't have the right to access to orphaned dataset");
+            logger.error("" + e);
+            return Collections.emptyList();
+        }
+
+        return orphanedDatasets;
     }
 
 
@@ -378,117 +297,18 @@ public final class OmeroRawTools {
      * Get all the orphaned {@code OmeroRawObject}s of type Image from the server.
      *
      * @param client the client {@code OmeroRawClient} object
-     * @param groupCtx security context of the current group
      * @return list of orphaned images
-     * @throws IOException
-     * @throws ServerError
-     * @throws DSOutOfServiceException
      */
-    public static List<OmeroRawObjects.OmeroRawObject> readOrphanedImages(OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner) {
-        // get orphaned images per user
-        Collection<ImageData> orphanedImages;
+    public static Collection<ImageData> readOmeroOrphanedImagesPerUser(OmeroRawClient client, long userId) {
         try {
-            orphanedImages = new ArrayList<>(client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(groupCtx, owner.getId()));
+            return client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(client.getContext(), userId);
         } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        }
-
-        List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
-
-        Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
-        ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
-
-        orphanedImages.forEach( e -> {
-            OmeroRawObjects.OmeroRawObject omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, new OmeroRawObjects.Server(client.getServerURI()),user, userGroup);
-            list.add(omeroObj);
-        });
-
-        return list;
-    }
-
-
-    /**
-     * Return the Id associated with the {@code URI} provided.
-     * If multiple Ids are present, only the first one will be retrieved.
-     * If no Id could be found, return -1.
-     *
-     * @param uri
-     * @param type
-     * @return Id
-     */
-    public static int parseOmeroRawObjectId(URI uri, OmeroRawObjects.OmeroRawObjectType type) {
-        String cleanUri = uri.toString().replace("%3D", "=");
-        Matcher m;
-        switch (type) {
-            case SERVER:
-                logger.error("Cannot parse an ID from OMERO server.");
-                break;
-            case PROJECT:
-                m = patternLinkProject.matcher(cleanUri);
-                if (m.find()) return Integer.parseInt(m.group(1));
-                break;
-            case DATASET:
-                m = patternLinkDataset.matcher(cleanUri);
-                if (m.find()) return Integer.parseInt(m.group(1));
-                break;
-            case IMAGE:
-                for (var p: imagePatterns) {
-                    m = p.matcher(cleanUri);
-                    if (m.find()) return Integer.parseInt(m.group(1));
-                }
-                break;
-            default:
-                throw new UnsupportedOperationException("Type (" + type + ") not supported");
-        }
-        return -1;
-    }
-
-    /**
-     * Return the type associated with the {@code URI} provided.
-     * If multiple types are present, only the first one will be retrieved.
-     * If no type is found, return UNKNOWN.
-     * <p>
-     * Accepts the same formats as the {@code OmeroRawImageServer} constructor.
-     * <br>
-     * E.g., https://{server}/webclient/?show=dataset-{datasetId}
-     *
-     * @param uri
-     * @return omeroRawObjectType
-     */
-    public static OmeroRawObjects.OmeroRawObjectType parseOmeroRawObjectType(URI uri) {
-        var uriString = uri.toString().replace("%3D", "=");
-        if (patternLinkProject.matcher(uriString).find())
-            return OmeroRawObjects.OmeroRawObjectType.PROJECT;
-        else if (patternLinkDataset.matcher(uriString).find())
-            return OmeroRawObjects.OmeroRawObjectType.DATASET;
-        else {
-            for (var p: imagePatterns) {
-                if (p.matcher(uriString).find())
-                    return OmeroRawObjects.OmeroRawObjectType.IMAGE;
-            }
-        }
-        return OmeroRawObjects.OmeroRawObjectType.UNKNOWN;
-    }
-
-
-    /**
-     * Request the {@code OmeroRawAnnotations} object of type {@code category} associated with
-     * the {@code OmeroRawObject} specified.
-     *
-     * @param client
-     * @param obj
-     * @param category
-     * @return omeroRawAnnotations object
-     */
-    public static OmeroRawAnnotations readOmeroAnnotations(OmeroRawClient client, OmeroRawObjects.OmeroRawObject obj, OmeroRawAnnotations.OmeroRawAnnotationType category) {
-        try {
-            List<?> annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), obj.getData());
-            return OmeroRawAnnotations.getOmeroAnnotations(client, category, annotations);
-        } catch (Exception ex) {
-            logger.warn("Could not fetch {} information: {}", category, ex.getLocalizedMessage());
-            return null;
+            Dialogs.showErrorMessage("Orphaned images","Cannot retrieved orphaned images for user "+userId);
+            logger.error("" + e);
+            return Collections.emptyList();
         }
     }
+
 
 
     /**
@@ -523,8 +343,71 @@ public final class OmeroRawTools {
 
         }catch(ExecutionException | DSOutOfServiceException| DSAccessException | ServerError e){
             Dialogs.showErrorMessage("Rendering def reading","Could not read rendering settings on OMERO.");
-            logger.error("" + e);
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * read all project represented by the list of ids
+     *
+     * @param client
+     * @param projectIds
+     * @return
+     */
+    public static Collection<ProjectData> readOmeroProjects(OmeroRawClient client, List<Long> projectIds){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(), projectIds);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorMessage("Reading projects","An error occurs when reading OMERO projects "+projectIds);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }catch (DSAccessException e){
+            Dialogs.showErrorMessage("Reading projects","You don't have the right to access OMERO projects "+projectIds);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }
+    }
+
+
+    /**
+     * read all projects for a certain user.
+     *
+     * @param client
+     * @param userId
+     * @return
+     */
+    public static Collection<ProjectData> readOmeroProjectsByUser(OmeroRawClient client, long userId){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(), userId);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorMessage("Reading projects by user","An error occurs when reading OMERO projects for the user "+userId);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }catch (DSAccessException e){
+            Dialogs.showErrorMessage("Reading projects by user","You don't have the right to access OMERO projects for the user "+userId);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * read all datasets given by the list of ids
+     *
+     * @param client
+     * @param datasetIds
+     * @return
+     */
+    public static Collection<DatasetData> readOmeroDatasets(OmeroRawClient client, List<Long> datasetIds){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(), datasetIds);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorMessage("Reading datasets","An error occurs when reading OMERO datasets "+datasetIds);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }catch (DSAccessException e){
+            Dialogs.showErrorMessage("Reading datasets","You don't have the right to access OMERO datasets "+datasetIds);
+            logger.error("" + e);
+            return Collections.emptyList();
         }
     }
 
@@ -547,6 +430,30 @@ public final class OmeroRawTools {
         }
 
     }
+
+
+    /**
+     * read all annotations attached to an image on OMERO
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
+    public static List<AnnotationData> readOmeroAnnotations(OmeroRawClient client, long imageId){
+        try {
+            // get current image from OMERO
+            ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+
+            // read annotations linked to the image
+            return client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), imageData);
+
+        }catch(ExecutionException | DSOutOfServiceException | DSAccessException e) {
+            Dialogs.showErrorMessage("Reading OMERO annotations", "Cannot get annotations from OMERO for the image "+imageId);
+            logger.error("" + e);
+            return Collections.emptyList();
+        }
+    }
+
 
     /**
      * Convert a QuPath measurement table to an OMERO table
@@ -1615,4 +1522,70 @@ public final class OmeroRawTools {
         var state = loggedIn ? IconFactory.PathIcons.ACTIVE_SERVER : IconFactory.PathIcons.INACTIVE_SERVER;
         return IconFactory.createNode(QuPathGUI.TOOLBAR_ICON_SIZE, QuPathGUI.TOOLBAR_ICON_SIZE, state);
     }
+
+
+
+    /**
+     * Return the Id associated with the {@code URI} provided.
+     * If multiple Ids are present, only the first one will be retrieved.
+     * If no Id could be found, return -1.
+     *
+     * @param uri
+     * @param type
+     * @return Id
+     */
+    public static int parseOmeroRawObjectId(URI uri, OmeroRawObjects.OmeroRawObjectType type) {
+        String cleanUri = uri.toString().replace("%3D", "=");
+        Matcher m;
+        switch (type) {
+            case SERVER:
+                logger.error("Cannot parse an ID from OMERO server.");
+                break;
+            case PROJECT:
+                m = patternLinkProject.matcher(cleanUri);
+                if (m.find()) return Integer.parseInt(m.group(1));
+                break;
+            case DATASET:
+                m = patternLinkDataset.matcher(cleanUri);
+                if (m.find()) return Integer.parseInt(m.group(1));
+                break;
+            case IMAGE:
+                for (var p: imagePatterns) {
+                    m = p.matcher(cleanUri);
+                    if (m.find()) return Integer.parseInt(m.group(1));
+                }
+                break;
+            default:
+                throw new UnsupportedOperationException("Type (" + type + ") not supported");
+        }
+        return -1;
+    }
+
+    /**
+     * Return the type associated with the {@code URI} provided.
+     * If multiple types are present, only the first one will be retrieved.
+     * If no type is found, return UNKNOWN.
+     * <p>
+     * Accepts the same formats as the {@code OmeroRawImageServer} constructor.
+     * <br>
+     * E.g., https://{server}/webclient/?show=dataset-{datasetId}
+     *
+     * @param uri
+     * @return omeroRawObjectType
+     */
+    public static OmeroRawObjects.OmeroRawObjectType parseOmeroRawObjectType(URI uri) {
+        var uriString = uri.toString().replace("%3D", "=");
+        if (patternLinkProject.matcher(uriString).find())
+            return OmeroRawObjects.OmeroRawObjectType.PROJECT;
+        else if (patternLinkDataset.matcher(uriString).find())
+            return OmeroRawObjects.OmeroRawObjectType.DATASET;
+        else {
+            for (var p: imagePatterns) {
+                if (p.matcher(uriString).find())
+                    return OmeroRawObjects.OmeroRawObjectType.IMAGE;
+            }
+        }
+        return OmeroRawObjects.OmeroRawObjectType.UNKNOWN;
+    }
+
 }
