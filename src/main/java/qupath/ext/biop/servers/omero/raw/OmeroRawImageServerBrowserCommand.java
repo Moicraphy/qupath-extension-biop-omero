@@ -731,11 +731,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
             // If parentObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
             if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
-                List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawTools.readOrphanedDatasets(client, groupCtx);
+                List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawTools.readOrphanedDatasets(client, groupCtx, owner);
                 orphanedDatasets.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
                 children.addAll(orphanedDatasets);
 
-                orphanedImageList.addAll(OmeroRawTools.readOrphanedImages(client, groupCtx));
+                orphanedImageList.addAll(OmeroRawTools.readOrphanedImages(client, groupCtx, group, owner));
 
                 if(groupOwnersChildrenMap.containsKey(group))
                     groupOwnersChildrenMap.get(group).put(owner, children);

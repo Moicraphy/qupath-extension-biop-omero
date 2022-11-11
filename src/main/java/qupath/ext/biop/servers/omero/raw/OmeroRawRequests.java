@@ -18,32 +18,15 @@ import java.util.stream.Collectors;
 
 public class OmeroRawRequests {
 
-    public static Collection<ImageData> getOrphanedImages(OmeroRawClient client, SecurityContext groupCtx) throws DSOutOfServiceException, ServerError {
-
-        //System.out.println("OmeroRawToools - getOrphanedImages - Begin getLookupGroups");
-       // long time = System.currentTimeMillis();
-       // List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
-        //System.out.println("OmeroRawToools - getOrphanedImages - End getLookupGroups : "+(System.currentTimeMillis()-time));
+    public static Collection<ImageData> getOrphanedImages(OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Owner owner) throws DSOutOfServiceException, ServerError {
 
         Collection<ImageData> map = new ArrayList<>();
-       // groups.forEach(group-> {
+        try {
+            map.addAll(client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(groupCtx, owner.getId()));
 
-            // get all members of the current group
-           // List<GroupExperimenterMap> experimentersByGroup = group.copyGroupExperimenterMap();
-
-           // for (GroupExperimenterMap experimenter : experimentersByGroup) {
-            //    long userId = experimenter.getChild().getId().getValue();
-
-                try {
-                    //System.out.println("OmeroRawToools - getOrphanedImages - Begin getOrphanedImages from OMERO");
-                    long time2 = System.currentTimeMillis();
-                    map.addAll(client.getGateway().getFacility(BrowseFacility.class).getOrphanedImages(groupCtx, -1));
-                   // System.out.println("OmeroRawToools - getOrphanedImages - End getOrphanedImages from OMERO : "+(System.currentTimeMillis()-time2));
-                } catch (ExecutionException e) {
-                    throw new RuntimeException(e);
-                }
-        //    }
-      //  });
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
 
         return map;
     }
@@ -69,15 +52,15 @@ public class OmeroRawRequests {
     }
 
 
-    public static Collection<DatasetData> getOrphanedDatasetsPerOwner(OmeroRawClient client, SecurityContext groupCtx) throws DSOutOfServiceException, ServerError {
+    public static Collection<DatasetData> getOrphanedDatasetsPerOwner(OmeroRawClient client, SecurityContext groupCtx, OmeroRawObjects.Owner owner) throws ServerError {
         Collection<DatasetData> orphanedDatasets;
 
         try {
             List<IObject> datasetObjects = client.getGateway().getQueryService(groupCtx).findAllByQuery("select dataset from Dataset as dataset " +
-                            "where dataset.details.owner = " +
-                            "where not exists (select obl from " +
-                            "ProjectDatasetLink as obl where obl.child = dataset.id) "
-                    , null);
+                            "join fetch dataset.details.owner as o " +
+                            "where o.id = "+ owner.getId() +
+                            "and not exists (select obl from " +
+                            "ProjectDatasetLink as obl where obl.child = dataset.id) ", null);
 
             List<Long> datasetIds = datasetObjects.stream().map(IObject::getId).map(RLong::getValue).collect(Collectors.toList());
             orphanedDatasets = client.getGateway().getFacility(BrowseFacility.class).getDatasets(groupCtx,datasetIds);
