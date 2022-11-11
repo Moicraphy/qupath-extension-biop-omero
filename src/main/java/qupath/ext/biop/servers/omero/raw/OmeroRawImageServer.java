@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.color.ColorModelFactory;
 import qupath.lib.common.ColorTools;
+import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.*;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
@@ -907,68 +908,50 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws IOException
 			 */
 			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
-				BrowseFacility browse = client.getGateway().getFacility(BrowseFacility.class);
-				ImageData image = null;
 				OmeroRawClient currentClient = client;
 
-				// first, try to access the image with the main OmeroRawClient
-				try {
-					image = browse.getImage(currentClient.getContext(), imageID);
-				}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e){
+				// read the image with the current client, connected to the current group
+				ImageData image = OmeroRawTools.readOmeroImage(currentClient,imageID);
+				//long tryyrid = OmeroRawTools.getGroupIdFromImageId(currentClient,imageID);
+				//System.out.println("tryyid : "+tryyrid);
 
-
-
-					boolean canConnectWithOtherClients = false;
-
-					// if none of clients can open, ask for a sudo connection
-					List<ExperimenterGroup> availableGroups = OmeroRawTools.getUserOmeroGroups(client, client.getLoggedInUser().getId().getValue());
+				// if image unreadable, check all groups the current user is part of
+				if(image == null){
+					List<ExperimenterGroup> availableGroups = OmeroRawTools.getUserOmeroGroups(currentClient, currentClient.getLoggedInUser().getId().getValue());
 					for(ExperimenterGroup group:availableGroups){
-						try{
-							SecurityContext grCtx = new SecurityContext(group.getId().getValue());
-							image = browse.getImage(grCtx, imageID);
-							canConnectWithOtherClients = true;
-							currentClient.switchGroup(group.getId().getValue());
+						// switch the user to another group
+						currentClient.switchGroup(group.getId().getValue());
+
+						// read the image
+						image = OmeroRawTools.readOmeroImage(currentClient,imageID);
+						if(image != null)
 							break;
-						}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1){
+					}
+				}
 
+				// if image unreadable, check all other open clients
+				if(image == null){
+					// get opened clients
+					List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
+					for (OmeroRawClient cli : otherClients) {
+						// read the image
+						image = OmeroRawTools.readOmeroImage(cli, imageID);
+						if(image != null) {
+							currentClient = cli;
+							break;
 						}
 					}
+				}
 
-					if (!canConnectWithOtherClients) {
-						List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
-						// browse in the list of opened OmeroRawClients and try to find one that can open the image
-						for (OmeroRawClient cli : otherClients) {
-							try {
-								image = browse.getImage(cli.getContext(), imageID);
-								canConnectWithOtherClients = true;
-								currentClient = cli;
-								break;
-							} catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1) {
+				// if image still unreadable and current user is admin, check all OMERO groups
+				if(image == null && currentClient.getIsAdmin()){
+					OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
 
-							}
-						}
-
-
-					}
-
-					// if the main OmeroRawClient could not access the image, check if the user has admin rights
-					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
-
-							// if none of clients can open, ask for a sudo connection
-							if (!canConnectWithOtherClients) {
-								// create a new OmeroRawClient
-								OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
-								if (sudoClient.sudoConnection(client)) {
-									image = browse.getImage(sudoClient.getContext(), imageID);
-									currentClient = sudoClient;
-									OmeroRawClients.addClient(sudoClient);
-								} else
-									return null;
-							}
-					} else{
-						// user does not have admin rights
-						logger.error("You do not have access to this image because it is part of another group");
-						throw new RuntimeException(e);
+					//long groupId = OmeroRawTools.getGroupIdFromImageId(currentClient,imageID);
+					if(sudoClient.sudoConnection(currentClient)) {
+						currentClient.switchGroup(sudoClient.getContext().getGroupID());
+						// read the image
+						image = OmeroRawTools.readOmeroImage(currentClient, imageID);
 					}
 				}
 
@@ -979,8 +962,11 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 					rawPixStore.setPixelsId(pixelData.getId(), false);
 					return new LocalReaderWrapper(rawPixStore, pixelData, currentClient);
 				}
-				else
+				else {
+					// user does not have admin rights
+					Dialogs.showErrorMessage("Load image","You do not have access to this image because it is part of a group / user you do not have access to");
 					return null;
+				}
 			}
 
 			/**

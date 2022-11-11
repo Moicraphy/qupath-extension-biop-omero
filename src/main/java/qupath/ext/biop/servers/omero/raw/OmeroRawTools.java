@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import omero.RLong;
+import omero.RType;
 import omero.ServerError;
 import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
@@ -216,6 +217,26 @@ public final class OmeroRawTools {
         }
     }
 
+
+   /* public static long getGroupIdFromImageId(OmeroRawClient client, long imageId){
+        try {
+            // query orphaned dataset
+            List<List<RType>> res = client.getGateway().getQueryService(client.getContext()).projection("select i.details.group.id from Image as i " +
+                    "where i.id = " + imageId, null);
+            System.out.println("res : "+res);
+            // get orphaned dataset ids
+            Collection<Long> ids = res.stream().flatMap(Collection::stream).
+                    map(o -> ((RLong) o).getValue()).collect(Collectors.toList());
+
+            // get orphaned datasets
+            return ids.iterator().next();
+
+        } catch (DSOutOfServiceException | ServerError | NoSuchElementException e) {
+            Dialogs.showErrorMessage("get group id","Cannot retrieved group id from image "+imageId);
+            logger.error("" + e);
+            return -1;
+        }
+    }*/
 
 
     /**
@@ -408,6 +429,20 @@ public final class OmeroRawTools {
             Dialogs.showErrorMessage("Reading datasets","You don't have the right to access OMERO datasets "+datasetIds);
             logger.error("" + e);
             return Collections.emptyList();
+        }
+    }
+
+    public static ImageData readOmeroImage(OmeroRawClient client, long imageId){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorMessage("Reading image","An error occurs when reading OMERO image "+imageId);
+            logger.error("" + e);
+            return null;
+        }catch (DSAccessException | NoSuchElementException e){
+            //Dialogs.showErrorMessage("Reading datasets","You don't have the right to access OMERO datasets "+datasetIds);
+           // logger.error("" + e);
+            return null;
         }
     }
 
