@@ -290,43 +290,20 @@ public final class OmeroRawTools {
             groups = client.getUserGroups();
 
         groups.forEach(group-> {
-            // get group permissions
-            Permissions permissions = group.getDetails().getPermissions();
-
             // initialize lists
             List<OmeroRawObjects.Owner> owners = new ArrayList<>();
             OmeroRawObjects.Group userGroup = new OmeroRawObjects.Group(group.getId().getValue(), group.getName().getValue());
 
-            // check if the current user is owner or not
-            boolean isOwner = false;
-            if(client.getGateway().getLoggedInUser().isMemberOfGroup(group.getId().getValue())){
-                System.out.println(client.getGateway().getLoggedInUser().getGroups());
-                client.getGateway().getLoggedInUser().getGroups().forEach(e->System.out.println(e.getId()));
-                System.out.println(group.getId().getValue());
-                Set<ExperimenterData> leaders = client.getGateway().getLoggedInUser().getGroups().stream().filter(e -> e.getId() == group.getId().getValue()).collect(Collectors.toList()).get(0).getLeaders();
-                if(leaders!=null) {
-                    System.out.println("not null");
-                    isOwner = leaders.stream().anyMatch(e -> e.equals(client.getGateway().getLoggedInUser()));
-                }
-            }
+            // get all available users for the current group
+            List<Experimenter> users = getOmeroUsersInGroup(client, group.getId().getValue());
 
-            System.out.println(isOwner);
-            if(permissions.isGroupAnnotate() || permissions.isGroupRead() || permissions.isGroupWrite() || isOwner || client.isAdminUser) {
-                // get all available users for the current group
-                List<Experimenter> users = getOmeroUsersInGroup(client, group.getId().getValue());
+            // convert each user to qupath compatible owners object
+            for (Experimenter user : users)
+                owners.add(getOwnerObject(user));
 
-                // convert each user to qupath compatible owners object
-                for (Experimenter user : users)
-                    owners.add(getOwnerObject(user));
-
-                // sort in alphabetic order
-                owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
-                map.put(userGroup, owners);
-            }else{
-                // if the current group is private and user non admin, only show default user
-                owners.add(getDefaultOwnerObject(client));
-                map.put(userGroup, owners);
-            }
+            // sort in alphabetic order
+            owners.sort(Comparator.comparing(OmeroRawObjects.Owner::getName));
+            map.put(userGroup, owners);
         });
 
         return new TreeMap<>(map);
