@@ -568,7 +568,7 @@ public class OmeroRawScripting {
         ob.setImageData(imageData, pathObjects);
 
         // convert the table to OMERO.table
-        TableData table = OmeroRawTools.convertMeasurementTableToOmeroTable(pathObjects, ob);
+        TableData table = OmeroRawTools.convertMeasurementTableToOmeroTable(pathObjects, ob, imageServer.getClient(), imageServer.getId());
 
         // send the table to OMERO
         return OmeroRawTools.addTableToOmero(table, tableName, imageServer.getClient(), imageServer.getId());
@@ -708,7 +708,7 @@ public class OmeroRawScripting {
         String path = QPEx.getQuPath().getProject().getPath().getParent().toString();
 
         // build the csv file from the measurement table
-        File file = OmeroRawTools.buildCSVFileFromMeasurementTable(pathObjects, ob, filename, path);
+        File file = OmeroRawTools.buildCSVFileFromMeasurementTable(pathObjects, ob, imageServer.getId(), filename, path);
 
         if (file.exists()) {
             // add the csv file to OMERO

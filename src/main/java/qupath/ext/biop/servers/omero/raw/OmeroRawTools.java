@@ -37,11 +37,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import omero.RLong;
-import omero.RType;
 import omero.ServerError;
 import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
-import omero.cmd.CmdCallbackI;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.*;
@@ -537,10 +535,20 @@ public final class OmeroRawTools {
      * @param ob
      * @return
      */
-    public static TableData convertMeasurementTableToOmeroTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob) {
+    public static TableData convertMeasurementTableToOmeroTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, OmeroRawClient client, long imageId) {
         List<TableDataColumn> columns = new ArrayList<>();
         List<List<Object>> measurements = new ArrayList<>();
         int i = 0;
+
+        // add the first column with the image data (linkable on OMERO)
+        columns.add(new TableDataColumn("Image ID",i++, ImageData.class));
+        ImageData image = readOmeroImage(client, imageId);
+        List<Object> imageData = new ArrayList<>();
+
+        for (PathObject ignored : pathObjects) {
+            imageData.add(image);
+        }
+        measurements.add(imageData);
 
         // create formatted Lists of measurements to be compatible with omero.tables
         for (String col : ob.getAllNames()) {
@@ -763,10 +771,11 @@ public final class OmeroRawTools {
      * @param ob
      * @param path
      */
-    public static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, String name, String path) {
+    public static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, long imageId, String name, String path) {
         StringBuilder tableString = new StringBuilder();
 
         // get the header
+        tableString.append("Image_ID").append(",");
         for (String col : ob.getAllNames()) {
             tableString.append(col).append(",");
         }
@@ -775,6 +784,8 @@ public final class OmeroRawTools {
 
         // get the table
         for (PathObject pathObject : pathObjects) {
+            // add image id
+            tableString.append(imageId).append(",");
             for (String col : ob.getAllNames()) {
                 if (ob.isNumericMeasurement(col))
                     tableString.append(ob.getNumericValue(pathObject, col)).append(",");
