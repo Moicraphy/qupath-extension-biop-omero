@@ -124,6 +124,10 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                     objs.size(),
                     objectString,
                     (objs.size() == 1 ? "was" : "were")));
+        else {
+            Dialogs.showErrorMessage("Sending annotations", "Cannot send annotations to OMERO. Please look at the log console to know more (View->Show log).");
+            return;
+        }
 
         if(annotationMap) {
             // send table to OMERO

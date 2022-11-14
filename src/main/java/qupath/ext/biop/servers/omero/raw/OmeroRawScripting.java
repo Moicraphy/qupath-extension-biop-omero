@@ -727,6 +727,8 @@ public class OmeroRawScripting {
      * Set the minimum and maximum display range value for each channel on QuPath, based on OMERO settings.
      * Channel indices are taken as reference.
      *
+     * Only works for fluorescent images
+     *
      * @param imageServer
      */
     public static void setChannelsDisplayRangeFromOmeroChannel(OmeroRawImageServer imageServer) {
@@ -742,8 +744,11 @@ public class OmeroRawScripting {
         // get the number of the channels in OMERO
         int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
 
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
         // check if both images has the same number of channels
-        if(omeroNChannels != imageServer.nChannels()){
+        if(omeroNChannels != qpChannels.size()){
             Dialogs.showWarningNotification("Channel settings", "The image on OMERO has not the same number of channels ("+omeroNChannels+" as the one in QuPath ("+imageServer.nChannels()+")");
             return;
         }
@@ -768,6 +773,8 @@ public class OmeroRawScripting {
      * Set the color for each channel on QuPath, based on OMERO settings.
      * Channel indices are taken as reference.
      *
+     * Only works for fluorescent images
+     *
      * @param imageServer
      * @return
      */
@@ -784,8 +791,11 @@ public class OmeroRawScripting {
         // get the number of the channels in OMERO
         int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
 
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
         // check if both images has the same number of channels
-        if(omeroNChannels != imageServer.nChannels()){
+        if(omeroNChannels != qpChannels.size()){
             Dialogs.showWarningNotification("Channel settings", "The image on OMERO has not the same number of channels ("+omeroNChannels+" as the one in QuPath ("+imageServer.nChannels()+")");
             return;
         }
@@ -836,6 +846,8 @@ public class OmeroRawScripting {
      * Set the name for each channel on QuPath, based on OMERO settings.
      * Channel indices are taken as reference.
      *
+     * Only works for fluorescent images
+     *
      * @param imageServer
      * @return
      */
@@ -843,8 +855,11 @@ public class OmeroRawScripting {
         // get the number of the channels in OMERO
         List<ChannelData> omeroChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId());
 
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
         // check if both images has the same number of channels
-        if(omeroChannels.size() != imageServer.nChannels()){
+        if(omeroChannels.size() != qpChannels.size()){
             Dialogs.showWarningNotification("Channel settings", "The image on OMERO has not the same number of channels ("+omeroChannels.size()+" as the one in QuPath ("+imageServer.nChannels()+")");
             return;
         }
@@ -866,6 +881,8 @@ public class OmeroRawScripting {
      * Set the minimum and maximum display range value for each channel on OMERO, based on QuPath settings.
      * Channel indices are taken as reference.
      *
+     * Only works for fluorescent images
+     *
      * @param imageServer
      * @return
      */
@@ -882,14 +899,14 @@ public class OmeroRawScripting {
         // get the number of the channels in OMERO
         int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
 
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
         // check if both images has the same number of channels
-        if(omeroNChannels != imageServer.nChannels()){
+        if(omeroNChannels != qpChannels.size()){
             Dialogs.showWarningNotification("OMERO channel settings", "The image on QuPath has not the same number of channels ("+imageServer.nChannels()+" as the one in OMERO ("+omeroNChannels+")");
             return false;
         }
-
-        // get current channels from QuPath
-        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
 
         for(int c = 0; c < imageServer.nChannels(); c++) {
             // get min/max display
@@ -911,9 +928,12 @@ public class OmeroRawScripting {
         return updateImageDisplay && updateThumbnail;
     }
 
+
     /**
      * Set the name for each channel on OMERO, based on QuPath settings.
      * Channel indices are taken as reference.
+     *
+     * Only works for fluorescent images
      *
      * @param imageServer
      * @return
@@ -922,8 +942,11 @@ public class OmeroRawScripting {
         // get the number of the channels in OMERO
         List<ChannelData> omeroChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId());
 
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
         // check if both images has the same number of channels
-        if(omeroChannels.size() != imageServer.nChannels()){
+        if(omeroChannels.size() != qpChannels.size()){ // can use imageServer.nChannels() to get the real number of channel
             Dialogs.showWarningNotification("OMERO channel settings", "The image on QuPath has not the same number of channels ("+imageServer.nChannels()+" as the one in OMERO ("+omeroChannels.size()+")");
             return false;
         }
@@ -945,6 +968,8 @@ public class OmeroRawScripting {
      * Set the color for each channel on OMERO, based on QuPath settings.
      * Channel indices are taken as reference.
      *
+     * Only works for fluorescent images
+     *
      * @param imageServer
      * @return
      */
@@ -961,14 +986,14 @@ public class OmeroRawScripting {
         // get the number of the channels in OMERO
         int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
 
+        // get current channels from QuPath
+        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
+
         // check if both images has the same number of channels
-        if(omeroNChannels != imageServer.nChannels()){
+        if(omeroNChannels != qpChannels.size()){ // can use imageServer.nChannels() to get the real number of channel
             Dialogs.showWarningNotification("OMERO channel settings", "The image on QuPath has not the same number of channels ("+imageServer.nChannels()+" as the one in OMERO ("+omeroNChannels+")");
             return false;
         }
-
-        // get current channels from QuPath
-        ObservableList<ChannelDisplayInfo> qpChannels = QPEx.getQuPath().getViewer().getImageDisplay().availableChannels();
 
         for(int c = 0; c < imageServer.nChannels(); c++) {
             // get min/max display
@@ -987,7 +1012,7 @@ public class OmeroRawScripting {
         boolean updateImageDisplay = OmeroRawTools.updateObjectOnOmero(imageServer.getClient(), renderingSettings);
 
         // update the image thumbnail on OMERO
-        boolean updateThumbnail = OmeroRawTools.updateOmeroThumbnail(imageServer.getClient(),imageServer.getId(),renderingSettings.getId().getValue());
+        boolean updateThumbnail = OmeroRawTools.updateOmeroThumbnail(imageServer.getClient(), imageServer.getId(), renderingSettings.getId().getValue());
 
         return updateImageDisplay && updateThumbnail;
     }
