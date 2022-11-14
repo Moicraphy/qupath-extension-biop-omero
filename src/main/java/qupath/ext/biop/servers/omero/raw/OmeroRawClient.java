@@ -283,7 +283,7 @@ public class OmeroRawClient {
      * @throws DSOutOfServiceException
      * @throws ServerError
      */
-    public void switchGroup(long groupId) throws DSOutOfServiceException, ServerError {
+    public void switchGroup(long groupId)  {
         // check if the user is member of the group
         boolean canUserAccessGroup = OmeroRawTools.getUserOmeroGroups(this, this.loggedInUser.getId().getValue()).stream()
                 .map(ExperimenterGroup::getId)
@@ -292,7 +292,7 @@ public class OmeroRawClient {
                 .anyMatch(e -> e.getValue() == groupId);
 
         // if member, change the group
-        if(canUserAccessGroup || this.isAdminUser)
+        if (canUserAccessGroup || this.isAdminUser)
             this.securityContext = new SecurityContext(groupId);
     }
 

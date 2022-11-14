@@ -93,6 +93,7 @@ public final class OmeroRawTools {
     private final static Pattern patternWebViewer= Pattern.compile("/webclient/img_detail/(\\d+)");
     private final static Pattern patternLinkImage = Pattern.compile("show=image-(\\d+)");
     private final static Pattern patternImgDetail = Pattern.compile("img_detail/(\\d+)");
+    private final static String noImageThumbnail = "NoImage256.png";
     private final static Pattern[] imagePatterns = new Pattern[] {patternOldViewer, patternNewViewer, patternWebViewer, patternImgDetail, patternLinkImage};
 
     /**
@@ -218,17 +219,17 @@ public final class OmeroRawTools {
     }
 
 
-   /* public static long getGroupIdFromImageId(OmeroRawClient client, long imageId){
+    public static long getGroupIdFromImageId(OmeroRawClient client, long imageId){
         try {
-            // query orphaned dataset
+            // query group id of an image
             List<List<RType>> res = client.getGateway().getQueryService(client.getContext()).projection("select i.details.group.id from Image as i " +
                     "where i.id = " + imageId, null);
             System.out.println("res : "+res);
-            // get orphaned dataset ids
+            // get group id
             Collection<Long> ids = res.stream().flatMap(Collection::stream).
                     map(o -> ((RLong) o).getValue()).collect(Collectors.toList());
 
-            // get orphaned datasets
+            // get group id
             return ids.iterator().next();
 
         } catch (DSOutOfServiceException | ServerError | NoSuchElementException e) {
@@ -236,7 +237,7 @@ public final class OmeroRawTools {
             logger.error("" + e);
             return -1;
         }
-    }*/
+    }
 
 
     /**
@@ -767,10 +768,14 @@ public final class OmeroRawTools {
             client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData);
 
             Dialogs.showInfoNotification("ROI deletion","ROIs successfully deleted");
-        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e){
+        } catch (DSOutOfServiceException |  ExecutionException e){
             Dialogs.showErrorMessage("ROI deletion","Could not delete existing ROIs on OMERO.");
             logger.error("" + e);
-            throw new RuntimeException(e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e) {
+            Dialogs.showErrorMessage("ROI deletion", "You don't have the right to delete annotations on the image " + imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
         }
     }
 
@@ -792,12 +797,15 @@ public final class OmeroRawTools {
                 // save ROIs
                 client.getGateway().getFacility(ROIFacility.class).saveROIs(client.getContext(), imageId, client.getGateway().getLoggedInUser().getId(), omeroRois);
                 roiSaved = true;
-            } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
+            } catch (ExecutionException | DSOutOfServiceException e){
                 Dialogs.showErrorMessage("ROI Saving","Error during saving ROIs on OMERO.");
-                logger.error("" + e);
-                throw new RuntimeException(e);
+                logger.error(""+e);
+                logger.error(getErrorStackTraceAsString(e));
+            } catch (DSAccessException e){
+                Dialogs.showErrorMessage("ROI Saving","You don't have the right to write annotations on the image "+imageId);
+                logger.error(""+e);
+                logger.error(getErrorStackTraceAsString(e));
             }
-
         } else {
             Dialogs.showInfoNotification("Upload annotations","There is no Annotations to upload on OMERO");
         }
@@ -1282,9 +1290,9 @@ public final class OmeroRawTools {
         PixelsData pixel;
         try {
             pixel = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels();
-        }catch(ExecutionException | DSOutOfServiceException | DSAccessException e){
+        }catch(ExecutionException | DSOutOfServiceException | DSAccessException | NullPointerException e){
             Dialogs.showErrorMessage( "Error retrieving image and pixels for thumbnail :","" +e);
-            return null;
+            return readLocalImage(noImageThumbnail);
         }
 
         // set the thumbnail size
@@ -1296,35 +1304,53 @@ public final class OmeroRawTools {
         int   width  = (int) (sizeX / ratio);
         int   height = (int) (sizeY / ratio);
 
-        BufferedImage thumbnail = null;
-
         // get rendering settings for the current image
         RenderingDef renderingSettings = readOmeroRenderingSettings(client, imageId);
 
         // get thumbnail
-        byte[] array = null;
+        byte[] array;
         try {
             ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
             store.setPixelsId(pixel.getId());
             store.setRenderingDefId(renderingSettings.getId().getValue());
             array = store.getThumbnail(rint(width), rint(height));
             store.close();
-        } catch (DSOutOfServiceException | ServerError e) {
+        } catch (DSOutOfServiceException | ServerError | NullPointerException e) {
             Dialogs.showErrorMessage( "Error retrieving thumbnail :","" +e);
+            return readLocalImage(noImageThumbnail);
         }
 
         // convert thumbnail into BufferedImage
         if (array != null) {
             try (ByteArrayInputStream stream = new ByteArrayInputStream(array)) {
                 //Create a buffered image to display
-                thumbnail = ImageIO.read(stream);
+                BufferedImage thumbnail = ImageIO.read(stream);
+                if(thumbnail == null)
+                    return readLocalImage(noImageThumbnail);
+                else return thumbnail;
             }catch(IOException e){
                 Dialogs.showErrorMessage( "Error converting thumbnail to bufferedImage :","" +e);
+                return readLocalImage(noImageThumbnail);
             }
         }
-
-        return thumbnail;
+        else return readLocalImage(noImageThumbnail);
     }
+
+
+    /**
+     * read an image stored in the resource folder of the main class
+     *
+     * @param imageName
+     * @return
+     */
+    public static BufferedImage readLocalImage(String imageName){
+        try {
+            return ImageIO.read(OmeroRawTools.class.getClassLoader().getResource("images/"+imageName));
+        }catch(IOException e){
+            return null;
+        }
+    }
+
 
 //	/**
 //	 * Return a list of all {@code OmeroWebClient}s that are using the specified URI (based on their {@code host}).
@@ -1623,4 +1649,7 @@ public final class OmeroRawTools {
         return OmeroRawObjects.OmeroRawObjectType.UNKNOWN;
     }
 
+    public static String getErrorStackTraceAsString(Exception e){
+        return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a,b)->a + "     at "+b+"\n");
+    }
 }

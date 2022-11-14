@@ -716,41 +716,42 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             return new ArrayList<>();
 
         List<OmeroRawObjects.OmeroRawObject> children;
-        try {
-            // If orphaned folder, return all orphaned images
-            if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
-                return orphanedImageList;
 
-            // Read children and populate maps
-            //SecurityContext groupCtx = new SecurityContext(group.getId());
+        // If orphaned folder, return all orphaned images
+        if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
+            return orphanedImageList;
+
+        // switch the client to the current group
+        if(this.client.getContext().getGroupID() != group.getId())
             this.client.switchGroup(group.getId());
-            SecurityContext groupCtx = this.client.getContext();
-            children = OmeroRawBrowserTools.readOmeroObjectsItems(parentObj, this.client, group, owner);
-            children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
-            // If parentObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
-            if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
-                List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawBrowserTools.readOrphanedDatasetsItem(client, group, owner);
-                orphanedDatasets.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
-                children.addAll(orphanedDatasets);
+        // Read children and populate maps
+        children = OmeroRawBrowserTools.readOmeroObjectsItems(parentObj, this.client, group, owner);
+        children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
-                orphanedImageList.addAll(OmeroRawBrowserTools.readOrphanedImagesItem(client, group, owner));
+        // If parentObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
+        if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
+            // read orphaned dataset
+            List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawBrowserTools.readOrphanedDatasetsItem(client, group, owner);
+            orphanedDatasets.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
+            children.addAll(orphanedDatasets);
 
-                if(groupOwnersChildrenMap.containsKey(group))
-                    groupOwnersChildrenMap.get(group).put(owner, children);
-                else {
-                    Map<OmeroRawObjects.Owner, List<OmeroRawObjects.OmeroRawObject>> ownerMap = new HashMap<>();
-                    ownerMap.put(owner, children);
-                    groupOwnersChildrenMap.put(group, ownerMap);
-                }
+            // read orphaned images
+            orphanedImageList.addAll(OmeroRawBrowserTools.readOrphanedImagesItem(client, group, owner));
 
-            } else if (parentObj .getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-                projectMap.put(parentObj, children);
-            } else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
-                datasetMap.put(parentObj, children);
+            // update the list of already loaded items
+            if(groupOwnersChildrenMap.containsKey(group))
+                groupOwnersChildrenMap.get(group).put(owner, children);
+            else {
+                Map<OmeroRawObjects.Owner, List<OmeroRawObjects.OmeroRawObject>> ownerMap = new HashMap<>();
+                ownerMap.put(owner, children);
+                groupOwnersChildrenMap.put(group, ownerMap);
             }
-        } catch (DSOutOfServiceException | ServerError e) {
-            throw new RuntimeException(e);
+
+        } else if (parentObj .getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
+            projectMap.put(parentObj, children);
+        } else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
+            datasetMap.put(parentObj, children);
         }
 
         return children;

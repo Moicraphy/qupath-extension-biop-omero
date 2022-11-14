@@ -53,6 +53,7 @@ import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.*;
@@ -823,7 +824,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			public synchronized RawPixelsStorePrx getReaderForThread( final Long pixelsId,  OmeroRawClient client , SecurityContext ctx) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			public synchronized RawPixelsStorePrx getReaderForThread( final Long pixelsId,  OmeroRawClient client , SecurityContext ctx) throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 
 				LocalReaderWrapper wrapper = localReader.get();
 
@@ -873,7 +874,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			synchronized LocalReaderWrapper createPrimaryReader(final Long pixelsID, IMetadata metadata, OmeroRawClient client) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			synchronized LocalReaderWrapper createPrimaryReader(final Long pixelsID, IMetadata metadata, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException, URISyntaxException {
 				return createReader(pixelsID, metadata == null ? MetadataTools.createOMEXMLMetadata() : metadata, client);
 			}
 
@@ -888,7 +889,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws DependencyException, ServiceException, FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws ServerError, DSOutOfServiceException, URISyntaxException, IOException {
 				/*for (LocalReaderWrapper wrapper : primaryReaders) {
 					if (pixelsID.equals(wrapper.getReader().getPixelsId()))
 						return wrapper;
@@ -907,13 +908,11 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @return the {@code IFormatReader}
 			 * @throws IOException
 			 */
-			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws DSOutOfServiceException, URISyntaxException, MalformedURLException, ServerError {
 				OmeroRawClient currentClient = client;
 
 				// read the image with the current client, connected to the current group
 				ImageData image = OmeroRawTools.readOmeroImage(currentClient,imageID);
-				//long tryyrid = OmeroRawTools.getGroupIdFromImageId(currentClient,imageID);
-				//System.out.println("tryyid : "+tryyrid);
 
 				// if image unreadable, check all groups the current user is part of
 				if(image == null){
@@ -947,7 +946,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				if(image == null && currentClient.getIsAdmin()){
 					OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
 
-					//long groupId = OmeroRawTools.getGroupIdFromImageId(currentClient,imageID);
 					if(sudoClient.sudoConnection(currentClient)) {
 						currentClient.switchGroup(sudoClient.getContext().getGroupID());
 						// read the image
