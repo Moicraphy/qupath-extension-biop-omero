@@ -944,11 +944,9 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 				// if image still unreadable and current user is admin, check all OMERO groups
 				if(image == null && currentClient.getIsAdmin()){
-					OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
-
-					if(sudoClient.sudoConnection(currentClient)) {
-						currentClient.switchGroup(sudoClient.getContext().getGroupID());
-						// read the image
+					long groupId = OmeroRawTools.getGroupIdFromImageId(client, imageID);
+					if(groupId > 0) {
+						currentClient.switchGroup(groupId);
 						image = OmeroRawTools.readOmeroImage(currentClient, imageID);
 					}
 				}

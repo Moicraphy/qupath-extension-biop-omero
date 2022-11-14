@@ -234,19 +234,13 @@ public final class OmeroRawTools {
 
     public static long getGroupIdFromImageId(OmeroRawClient client, long imageId){
         try {
-            // query group id of an image
-            List<List<RType>> res = client.getGateway().getQueryService(client.getContext()).projection("select i.details.group.id from Image as i " +
-                    "where i.id = " + imageId, null);
-            System.out.println("res : "+res);
-            // get group id
-            Collection<Long> ids = res.stream().flatMap(Collection::stream).
-                    map(o -> ((RLong) o).getValue()).collect(Collectors.toList());
+            // request an imageData object for the image id by searching in all groups on OMERO
+            // take care if the user is admin or not
+            ImageData img = (ImageData) client.getGateway().getFacility(BrowseFacility.class).findObject(client.getContext(), "ImageData", imageId, true);
+            return img.getGroupId();
 
-            // get group id
-            return ids.iterator().next();
-
-        } catch (DSOutOfServiceException | ServerError | NoSuchElementException e) {
-            Dialogs.showErrorMessage("Get group id","Cannot retrieved group id from image "+imageId);
+        } catch (DSOutOfServiceException | NoSuchElementException | ExecutionException | DSAccessException e) {
+            Dialogs.showErrorNotification("Get group id","Cannot retrieved group id from image "+imageId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return -1;
