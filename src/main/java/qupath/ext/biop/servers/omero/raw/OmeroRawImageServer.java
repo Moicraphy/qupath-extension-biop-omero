@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.color.ColorModelFactory;
 import qupath.lib.common.ColorTools;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.*;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
@@ -159,7 +160,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		client.addURI(uri);
 	}
 	
-	protected ImageServerMetadata buildMetadata() throws IOException, ServerError, ServiceException, DSOutOfServiceException, DependencyException, ExecutionException, FormatException, DSAccessException, URISyntaxException {
+	protected ImageServerMetadata buildMetadata() throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 
 		long startTime = System.currentTimeMillis();
 
@@ -188,8 +189,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		// There is just one series per image ID
 		synchronized (reader) {
 			String name = meta.getImage().getName();
-
-			//meta.getImage().getDefaultPixels().asPixels().en
 
 			long sizeX = meta.getSizeX();
 			long sizeY = meta.getSizeY();
@@ -395,21 +394,33 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			var resolutionBuilder = new ImageServerMetadata.ImageResolutionLevel.Builder(width, height)
 					.addFullResolutionLevel();
 
+			String imageFormat = OmeroRawTools.readImageFileType(client, imageID);
 			// I have seen czi files where the resolutions are not read correctly & this results in an IndexOutOfBoundsException
 			for (int i = 1; i < nResolutions; i++) {
 				try {
 					int w = resDescriptions[i].sizeX;
 					int h = resDescriptions[i].sizeY;
+
 					if (w <= 0 || h <= 0) {
 						logger.warn("Invalid resolution size {} x {}! Will skip this level, but something seems wrong...", w, h);
 						continue;
 					}
+					// In some VSI images, the calculated downsamples for width & height can be wildly discordant,
+					// and we are better off using defaults
+					if (imageFormat.equals("CellSens")) {
+						double downsampleX = (double)width / w;
+						double downsampleY = (double)height / h;
+						double downsample = Math.pow(2, i);
+
+						if (!GeneralTools.almostTheSame(downsampleX, downsampleY, 0.01)) {
+							logger.warn("Non-matching downsamples calculated for level {} ({} and {}); will use {} instead", i, downsampleX, downsampleY, downsample);
+							resolutionBuilder.addLevel(downsample, w, h);
+							continue;
+						}
+					}
 
 					resolutionBuilder.addLevel(w, h);
-					//logger.warn("found width:{}, found height:{}", w, h);
-
 				} catch (Exception e) {
-
 					logger.warn("Error attempting to extract resolution " + i + " for " + meta.getImage().getName(), e);
 					break;
 				}
@@ -447,10 +458,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				builder.preferredTileSize(tileWidth, tileHeight);
 			originalMetadata = builder.build();
 
-
 			long endTime = System.currentTimeMillis();
 			logger.debug(String.format("Initialization time: %d ms", endTime - startTime));
-
 
 			return builder.build();
 		}
@@ -480,9 +489,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 	@Override
 	protected BufferedImage readTile(TileRequest request) throws IOException {
-
 		int level = request.getLevel();
-
 		int tileX = request.getTileX();
 		int tileY = request.getTileY();
 		int tileWidth = request.getTileWidth();

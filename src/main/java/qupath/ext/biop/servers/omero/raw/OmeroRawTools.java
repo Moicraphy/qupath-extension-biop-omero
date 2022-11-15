@@ -528,6 +528,25 @@ public final class OmeroRawTools {
     }
 
 
+    public static String readImageFileType(OmeroRawClient client, long imageId){
+        try {
+            ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
+            String format = imageData.asImage().getFormat().getValue().getValue();
+            System.out.println("format : "+format);
+            return format;
+        } catch(ExecutionException | DSOutOfServiceException e) {
+            Dialogs.showErrorNotification("Reading OMERO annotations", "Cannot get annotations from OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return "";
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Reading OMERO annotations","You don't have the read annotations on OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return "";
+        }
+    }
+;
     /**
      * Convert a QuPath measurement table to an OMERO table
      *
