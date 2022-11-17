@@ -32,6 +32,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
+import omero.ServerError;
 import omero.gateway.Gateway;
 import omero.gateway.LoginCredentials;
 import omero.gateway.SecurityContext;
@@ -40,6 +41,8 @@ import omero.gateway.exception.DSOutOfServiceException;
 import omero.gateway.facility.AdminFacility;
 import omero.gateway.model.ExperimenterData;
 import omero.log.SimpleLogger;
+import omero.model.Experimenter;
+import omero.model.ExperimenterGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.gui.dialogs.Dialogs;
@@ -52,6 +55,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 /**
  * Class representing an OMERO Web Client. This class takes care of
@@ -69,6 +73,10 @@ public class OmeroRawClient {
 
     // TODO Dfine port in some optional way
     private int port = 4064;
+
+    private boolean isAdminUser = false;
+
+    private Experimenter loggedInUser;
 
     /**
      * List of all URIs supported by this client.
@@ -185,87 +193,44 @@ public class OmeroRawClient {
         this.securityContext = ctx;
         this.gateway = gateway;
 
+        this.isAdminUser = !this.gateway.getAdminService(this.securityContext).getCurrentAdminPrivileges().isEmpty();
+        this.loggedInUser = this.gateway.getLoggedInUser().asExperimenter();
+
         return gateway.isConnected();
     }
 
-    /**
-     * Code adapted from Pierre Pouchin (@ppouchin) from simple-omero-client project
-     * https://github.com/GReD-Clermont/simple-omero-client
-     *
-     * Create a new OmeroRawClient from a given username. You need to have
-     * administrator rights to be allowed to connect as if you were the user defined by the given username.
-     * The new OmeroRawClient has a Security Context corresponding to the username but the Gateway is identical for
-     * both current and sudo OmeroRawClient
-     *
-     * @param currentClient
-     * @return
-     */
-    boolean sudoConnection(OmeroRawClient currentClient) {
-
-        // If the port is unset, use the default one
-        if (serverURI.getPort() != -1) port = serverURI.getPort();
-
-        // get the username
-        String username = getSudoUsername("Enter username");
-
-        // set the gateway as the same as the current OmeroRawClient
-        this.gateway = currentClient.getGateway();
-
-        ExperimenterData sudoUser;
-        // get the OMERO user according to the username
-        try {
-            sudoUser = currentClient.getGateway().getFacility(AdminFacility.class).lookupExperimenter(currentClient.getContext(), username);
-        } catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-            logger.error("Cannot retrieve user: " + username);
-            return false;
-        }
-
-        // create the new security context corresponding to the user
-        if (sudoUser != null) {
-            SecurityContext context = new SecurityContext(sudoUser.getDefaultGroup().getId());
-            context.setExperimenter(sudoUser);
-            context.sudo();
-            this.securityContext = context;
-            this.username = new SimpleStringProperty(username);
-            this.loggedIn = new SimpleBooleanProperty(true);
-        }
-        else
-            this.securityContext = currentClient.getContext();
-
-        return this.gateway.isConnected();
-    }
-
 
     /**
-     * Popup a small window to get the username of the user you want to import an image from, to be able to build
-     * a sudo connection.
+     * switch the current group to another group where the user is also part of
      *
-     * @param prompt
-     * @return the username as a string
+     * @param groupId
+     * @throws DSOutOfServiceException
+     * @throws ServerError
      */
-    private static String getSudoUsername(String prompt) {
-        GridPane pane = new GridPane();
-        javafx.scene.control.Label labUsername = new javafx.scene.control.Label("Username");
-        TextField tfUsername = new TextField("");
-        labUsername.setLabelFor(tfUsername);
+    public void switchGroup(long groupId)  {
+        // check if the user is member of the group
+        boolean canUserAccessGroup = OmeroRawTools.getUserOmeroGroups(this, this.loggedInUser.getId().getValue()).stream()
+                .map(ExperimenterGroup::getId)
+                .collect(Collectors.toList())
+                .stream()
+                .anyMatch(e -> e.getValue() == groupId);
 
-        int row = 0;
-        if (prompt != null && !prompt.isBlank())
-            pane.add(new javafx.scene.control.Label(prompt), 0, row++, 2, 1);
-        pane.add(labUsername, 0, row);
-        pane.add(tfUsername, 1, row);
-
-        pane.setHgap(5);
-        pane.setVgap(5);
-
-        if (!Dialogs.showConfirmDialog("Login Sudo", pane))
-            return null;
-
-        return tfUsername.getText();
+        // if member, change the group
+        if (canUserAccessGroup || this.isAdminUser)
+            this.securityContext = new SecurityContext(groupId);
     }
+
 
     Gateway getGateway() {
         return this.gateway;
+    }
+
+    Experimenter getLoggedInUser() {
+        return this.loggedInUser;
+    }
+
+    boolean getIsAdmin() {
+        return this.isAdminUser;
     }
 
     SecurityContext getContext() { return this.securityContext; }
@@ -390,7 +355,7 @@ public class OmeroRawClient {
             return true;
         } catch (Exception ex) {
             logger.error(ex.getLocalizedMessage());
-            Dialogs.showErrorNotification("OMERO web server", "Could not connect to OMERO raw server.\nCheck the following:\n- Valid credentials.\n- Access permission.\n- Correct URL.");
+            Dialogs.showErrorNotification("OMERO raw server", "Could not connect to OMERO raw server.\nCheck the following:\n- Valid credentials.\n- Access permission.\n- Correct URL.");
         }
         return false;
     }

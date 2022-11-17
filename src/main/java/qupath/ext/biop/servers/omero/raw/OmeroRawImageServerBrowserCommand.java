@@ -166,7 +166,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
     // Browser data 'storage'
    // private List<OmeroRawObject> serverChildrenList;
-    private Map<OmeroRawObjects.Group, List<OmeroRawObjects.OmeroRawObject>>  groupChildrenMap;
+    private Map<OmeroRawObjects.Group, Map<OmeroRawObjects.Owner,List<OmeroRawObjects.OmeroRawObject>>> groupOwnersChildrenMap;
     private ObservableList<OmeroRawObjects.OmeroRawObject> orphanedImageList;
     private Map<OmeroRawObjects.Group, List<OmeroRawObjects.Owner>> groupMap;
     private Map<OmeroRawObjects.OmeroRawObject, List<OmeroRawObjects.OmeroRawObject>> projectMap;
@@ -226,7 +226,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
         // Initialize class variables
         //serverChildrenList = new ArrayList<>();
-        groupChildrenMap = new ConcurrentHashMap<>();
+        groupOwnersChildrenMap = new ConcurrentHashMap<>();
         orphanedImageList = FXCollections.observableArrayList();
         orphanedFolder = new OmeroRawObjects.OrphanedFolder(orphanedImageList);
         currentOrphanedCount = orphanedFolder.getCurrentCountProperty();
@@ -335,14 +335,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         orphanedFolder.setLoading(false);
 
         // Initialises the comboboxes with all the available groups and set select the default group and owner
-        try {
-            groupMap = OmeroRawTools.getAvailableGroups(client);
-            defaultGroup = OmeroRawTools.getDefaultGroup(client);
-            defaultOwner = OmeroRawTools.getDefaultOwner(client);
-            groups=   groupMap.keySet();
-        } catch (DSOutOfServiceException | ServerError e) {
-            throw new RuntimeException(e);
-        }
+        groupMap = OmeroRawBrowserTools.getGroupUsersMapAvailableForCurrentUser(client);
+        defaultGroup = OmeroRawBrowserTools.getDefaultGroupItem(client);
+        defaultOwner = OmeroRawBrowserTools.getDefaultOwnerItem(client);
+        groups=   groupMap.keySet();
+
         comboGroup.getItems().setAll(groups);
         comboGroup.getSelectionModel().select(defaultGroup);
 
@@ -599,16 +596,16 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                         OmeroRawObjects.OmeroRawObject uri = item.getValue();
                         if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
                             //System.out.println("ImportBtn -> objType == project");
-                            var temp = getChildren(uri,comboGroup.getSelectionModel().getSelectedItem());
+                            var temp = getChildren(uri,comboGroup.getSelectionModel().getSelectedItem(), comboOwner.getSelectionModel().getSelectedItem());
                             List<OmeroRawObjects.OmeroRawObject> out = new ArrayList<>();
                             for (var subTemp: temp) {
-                                out.addAll(getChildren(subTemp,comboGroup.getSelectionModel().getSelectedItem()));
+                                out.addAll(getChildren(subTemp,comboGroup.getSelectionModel().getSelectedItem(),comboOwner.getSelectionModel().getSelectedItem()));
                             }
                             return out.parallelStream();
                         } else if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET)
-                            return getChildren(uri, comboGroup.getSelectionModel().getSelectedItem()).parallelStream();
+                            return getChildren(uri, comboGroup.getSelectionModel().getSelectedItem(),comboOwner.getSelectionModel().getSelectedItem()).parallelStream();
                         else if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
-                            return getChildren(uri, comboGroup.getSelectionModel().getSelectedItem()).parallelStream();
+                            return getChildren(uri, comboGroup.getSelectionModel().getSelectedItem(),comboOwner.getSelectionModel().getSelectedItem()).parallelStream();
                         return Stream.of(uri);
                     })
                     .filter(obj -> isSupported(obj))
@@ -696,58 +693,65 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
     }
 
     /**
-     * Return a list of all children of the specified omeroObj, either by requesting them
+     * Return a list of all children of the specified parentObj, either by requesting them
      * to the server or by retrieving the stored value from the maps. If a request was
      * necessary, the value will be stored in the map to avoid future unnecessary computation.
      * <p>
      * No filter is applied to the object's children.
      *
-     * @param omeroObj
-     * @return list of omeroObj's children
+     * @param parentObj
+     * @return list of parentObj's children
      */
-    private List<OmeroRawObjects.OmeroRawObject> getChildren(OmeroRawObjects.OmeroRawObject omeroObj, OmeroRawObjects.Group group) {
+    private List<OmeroRawObjects.OmeroRawObject> getChildren(OmeroRawObjects.OmeroRawObject parentObj, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner) {
         // Check if we already have the children for this OmeroObject (avoid sending request)
-        if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER && groupChildrenMap.containsKey(group))
-            return groupChildrenMap.get(group);
-        else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER && orphanedImageList.size() > 0)
+        if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER && groupOwnersChildrenMap.containsKey(group) && groupOwnersChildrenMap.get(group).containsKey(owner))
+            return groupOwnersChildrenMap.get(group).get(owner);
+        else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER && orphanedImageList.size() > 0)
             return orphanedImageList;
-        else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT && projectMap.containsKey(omeroObj))
-            return projectMap.get(omeroObj);
-        else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET && datasetMap.containsKey(omeroObj))
-            return datasetMap.get(omeroObj);
-        else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.IMAGE)
+        else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT && projectMap.containsKey(parentObj))
+            return projectMap.get(parentObj);
+        else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET && datasetMap.containsKey(parentObj))
+            return datasetMap.get(parentObj);
+        else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.IMAGE)
             return new ArrayList<>();
 
         List<OmeroRawObjects.OmeroRawObject> children;
-        try {
-            // If orphaned folder, return all orphaned images
-            if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
-                return orphanedImageList;
 
-            // Read children and populate maps
-            SecurityContext groupCtx = new SecurityContext(group.getId());
-            children = OmeroRawTools.readOmeroObjects(omeroObj, this.client, groupCtx, group);
-            children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
+        // If orphaned folder, return all orphaned images
+        if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
+            return orphanedImageList;
 
-            // If omeroObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
-            if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
-                List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawTools.readOrphanedDatasets(client, groupCtx);
-                orphanedDatasets.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
-                children.addAll(orphanedDatasets);
+        // switch the client to the current group
+        if(this.client.getContext().getGroupID() != group.getId())
+            this.client.switchGroup(group.getId());
 
-                orphanedImageList.addAll(OmeroRawTools.readOrphanedImages(client, groupCtx));
-                groupChildrenMap.put(group, children);
+        // Read children and populate maps
+        children = OmeroRawBrowserTools.readOmeroObjectsItems(parentObj, this.client, group, owner);
+        children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
-            } else if (omeroObj .getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-                projectMap.put(omeroObj, children);
-            } else if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
-                datasetMap.put(omeroObj, children);
+        // If parentObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
+        if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
+            // read orphaned dataset
+            List<OmeroRawObjects.OmeroRawObject> orphanedDatasets = OmeroRawBrowserTools.readOrphanedDatasetsItem(client, group, owner);
+            orphanedDatasets.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
+            children.addAll(orphanedDatasets);
+
+            // read orphaned images
+            orphanedImageList.addAll(OmeroRawBrowserTools.readOrphanedImagesItem(client, group, owner));
+
+            // update the list of already loaded items
+            if(groupOwnersChildrenMap.containsKey(group))
+                groupOwnersChildrenMap.get(group).put(owner, children);
+            else {
+                Map<OmeroRawObjects.Owner, List<OmeroRawObjects.OmeroRawObject>> ownerMap = new HashMap<>();
+                ownerMap.put(owner, children);
+                groupOwnersChildrenMap.put(group, ownerMap);
             }
-        } catch (IOException e) {
-            logger.error("Could not fetch server information: {}", e.getLocalizedMessage());
-            return new ArrayList<>();
-        } catch (DSOutOfServiceException | ExecutionException | DSAccessException | ServerError e) {
-            throw new RuntimeException(e);
+
+        } else if (parentObj .getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
+            projectMap.put(parentObj, children);
+        } else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
+            datasetMap.put(parentObj, children);
         }
 
         return children;
@@ -1016,6 +1020,36 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         }
     }
 
+    private void updateGroupsComboBox(List<OmeroRawObjects.Group> tempGroups){
+        // If we suddenly found more Groups, update the set (shoudn't happen)
+        if (tempGroups.size() > groups.size()) {
+            groups.clear();
+            groups.addAll(tempGroups);
+            // Update comboBox
+            Platform.runLater(() -> {
+                var selectedItem = comboGroup.getSelectionModel().getSelectedItem();
+                comboGroup.getItems().setAll(groups);
+                if (selectedItem == null)
+                    comboGroup.getSelectionModel().selectFirst();
+                else
+                    comboGroup.getSelectionModel().select(selectedItem);
+            });
+        }
+    }
+
+    private void updateOwnersComboBox(List<OmeroRawObjects.Owner> tempOwners, OmeroRawObjects.Owner currentOwner){
+        if (!tempOwners.containsAll(comboOwner.getItems()) || !comboOwner.getItems().containsAll(tempOwners)) {
+            Platform.runLater(() -> {
+                comboOwner.getItems().setAll(tempOwners);
+                // Attempt not to change the currently selected owner if present in new Owner set
+                if (tempOwners.contains(currentOwner))
+                    comboOwner.getSelectionModel().select(currentOwner);
+                else
+                    comboOwner.getSelectionModel().selectFirst(); // 'All members'
+            });
+        }
+    }
+
 
     /**
      * Display an OMERO object using its name.
@@ -1160,76 +1194,64 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
          */
         @Override
         public ObservableList<TreeItem<OmeroRawObjects.OmeroRawObject>> getChildren() {
-            //System.out.println("I am in OmeroRawObjectTreeItem.getChildren()");
-            //System.out.println("isLeaf : "+isLeaf());
-            //System.out.println("computed : "+computed);
             if (!isLeaf() && !computed) {
-                //System.out.println("Going inside the condition");
                 loadingChildrenLabel.setOpacity(1.0);
                 var filterTemp = filter.getText();
 
                 // If submitting tasks to a shutdown executor, an Exception is thrown
                 if (executorTable.isShutdown()) {
-                    //System.out.println("not good fpr me");
                     loadingChildrenLabel.setOpacity(0);
                     return FXCollections.observableArrayList();
                 }
 
                 executorTable.submit(() -> {
-                    var omeroObj = this.getValue();
+                    var parentOmeroObj = this.getValue();
 
-                    // Get children and populate maps if necessary
+                    // get current groups and owners
                     OmeroRawObjects.Group currentGroup = comboGroup.getSelectionModel().getSelectedItem();
                     OmeroRawObjects.Owner currentOwner = comboOwner.getSelectionModel().getSelectedItem();
+                    List<OmeroRawObjects.OmeroRawObject> children = new ArrayList<>();
 
-                    List<OmeroRawObjects.OmeroRawObject> children = OmeroRawImageServerBrowserCommand.this.getChildren(omeroObj, currentGroup);
+                    if (parentOmeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
+                        // if selected "all members", get data from all owners
+                        if(currentOwner.equals(OmeroRawObjects.Owner.getAllMembersOwner())){
+                            // get all available owners
+                            ObservableList<OmeroRawObjects.Owner> allUsers = comboOwner.getItems();
+                            // remove "all members" owner and get data from others
+                            for(OmeroRawObjects.Owner owner : allUsers.stream().filter(e->!e.equals(currentOwner)).collect(Collectors.toList()))
+                                children.addAll(OmeroRawImageServerBrowserCommand.this.getChildren(parentOmeroObj, currentGroup, owner));
+                        }else
+                            // get data from the selected owner
+                            children = OmeroRawImageServerBrowserCommand.this.getChildren(parentOmeroObj, currentGroup, currentOwner);
 
-                    // If server, update list of groups/owners (and comboBoxes)
-                    if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER) {
-                        // Fetch ALL Groups and ALL Owners
-                        Map<OmeroRawObjects.Group, List<OmeroRawObjects.Owner>> tempMap = OmeroRawTools.getAvailableGroups(client);
-                        List<OmeroRawObjects.Group> tempGroups = new ArrayList<>(tempMap.keySet());
-                        List<OmeroRawObjects.Owner> tempOwners = new ArrayList<>(tempMap.get(currentGroup));
+                        // get all group/owners maps
+                        Map<OmeroRawObjects.Group, List<OmeroRawObjects.Owner>> newGroupOwnersMap = OmeroRawBrowserTools.getGroupUsersMapAvailableForCurrentUser(client);
 
-                        // If we suddenly found more Groups, update the set (shoudn't happen)
-                        if (tempGroups.size() > groups.size()) {
-                            groups.clear();
-                            groups.addAll(tempGroups);
-                            // Update comboBox
-                            Platform.runLater(() -> {
-                                var selectedItem = comboGroup.getSelectionModel().getSelectedItem();
-                                comboGroup.getItems().setAll(groups);
-                                if (selectedItem == null)
-                                    comboGroup.getSelectionModel().selectFirst();
-                                else
-                                    comboGroup.getSelectionModel().select(selectedItem);
-                            });
-                        }
-                        // First 'Owner' is always 'All members'
-                        tempOwners.add(0, OmeroRawObjects.Owner.getAllMembersOwner());
-                        if (!tempOwners.containsAll(comboOwner.getItems()) || !comboOwner.getItems().containsAll(tempOwners)) {
-                            Platform.runLater(() -> {
-                                comboOwner.getItems().setAll(tempOwners);
-                                // Attempt not to change the currently selected owner if present in new Owner set
-                                if (tempOwners.contains(currentOwner))
-                                    comboOwner.getSelectionModel().select(currentOwner);
-                                else
-                                    comboOwner.getSelectionModel().selectFirst(); // 'All members'
-                            });
-                        }
+                        // update groups comboBox
+                        List<OmeroRawObjects.Group> newGroups = new ArrayList<>(newGroupOwnersMap.keySet()); // do nat add "All groups" => make no sense
+                        OmeroRawImageServerBrowserCommand.this.updateGroupsComboBox(newGroups);
+
+                        // update owners comboBox
+                        List<OmeroRawObjects.Owner> newOwners = new ArrayList<>(newGroupOwnersMap.get(currentGroup));
+                        newOwners.add(0, OmeroRawObjects.Owner.getAllMembersOwner());  // add 'All members' on the top of the list
+                        OmeroRawImageServerBrowserCommand.this.updateOwnersComboBox(newOwners,currentOwner);
+
                         if (owners.size() == 1)
-                            owners = new HashSet<>(tempOwners);
+                            owners = new HashSet<>(newOwners);
+
+                    }else if (parentOmeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER) {
+                        children = orphanedImageList;
+                    } else {
+                        children = OmeroRawImageServerBrowserCommand.this.getChildren(parentOmeroObj, currentGroup, parentOmeroObj.getOwner());
                     }
 
-                    if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
-                        children = orphanedImageList;
-
+                    // convert children into Java Tree items
                     var items = filterList(children, comboGroup.getSelectionModel().getSelectedItem(), comboOwner.getSelectionModel().getSelectedItem(), filterTemp).stream()
-                            .map(e -> new OmeroRawObjectTreeItem(e))
+                            .map(OmeroRawObjectTreeItem::new)
                             .collect(Collectors.toList());
 
-                    // Add an 'Orphaned Images' item to the server's children
-                    if (omeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER && (filter == null || filterTemp.isEmpty()))
+                    // Add an 'Orphaned Images' tree item to the server's children
+                    if (parentOmeroObj.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER && (filter == null || filterTemp.isEmpty()))
                         items.add(new OmeroRawObjectTreeItem(orphanedFolder));
 
                     Platform.runLater(() -> {
@@ -1241,7 +1263,6 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     return super.getChildren();
                 });
             }
-
             return super.getChildren();
         }
 
@@ -1282,12 +1303,12 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
         private AdvancedObjectInfo(OmeroRawObjects.OmeroRawObject obj) {
             this.obj = obj;
-            this.tags = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.TAG);
-            this.keyValuePairs = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.MAP);
+            this.tags = OmeroRawBrowserTools.readAnnotationsItems(client, obj, OmeroRawAnnotationType.TAG);
+            this.keyValuePairs = OmeroRawBrowserTools.readAnnotationsItems(client, obj, OmeroRawAnnotationType.MAP);
 //			this.tables = OmeroRawTools.getOmeroAnnotations(client, obj, OmeroRawAnnotationType.TABLE);
-            this.attachments = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.ATTACHMENT);
-            this.comments = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.COMMENT);
-            this.ratings = OmeroRawTools.readOmeroAnnotations(client, obj, OmeroRawAnnotationType.RATING);
+            this.attachments = OmeroRawBrowserTools.readAnnotationsItems(client, obj, OmeroRawAnnotationType.ATTACHMENT);
+            this.comments = OmeroRawBrowserTools.readAnnotationsItems(client, obj, OmeroRawAnnotationType.COMMENT);
+            this.ratings = OmeroRawBrowserTools.readAnnotationsItems(client, obj, OmeroRawAnnotationType.RATING);
 //			this.others = OmeroRawTools.getOmeroAnnotations(client, obj, OmeroRawAnnotationType.CUSTOM);
 
             showOmeroObjectInfo();
@@ -1587,11 +1608,8 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             groupCombo.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
                 Platform.runLater(() -> {
                     Map<OmeroRawObjects.Group, List<OmeroRawObjects.Owner>> tempMap = null;
-                    try {
-                        tempMap = OmeroRawTools.getAvailableGroups(client);
-                    } catch (DSOutOfServiceException | ServerError e) {
-                        throw new RuntimeException(e);
-                    }
+                    tempMap = OmeroRawBrowserTools.getGroupUsersMapAvailableForCurrentUser(client);
+
                     var tempOwners = new ArrayList<>(tempMap.get(groupCombo.getSelectionModel().getSelectedItem()));
                     tempOwners.add(0, OmeroRawObjects.Owner.getAllMembersOwner());
                     if (!tempOwners.containsAll(ownedByCombo.getItems()) || !ownedByCombo.getItems().containsAll(tempOwners)) {

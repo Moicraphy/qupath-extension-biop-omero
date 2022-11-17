@@ -21,15 +21,11 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.GridPane;
 import loci.common.DataTools;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
 import loci.formats.FormatException;
 import loci.formats.MetadataTools;
-import loci.formats.gui.AWTImageTools;
 import loci.formats.meta.IMetadata;
 import loci.formats.meta.MetadataStore;
 import omero.ServerError;
@@ -38,43 +34,27 @@ import omero.api.ResolutionDescription;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.AdminFacility;
 import omero.gateway.facility.BrowseFacility;
 import omero.gateway.facility.MetadataFacility;
-import omero.gateway.facility.ROIFacility;
 import omero.gateway.model.*;
 import omero.model.*;
-import omero.model.Label;
-import omero.model.Point;
-import omero.model.Polygon;
-import omero.model.Rectangle;
-import omero.model.Shape;
 import omero.model.enums.UnitsLength;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.color.ColorModelFactory;
 import qupath.lib.common.ColorTools;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.*;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
-import qupath.lib.objects.PathObjects;
-import qupath.lib.objects.classes.PathClassFactory;
-import qupath.lib.regions.ImagePlane;
-import qupath.lib.roi.ROIs;
-import qupath.lib.roi.RoiTools;
-import qupath.lib.roi.interfaces.ROI;
-
-import java.awt.*;
-import java.awt.geom.Area;
-import java.awt.geom.Point2D;
 
 import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
-import java.net.PasswordAuthentication;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.*;
@@ -85,9 +65,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static fr.igred.omero.exception.ExceptionHandler.handleServiceOrAccess;
 
 /**
  * ImageServer that reads pixels using the OMERO web API.
@@ -183,7 +160,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		client.addURI(uri);
 	}
 	
-	protected ImageServerMetadata buildMetadata() throws IOException, ServerError, ServiceException, DSOutOfServiceException, DependencyException, ExecutionException, FormatException, DSAccessException, URISyntaxException {
+	protected ImageServerMetadata buildMetadata() throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 
 		long startTime = System.currentTimeMillis();
 
@@ -212,8 +189,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		// There is just one series per image ID
 		synchronized (reader) {
 			String name = meta.getImage().getName();
-
-			//meta.getImage().getDefaultPixels().asPixels().en
 
 			long sizeX = meta.getSizeX();
 			long sizeY = meta.getSizeY();
@@ -307,8 +282,6 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			} else if (pixelType.isUnsignedInteger()) {
 				maxValue = (int) (Math.pow(2, bpp) - 1);
 			}
-			/*System.out.println("minValue : "+minValue);
-			System.out.println("maxValue : "+maxValue);*/
 
 			// Try to read the default display colors for each channel from the file
 			List<ChannelData> channelMetadata = client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(), imageID);
@@ -421,21 +394,33 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			var resolutionBuilder = new ImageServerMetadata.ImageResolutionLevel.Builder(width, height)
 					.addFullResolutionLevel();
 
+			String imageFormat = OmeroRawTools.readImageFileType(client, imageID);
 			// I have seen czi files where the resolutions are not read correctly & this results in an IndexOutOfBoundsException
 			for (int i = 1; i < nResolutions; i++) {
 				try {
 					int w = resDescriptions[i].sizeX;
 					int h = resDescriptions[i].sizeY;
+
 					if (w <= 0 || h <= 0) {
 						logger.warn("Invalid resolution size {} x {}! Will skip this level, but something seems wrong...", w, h);
 						continue;
 					}
+					// In some VSI images, the calculated downsamples for width & height can be wildly discordant,
+					// and we are better off using defaults
+					if (imageFormat.equals("CellSens")) {
+						double downsampleX = (double)width / w;
+						double downsampleY = (double)height / h;
+						double downsample = Math.pow(2, i);
+
+						if (!GeneralTools.almostTheSame(downsampleX, downsampleY, 0.01)) {
+							logger.warn("Non-matching downsamples calculated for level {} ({} and {}); will use {} instead", i, downsampleX, downsampleY, downsample);
+							resolutionBuilder.addLevel(downsample, w, h);
+							continue;
+						}
+					}
 
 					resolutionBuilder.addLevel(w, h);
-					//logger.warn("found width:{}, found height:{}", w, h);
-
 				} catch (Exception e) {
-
 					logger.warn("Error attempting to extract resolution " + i + " for " + meta.getImage().getName(), e);
 					break;
 				}
@@ -473,10 +458,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				builder.preferredTileSize(tileWidth, tileHeight);
 			originalMetadata = builder.build();
 
-
 			long endTime = System.currentTimeMillis();
 			logger.debug(String.format("Initialization time: %d ms", endTime - startTime));
-
 
 			return builder.build();
 		}
@@ -506,9 +489,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 
 	@Override
 	protected BufferedImage readTile(TileRequest request) throws IOException {
-
 		int level = request.getLevel();
-
 		int tileX = request.getTileX();
 		int tileY = request.getTileY();
 		int tileWidth = request.getTileWidth();
@@ -779,343 +760,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 */
 	@Override
 	public Collection<PathObject> readPathObjects() {
-		List<ROIResult> roiList;
 
-		// get ROIs from OMERO.web
-		try {
-			roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageID);
-		} catch (DSOutOfServiceException | DSAccessException | ExecutionException e) {
-			throw new RuntimeException(e);
-		}
-
-		if(roiList == null || roiList.isEmpty())
-			return new ArrayList<>();
-
-		// Convert them into ROIData
-		List<ROIData> roiData = new ArrayList<>();
-		for (ROIResult roiResult : roiList) {
-			roiData.addAll(roiResult.getROIs());
-		}
+		List<ROIData> roiData = OmeroRawTools.readOmeroROIs(this.getClient(), this.imageID);
 
 		if(roiData.isEmpty())
 			return new ArrayList<>();
 
-		Map<Double,Double> idParentIdMap = new HashMap<>();
-		Map<Double,PathObject> idObjectMap = new HashMap<>();
-
-		for (ROIData roiDatum : roiData) {
-			// get the type and assigned class from OMERO ROIs
-			String[] roiComment = getROIComment(roiDatum);
-			// convert OMERO ROIs to QuPath ROIs
-			ROI finalROI = roiConversion(roiDatum);
-			// get the roi color
-			Color color = Color.WHITE;
-			if(roiDatum.getShapeCount() > 0)
-				color = roiDatum.getShapes().iterator().next().getShapeSettings().getStroke();
-
-			// because Yellow in QuPath is reserved to show which annotation is selected.
-			if(color.equals(Color.YELLOW))
-				color = Color.RED;
-
-			// convert QuPath ROI to QuPath Annotation or detection Object (according to type).
-			idObjectMap.put(Double.parseDouble(roiComment[2]),createPathObjectFromRoi(finalROI, roiComment[0], roiComment[1], color));
-			// populate parent map
-			double parentID = Double.parseDouble(roiComment[3]);
-			idParentIdMap.put(Double.parseDouble(roiComment[2]),parentID);
-		}
-
-		// set the parent/child hierarchy and add objects without any parent to the final list
-		List<PathObject> list = new ArrayList<>();
-
-		idParentIdMap.keySet().forEach(objID->{
-			if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID))==null)){
-				idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
-			}else
-				list.add(idObjectMap.get(objID));
-		});
-
-		return list;
-	}
-
-
-	/**
-	 * Create an annotation or a detection PathObject with a certain PathClass
-	 *
-	 * @param roi
-	 * @param roiType
-	 * @param roiClass
-	 * @return
-	 */
-	private static PathObject createPathObjectFromRoi(ROI roi, String roiType, String roiClass, Color color){
-		PathObject pathObject;
-		if (roiType.equals("Detection")) {
-			if (roiClass.equals("NoClass"))
-				pathObject = PathObjects.createDetectionObject(roi);
-			else
-				pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
-		} else {
-			if (roiClass.equals("NoClass"))
-				pathObject = PathObjects.createAnnotationObject(roi);
-			else
-				pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
-		}
-
-		pathObject.setColorRGB(color.getRGB());
-		return pathObject;
-	}
-
-
-	/**
-	 * convert Omero ROIs To QuPath ROIs.
-	 * For annotations, takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality.
-	 * For detections, no complex ROIs are possible. So, each shape = one ROI
-	 *
-	 * @param roiDatum
-	 * @return
-	 */
-	private static ROI roiConversion(ROIData roiDatum) {
-		// Convert OMERO ROIs into QuPath ROIs
-		List<ROI> roi = convertOmeroROIsToQuPathROIs(roiDatum);
-
-		if (!roi.isEmpty()) {
-			// get the number of ROI "Point" in all shapes attached the current ROI
-			// Points are not supported during the XOR operation ; they are processed differently.
-			long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
-			ROI finalROI = roi.get(0);
-
-			// process ROIs with multiple points only
-			if (nbPoints == roi.size() && roi.size() > 1) {
-				// create a pointsROI instance with multiple points
-				finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
-						roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
-						ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
-			}
-
-			// Process ROIs with multiple shapes, containing one or more points
-			else if (nbPoints > 0 && roi.size() > 1) {
-				List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
-				List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
-
-				// create a pointsROI instance with multiple points
-				ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
-						pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
-						ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
-
-				// make a complex roi by applying XOR operation between shapes
-				finalROI = notPointsList.get(0);
-				for (int k = 1; k < notPointsList.size(); k++) {
-					finalROI = linkShapes(finalROI, notPointsList.get(k));
-				}
-
-				// make the union between points and complex ROI
-				finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
-			}
-
-			// Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
-			else {
-				for (int k = 1; k < roi.size(); k++) {
-					// make a complex roi by applying XOR operation between shapes
-					finalROI = linkShapes(finalROI, roi.get(k));
-				}
-			}
-			return finalROI;
-		}
-		return null;
-	}
-
-	/**
-	 * convert Omero ROIs To QuPath ROIs.
-	 *
-	 * *********************** BE CAREFUL *****************************
-	 * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
-	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
-	 * ****************************************************************
-	 *
-	 * @param roiData
-	 * @return list of QuPath ROIs
-	 */
-	private static List<ROI> convertOmeroROIsToQuPathROIs(ROIData roiData){
-		// get the ROI
-		Roi omeROI = (Roi) roiData.asIObject();
-
-		// get the shapes contained in the ROI (i.e. holes or something else)
-		List<Shape> shapes = omeROI.copyShapes();
-		List<ROI> list = new ArrayList<>();
-
-		// Iterate on shapes, select the correct instance and create the corresponding QuPath ROI
-		for (Shape shape:shapes) {
-
-			if(shape instanceof Rectangle){
-				RectangleData s = new RectangleData(shape);
-				list.add(ROIs.createRectangleROI(s.getX(),s.getY(),s.getWidth(),s.getHeight(),ImagePlane.getPlaneWithChannel(s.getC(), Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Ellipse){
-				EllipseData s = new EllipseData(shape);
-				list.add(ROIs.createEllipseROI(s.getX()-s.getRadiusX(),s.getY()-s.getRadiusY(),s.getRadiusX()*2, s.getRadiusY()*2,ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Point){
-				PointData s = new PointData(shape);
-				list.add(ROIs.createPointsROI(s.getX(),s.getY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Polyline){
-				PolylineData s = new PolylineData(shape);
-				list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
-												s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
-												ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-
-			}else if(shape instanceof Polygon){
-				PolygonData s = new PolygonData(shape);
-				list.add(ROIs.createPolygonROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
-											   s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
-											   ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Label){
-				logger.warn("No ROIs created (requested label shape is unsupported)");
-				//s=new TextData(shape);
-
-			}else if(shape instanceof Line){
-				LineData s = new LineData(shape);
-				list.add(ROIs.createLineROI(s.getX1(),s.getY1(),s.getX2(),s.getY2(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
-			}else if(shape instanceof Mask){
-				logger.warn("No ROIs created (requested Mask shape is not supported yet)");
-				//s=new MaskData(shape);
-			}else{
-				logger.warn("Unsupported shape ");
-			}
-		}
-
-		return list;
-	}
-
-
-	/**
-	 * Output the ROI result of the XOR operation between the 2 input ROIs
-	 *
-	 * 	 * *********************** BE CAREFUL *****************************
-	 * 	 * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
-	 * 	 * the new composite ROI are set on the lowest c/z/t plane
-	 * 	 * ****************************************************************
-	 *
-	 * @param roi1
-	 * @param roi2
-	 * @return ROI resulting of the XOR operation
-	 */
-	private static ROI linkShapes(ROI roi1, ROI roi2){
-		// get the area of the first roi
-		Area a1 = new Area(roi1.getShape());
-
-		// get the area of the second roi
-		Area a2 = new Area(roi2.getShape());
-
-		// Apply a xor operation on both area to combine them (ex. make a hole)
-		a1.exclusiveOr(a2);
-
-		// get the area of the newly created area
-		java.awt.Rectangle r = a1.getBounds();
-
-		// Assign the new ROI to the lowest valid plan of the stack
-		return ROIs.createAreaROI(a1, ImagePlane.getPlaneWithChannel(Math.min(roi1.getC(), roi2.getC()),
-																	 Math.min(roi1.getZ(), roi2.getZ()),
-																	 Math.min(roi1.getT(), roi2.getT())));
-	}
-
-	/**
-	 * Read the comment attach to the current ROI in OMERO. If the ROI has more than one shape, the first comment is
-	 * taken as reference. A warning is displayed to the user because all comments in the nested hierarchy should be
-	 * the same.
-	 *
-	 * @param roiData
-	 * @return list of QuPath ROIs
-	 */
-	private static String[] getROIComment(ROIData roiData){
-		// get the ROI
-		Roi omeROI = (Roi) roiData.asIObject();
-
-		// get the shapes contained in the ROI (i.e. holes or something else)
-		List<Shape> shapes = omeROI.copyShapes();
-		List<String> list = new ArrayList<>();
-
-		// Iterate on shapes, select the correct instance and get the comment attached to it.
-		for (Shape shape:shapes) {
-			if(shape instanceof Rectangle){
-				RectangleData s = new RectangleData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Ellipse){
-				EllipseData s = new EllipseData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Point){
-				PointData s = new PointData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Polyline){
-				PolylineData s = new PolylineData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Polygon){
-				PolygonData s = new PolygonData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Label){
-				logger.warn("No ROIs created (requested label shape is unsupported)");
-				//s=new TextData(shape);
-			}else if(shape instanceof Line){
-				LineData s = new LineData(shape);
-				list.add(s.getText());
-			}else if(shape instanceof Mask){
-				logger.warn("No ROIs created (requested Mask shape is not supported yet)");
-				//s=new MaskData(shape);
-			}else{
-				logger.warn("Unsupported shape ");
-			}
-		}
-
-		// get the first comment
-		String pathClass = "";
-		if(!list.isEmpty()) {
-			pathClass = list.get(0);
-			for (int i = 0; i < list.size() - 1; i++) {
-				if (!(list.get(i).equals(list.get(i + 1)))) {
-					logger.warn("Different classes are set for two shapes link to the same parent");
-					logger.warn("The following class will be assigned for all child object -> "+pathClass);
-				}
-			}
-		}
-
-		String roiClass = "NoClass";
-		String roiType = "Annotation";
-		String roiParent =  "0";
-		String roiID =  "-"+roiData.hashCode();
-
-		// Parse the string and get object information
-		String[] tokens = (pathClass.isBlank() || pathClass.isEmpty()) ? null : pathClass.split(":");
-		if(tokens== null)
-			return new String[]{roiType, roiClass, roiID, roiParent};
-
-		if (tokens.length > 0)
-			if (tokens[0].equals("Detection") || tokens[0].equals("detection"))
-				roiType = "Detection";
-
-		if(tokens.length > 1)
-			roiClass = tokens[1];
-
-		if(tokens.length > 2) {
-			try {
-				Double.parseDouble(tokens[2]);
-				roiID = tokens[2];
-			} catch (NumberFormatException e) {
-				roiID = "-"+roiData.hashCode();
-			}
-		}
-
-		if(tokens.length > 3) {
-			try {
-				Double.parseDouble(tokens[3]);
-				roiParent = tokens[3];
-			} catch (NumberFormatException e) {
-				roiParent = "0";
-			}
-		}
-
-		return new String[]{roiType, roiClass, roiID, roiParent};
+		return OmeroRawTools.createPathObjectsFromOmeroROIs(roiData);
 	}
 
 
@@ -1180,7 +831,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			public synchronized RawPixelsStorePrx getReaderForThread( final Long pixelsId,  OmeroRawClient client , SecurityContext ctx) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			public synchronized RawPixelsStorePrx getReaderForThread( final Long pixelsId,  OmeroRawClient client , SecurityContext ctx) throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 
 				LocalReaderWrapper wrapper = localReader.get();
 
@@ -1230,7 +881,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			synchronized LocalReaderWrapper createPrimaryReader(final Long pixelsID, IMetadata metadata, OmeroRawClient client) throws FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			synchronized LocalReaderWrapper createPrimaryReader(final Long pixelsID, IMetadata metadata, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException, URISyntaxException {
 				return createReader(pixelsID, metadata == null ? MetadataTools.createOMEXMLMetadata() : metadata, client);
 			}
 
@@ -1245,7 +896,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws FormatException
 			 * @throws IOException
 			 */
-			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws DependencyException, ServiceException, FormatException, IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
+			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws ServerError, DSOutOfServiceException, URISyntaxException, IOException {
 				/*for (LocalReaderWrapper wrapper : primaryReaders) {
 					if (pixelsID.equals(wrapper.getReader().getPixelsId()))
 						return wrapper;
@@ -1264,48 +915,46 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @return the {@code IFormatReader}
 			 * @throws IOException
 			 */
-			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
-				BrowseFacility browse = client.getGateway().getFacility(BrowseFacility.class);
-				ImageData image = null;
+			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws DSOutOfServiceException, URISyntaxException, MalformedURLException, ServerError {
 				OmeroRawClient currentClient = client;
 
-				// first, try to access the image with the main OmeroRawClient
-				try {
-					image = browse.getImage(currentClient.getContext(), imageID);
-				}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e){
-					// if the main OmeroRawClient could not access the image, check if the user has admin rights
-					if(!client.getGateway().getAdminService(client.getContext()).getCurrentAdminPrivileges().isEmpty()) {
+				// read the image with the current client, connected to the current group
+				ImageData image = OmeroRawTools.readOmeroImage(currentClient,imageID);
 
-						List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
-						boolean canConnectWithOtherClients = false;
+				// if image unreadable, check all groups the current user is part of
+				if(image == null){
+					List<ExperimenterGroup> availableGroups = OmeroRawTools.getUserOmeroGroups(currentClient, currentClient.getLoggedInUser().getId().getValue());
+					for(ExperimenterGroup group:availableGroups){
+						// switch the user to another group
+						currentClient.switchGroup(group.getId().getValue());
 
-						// browse in the list of opened OmeroRawClients and try to find one that can open the image
-						for(OmeroRawClient cli:otherClients){
-							try{
-								image = browse.getImage(cli.getContext(), imageID);
-								canConnectWithOtherClients = true;
-								currentClient = cli;
-								break;
-							}catch (DSOutOfServiceException | DSAccessException | NoSuchElementException e1){
+						// read the image
+						image = OmeroRawTools.readOmeroImage(currentClient,imageID);
+						if(image != null)
+							break;
+					}
+				}
 
-							}
+				// if image unreadable, check all other open clients
+				if(image == null){
+					// get opened clients
+					List<OmeroRawClient> otherClients = OmeroRawClients.getAllClients().stream().filter(c -> !c.equals(client)).collect(Collectors.toList());
+					for (OmeroRawClient cli : otherClients) {
+						// read the image
+						image = OmeroRawTools.readOmeroImage(cli, imageID);
+						if(image != null) {
+							currentClient = cli;
+							break;
 						}
+					}
+				}
 
-						// if none of clients can open, ask for a sudo connection
-						if (!canConnectWithOtherClients) {
-							// create a new OmeroRawClient
-							OmeroRawClient sudoClient = OmeroRawClient.create(client.getServerURI());
-							if(sudoClient.sudoConnection(client)){
-								image = browse.getImage(sudoClient.getContext(), imageID);
-								currentClient = sudoClient;
-								OmeroRawClients.addClient(sudoClient);
-							}else
-								return null;
-						}
-					}else{
-						// user does not have admin rights
-						logger.error("You do not have access to this image because it is part of another group");
-						throw new RuntimeException(e);
+				// if image still unreadable and current user is admin, check all OMERO groups
+				if(image == null && currentClient.getIsAdmin()){
+					long groupId = OmeroRawTools.getGroupIdFromImageId(client, imageID);
+					if(groupId > 0) {
+						currentClient.switchGroup(groupId);
+						image = OmeroRawTools.readOmeroImage(currentClient, imageID);
 					}
 				}
 
@@ -1316,8 +965,11 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 					rawPixStore.setPixelsId(pixelData.getId(), false);
 					return new LocalReaderWrapper(rawPixStore, pixelData, currentClient);
 				}
-				else
+				else {
+					// user does not have admin rights
+					Dialogs.showErrorMessage("Load image","You do not have access to this image because it is part of a group / user you do not have access to");
 					return null;
+				}
 			}
 
 			/**

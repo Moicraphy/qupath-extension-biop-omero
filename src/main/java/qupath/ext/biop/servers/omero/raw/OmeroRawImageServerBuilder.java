@@ -43,36 +43,16 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
     private String equalSign = "%3D";
     private String vertBarSign = "%7C";
 
-    /*
-           private boolean canConnectToOmero(URI uri, String... args) {
-               try {
-                   var serverUri = OmeroRawTools.getServerURI(uri);
-
-                   if (supportLevel(uri) <= 0) {
-                       logger.debug("OMERO web server does not support {}", uri);
-                       return false;
-                   }
-                   var client = OmeroRawClients.getClientFromServerURI(serverUri);
-
-                   return client.logIn(args);
-
-               } catch (Exception e) {
-                   Dialogs.showErrorMessage("Omero raw server", "Could not connect to OMERO raw server.\nCheck the following:\n- Valid credentials.\n- Access permission.\n- Correct URL.");
-               }
-               return false;
-           }
-   */
     static boolean canConnectToOmero(URI uri, String... args) {
         try {
 
-           // System.out.println(Thread.currentThread()+"\t supportLevel :"+supportLevel(uri));
             if (supportLevel(uri) <= 0) {
                 logger.debug("OMERO raw server does not support {}", uri);
                 return false;
             }
 
             var serverUri = OmeroRawTools.getServerURI(uri);
-           // System.out.println("serverURI" + serverUri);
+
             if (serverUri == null)
                 return false;
 
@@ -81,20 +61,19 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
                 client = OmeroRawClient.create(serverUri);
                 client.logIn(args);
             }
-           // System.out.println("client.isLoggedIn()" + client.isLoggedIn());
+
             if (!client.isLoggedIn())
                 return false;
 
             // Add the client to the list (but not URI yet!)
             OmeroRawClients.addClient(client);
-           // System.out.println("client is added");
             return true;
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (URISyntaxException e) {
             e.printStackTrace();
         }
-       // System.out.println("Something went wrong ");
+
         return false;
 
     }

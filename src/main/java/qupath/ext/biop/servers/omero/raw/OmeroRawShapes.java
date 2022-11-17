@@ -22,6 +22,8 @@ package qupath.ext.biop.servers.omero.raw;
  */
 
 
+import java.awt.Color;
+import java.awt.geom.Area;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,13 +31,17 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import omero.gateway.model.ShapeData;
+import omero.model.*;
 import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import qupath.lib.geom.Point2;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
+import qupath.lib.objects.classes.PathClassFactory;
+import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.*;
 import qupath.lib.roi.interfaces.ROI;
 
@@ -44,6 +50,238 @@ import omero.gateway.model.*;
 class OmeroRawShapes {
 
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawShapes.class);
+
+
+    /**
+     * Create a PathObject with of certain type (annotation, detection,...)
+     * with no class and the default red color
+     *
+     * @param roi
+     * @param roiType
+     * @return
+     */
+    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType){
+        return createPathObjectFromQuPathRoi(roi, roiType,"");
+    }
+
+    /**
+     * Create a PathObject with of certain type (annotation, detection,...)
+     * with a certain color and without any class
+     *
+     * @param roi
+     * @param roiType
+     * @return
+     */
+    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, Color color){
+        PathObject pathObject = createPathObjectFromQuPathRoi(roi, roiType, "");
+
+        // check if the color is not the default color (yellow) for selected objects
+        if(color == null || color.equals(Color.YELLOW))
+            pathObject.setColorRGB(Color.RED.getRGB());
+        else pathObject.setColorRGB(color.getRGB());
+
+        return pathObject;
+    }
+
+
+    /**
+     * Create a PathObject with of type annotation or detection
+     * with the specified class and the color associated to the class.
+     *
+     * Currently, pathObjects of "cell" type are not supported and are considered as detections.
+     * All pathObjects of other type are automatically assigned to annotation type.
+     *
+     * @param roi
+     * @param roiType
+     * @param roiClass
+     * @return
+     */
+    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass){
+        PathObject pathObject;
+        boolean isValidClass = !(roiClass == null || roiClass.isEmpty() || roiClass.equalsIgnoreCase("noclass"));
+
+        switch(roiType.toLowerCase()){
+            case "cell": roiType = "detection";
+            case "detection":
+                if (!isValidClass)
+                    pathObject = PathObjects.createDetectionObject(roi);
+                else
+                    pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
+                break;
+            case "annotation":
+            default:
+                if (!isValidClass)
+                    pathObject = PathObjects.createAnnotationObject(roi);
+                else
+                    pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
+                break;
+        }
+
+        if(!isValidClass)
+            pathObject.setColorRGB(Color.RED.getRGB());
+
+        return pathObject;
+    }
+
+
+    /**
+     * convert Omero ROIs To QuPath ROIs.
+     * For annotations, takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality.
+     * For detections, no complex ROIs are possible. So, each shape = one ROI
+     *
+     * @param roiDatum
+     * @return
+     */
+    public static ROI convertOmeroROIsToQuPathROIs(ROIData roiDatum) {
+        // Convert OMERO ROIs into QuPath ROIs
+        List<ROI> roi = convertOmeroShapesToQuPathROIs(roiDatum);
+
+        if (!roi.isEmpty()) {
+            // get the number of ROI "Point" in all shapes attached the current ROI
+            // Points are not supported during the XOR operation ; they are processed differently.
+            long nbPoints = roi.stream().filter(e -> e.getRoiName().equals("Points")).count();
+            ROI finalROI = roi.get(0);
+
+            // process ROIs with multiple points only
+            if (nbPoints == roi.size() && roi.size() > 1) {
+                // create a pointsROI instance with multiple points
+                finalROI = ROIs.createPointsROI(roi.stream().mapToDouble(ROI::getCentroidX).toArray(),
+                        roi.stream().mapToDouble(ROI::getCentroidY).toArray(),
+                        ImagePlane.getPlaneWithChannel(roi.get(0).getC(), Math.max(roi.get(0).getZ(), 0), Math.max(roi.get(0).getT(), 0)));
+            }
+
+            // Process ROIs with multiple shapes, containing one or more points
+            else if (nbPoints > 0 && roi.size() > 1) {
+                List<ROI> pointsList = roi.stream().filter(e -> e.getRoiName().equals("Points")).collect(Collectors.toList());
+                List<ROI> notPointsList = roi.stream().filter(e -> !e.getRoiName().equals("Points")).collect(Collectors.toList());
+
+                // create a pointsROI instance with multiple points
+                ROI pointsROI = ROIs.createPointsROI(pointsList.stream().mapToDouble(ROI::getCentroidX).toArray(),
+                        pointsList.stream().mapToDouble(ROI::getCentroidY).toArray(),
+                        ImagePlane.getPlaneWithChannel(pointsList.get(0).getC(), Math.max(pointsList.get(0).getZ(), 0), Math.max(pointsList.get(0).getT(), 0)));
+
+                // make a complex roi by applying XOR operation between shapes
+                finalROI = notPointsList.get(0);
+                for (int k = 1; k < notPointsList.size(); k++) {
+                    finalROI = linkShapes(finalROI, notPointsList.get(k));
+                }
+
+                // make the union between points and complex ROI
+                finalROI = RoiTools.combineROIs(finalROI, pointsROI, RoiTools.CombineOp.ADD);
+            }
+
+            // Process ROIs with single shape AND ROIs with multiple shapes that do not contain points
+            else {
+                for (int k = 1; k < roi.size(); k++) {
+                    // make a complex roi by applying XOR operation between shapes
+                    finalROI = linkShapes(finalROI, roi.get(k));
+                }
+            }
+            return finalROI;
+        }
+        return null;
+    }
+
+    /**
+     * convert Omero ROIs To QuPath ROIs.
+     *
+     * *********************** BE CAREFUL *****************************
+     * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
+     * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
+     * ****************************************************************
+     *
+     * @param roiData
+     * @return list of QuPath ROIs
+     */
+    private static List<ROI> convertOmeroShapesToQuPathROIs(ROIData roiData){
+        // get the ROI
+        Roi omeROI = (Roi) roiData.asIObject();
+
+        // get the shapes contained in the ROI (i.e. holes or something else)
+        List<Shape> shapes = omeROI.copyShapes();
+        List<ROI> list = new ArrayList<>();
+
+        // Iterate on shapes, select the correct instance and create the corresponding QuPath ROI
+        for (Shape shape:shapes) {
+
+            if(shape instanceof Rectangle){
+                RectangleData s = new RectangleData(shape);
+                list.add(ROIs.createRectangleROI(s.getX(),s.getY(),s.getWidth(),s.getHeight(),ImagePlane.getPlaneWithChannel(s.getC(), Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
+            }else if(shape instanceof Ellipse){
+                EllipseData s = new EllipseData(shape);
+                list.add(ROIs.createEllipseROI(s.getX()-s.getRadiusX(),s.getY()-s.getRadiusY(),s.getRadiusX()*2, s.getRadiusY()*2,ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
+            }else if(shape instanceof omero.model.Point){
+                PointData s = new PointData(shape);
+                list.add(ROIs.createPointsROI(s.getX(),s.getY(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
+            }else if(shape instanceof Polyline){
+                PolylineData s = new PolylineData(shape);
+                list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
+                        s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
+                        ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
+
+            }else if(shape instanceof omero.model.Polygon){
+                PolygonData s = new PolygonData(shape);
+                list.add(ROIs.createPolygonROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
+                        s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
+                        ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
+            }else if(shape instanceof Label){
+                logger.warn("No ROIs created (requested label shape is unsupported)");
+                //s=new TextData(shape);
+
+            }else if(shape instanceof Line){
+                LineData s = new LineData(shape);
+                list.add(ROIs.createLineROI(s.getX1(),s.getY1(),s.getX2(),s.getY2(),ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
+
+            }else if(shape instanceof Mask){
+                logger.warn("No ROIs created (requested Mask shape is not supported yet)");
+                //s=new MaskData(shape);
+            }else{
+                logger.warn("Unsupported shape ");
+            }
+        }
+
+        return list;
+    }
+
+
+    /**
+     * Output the ROI result of the XOR operation between the 2 input ROIs
+     *
+     * 	 * *********************** BE CAREFUL *****************************
+     * 	 * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
+     * 	 * the new composite ROI are set on the lowest c/z/t plane
+     * 	 * ****************************************************************
+     *
+     * @param roi1
+     * @param roi2
+     * @return ROI resulting of the XOR operation
+     */
+    private static ROI linkShapes(ROI roi1, ROI roi2){
+        // get the area of the first roi
+        Area a1 = new Area(roi1.getShape());
+
+        // get the area of the second roi
+        Area a2 = new Area(roi2.getShape());
+
+        // Apply a xor operation on both area to combine them (ex. make a hole)
+        a1.exclusiveOr(a2);
+
+        // get the area of the newly created area
+        java.awt.Rectangle r = a1.getBounds();
+
+        // Assign the new ROI to the lowest valid plan of the stack
+        return ROIs.createAreaROI(a1, ImagePlane.getPlaneWithChannel(Math.min(roi1.getC(), roi2.getC()),
+                Math.min(roi1.getZ(), roi2.getZ()),
+                Math.min(roi1.getT(), roi2.getT())));
+    }
+
+
+
 
     /**
      * Convert PathObjects into OMERO-readable objects. In case the PathObject contains holes, it is split

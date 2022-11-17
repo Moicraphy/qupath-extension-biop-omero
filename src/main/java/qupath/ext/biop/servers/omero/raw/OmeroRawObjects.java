@@ -22,13 +22,19 @@
 package qupath.ext.biop.servers.omero.raw;
 
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import omero.ServerError;
-import omero.gateway.SecurityContext;
-import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.model.*;
+import omero.gateway.model.DatasetData;
+import omero.gateway.model.ProjectData;
+import omero.gateway.model.ImageData;
+import omero.gateway.model.PixelsData;
+import omero.gateway.model.DataObject;
+import omero.gateway.model.PermissionData;
+import omero.model.ExperimenterGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +43,7 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.ObservableList;
-//import fr.igred.omero.repository;
+
 
 
 /**
@@ -272,7 +278,7 @@ final class OmeroRawObjects {
      * contain orphaned images, <b>not</b> orphaned datasets (like the OMERO webclient).
      * <p>
      * It should only be used once per {@code OmeroRawImageServerBrowser}, with its children objects loaded
-     * in an executor (see {@link OmeroRawTools#readOrphanedImages(OmeroRawClient, SecurityContext)}). This class keeps track of:
+     * in an executor (see {@link OmeroRawTools#readOrphanedImages}). This class keeps track of:
      * <li>Total child count: total amount of orphaned images on the server.</li>
      * <li>Current child count: what is displayed in the current {@code OmeroRawServerImageBrowser}, which depends on what is loaded and the current Group/Owner.</li>
      * <li>Child count: total amount of orphaned images currently loaded (always smaller than total child count).</li>
@@ -369,7 +375,7 @@ final class OmeroRawObjects {
         }
 
 
-        public Project(String url, ProjectData projectData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
+        public Project(String url, ProjectData projectData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
             this.url = url;
             this.description = projectData.getDescription();
             this.childCount = projectData.asProject().sizeOfDatasetLinks();
@@ -380,37 +386,6 @@ final class OmeroRawObjects {
             super.setParent(parent);
 
             //TODO change the way to extract user info because it is only the one which is logged
-            //System.out.println(projectData.asExperimenter().getFirstName());
-           /* List<ExperimenterGroup> groups = client.getGateway().getAdminService(client.getContext()).lookupGroups();
-            List<omero.model.Experimenter> expermienters = client.getGateway().getAdminService(client.getContext()).lookupExperimenters();
-           // System.out.println(client.getGateway().);
-            //List<GroupExperimenterMap> links = client.getGateway().getAdminService(client.getContext()).getGroup(projectData.getGroupId()).copyGroupExperimenterMap();//.getExperimenter(1).copyGroupExperimenterMap();
-            for (ExperimenterGroup group:groups) {
-                System.out.println("group.getName().getValue()");
-                System.out.println(group.getName().getValue());
-                System.out.println("group.copyGroupExperimenterMap().get(0).getChild().getFirstName().getValue()");
-                System.out.println(group.copyGroupExperimenterMap().get(0).getChild().getFirstName().getValue());
-                client.getGateway().getAdminService(client.getContext()).getGroup(projectData.getGroupId());
-                System.out.println("blblb");
-                System.out.println(client.getGateway().getAdminService(client.getContext()).getExperimenter(projectData.getOwner().getId()));
-                System.out.println(client.getGateway().getAdminService(client.getContext()).getExperimenter(projectData.getOwner().getId()).getFirstName().getValue());
-            }
-
-            //List<omero.model.Experimenter> expermienters = client.getGateway().getAdminService(client.getContext()).lookupGroup(groups.get(0).getName().toString()).linkedExperimenterList();
-            System.out.println(expermienters.get(0));
-            for (omero.model.Experimenter exp:expermienters) {
-                System.out.println("exp.getFirstName().getValue()");
-                System.out.println(exp.getFirstName().getValue());
-            }*/
-            omero.model.Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(projectData.getOwner().getId());
-           /* System.out.println("id : " + user.getId().getValue());
-            System.out.println("first name : " + user.getFirstName().getValue());
-            System.out.println("middle name : " + user.getMiddleName());
-            System.out.println("last name : " + user.getLastName().getValue());
-            System.out.println("email : " + user.getEmail().getValue());
-            System.out.println("institution : " + user.getInstitution().getValue());
-            System.out.println("omemanem : " + user.getOmeName().getValue());*/
-
             super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
@@ -419,11 +394,7 @@ final class OmeroRawObjects {
                     user.getInstitution()==null ? "" : user.getInstitution().getValue(),
                     user.getOmeName()==null ? "" : user.getOmeName().getValue()));
 
-            //System.out.println("group "+ client.getGateway().getAdminService(client.getContext()).getGroup(projectData.getGroupId()));
-            //System.out.println("groupName "+ client.getGateway().getAdminService(client.getContext()).getGroup(projectData.getGroupId()).getName().toString());
-            super.setGroup(new Group(projectData.getGroupId(),
-                    client.getGateway().getAdminService(client.getContext()).getGroup(projectData.getGroupId()).getName().getValue()));
-
+            super.setGroup(new Group(projectData.getGroupId(), group.getName().getValue()));
         }
     }
 
@@ -448,18 +419,17 @@ final class OmeroRawObjects {
         }
 
 
-        public Dataset(String url, DatasetData datasetData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
+        public Dataset(String url, DatasetData datasetData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
             this.url = url;
             this.description = datasetData.getDescription();
             this.childCount = datasetData.asDataset().sizeOfImageLinks();
             super.data = datasetData;
-          //  System.out.println("nb of datasets in dataset object : "+this.childCount);
+
             super.setId(id);
             super.setName(datasetData.getName());
             super.setType(type.toString());
             super.setParent(parent);
 
-            omero.model.Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(datasetData.getOwner().getId());
             super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
@@ -468,9 +438,7 @@ final class OmeroRawObjects {
                     user.getInstitution()==null ? "" : user.getInstitution().getValue(),
                     user.getOmeName()==null ? "" : user.getOmeName().getValue()));
 
-            super.setGroup(new Group(datasetData.getGroupId(),
-                    client.getGateway().getAdminService(client.getContext()).getGroup(datasetData.getGroupId()).getName().getValue()));
-
+            super.setGroup(new Group(datasetData.getGroupId(), group.getName().getValue()));
         }
     }
 
@@ -502,7 +470,7 @@ final class OmeroRawObjects {
         }
 
 
-        public Image(String url, ImageData imageData, long id, OmeroRawObjectType type, OmeroRawClient client, OmeroRawObject parent) throws DSOutOfServiceException, ServerError {
+        public Image(String url, ImageData imageData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
             this.url = url;
             this.acquisitionDate = imageData.getAcquisitionDate()==null ? -1 : imageData.getAcquisitionDate().getTime();
             super.data = imageData;
@@ -521,7 +489,6 @@ final class OmeroRawObjects {
             super.setType(type.toString());
             super.setParent(parent);
 
-            omero.model.Experimenter user = client.getGateway().getAdminService(client.getContext()).getExperimenter(imageData.getOwner().getId());
             super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
@@ -530,8 +497,7 @@ final class OmeroRawObjects {
                     user.getInstitution()==null ? "" : user.getInstitution().getValue(),
                     user.getOmeName()==null ? "" : user.getOmeName().getValue()));
 
-            super.setGroup(new Group(imageData.getGroupId(),
-                    client.getGateway().getAdminService(client.getContext()).getGroup(imageData.getGroupId()).getName().getValue()));
+            super.setGroup(new Group(imageData.getGroupId(), group.getName().getValue()));
         }
     }
 

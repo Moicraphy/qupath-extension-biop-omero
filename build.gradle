@@ -8,7 +8,7 @@ plugins {
 ext.moduleName = 'qupath.extension.biop.omero'
 archivesBaseName = 'qupath-extension-biop-omero'
 description = "QuPath extension to support image reading using OMERO's Java API."
-version = "0.1.8-SNAPSHOT"
+version = "0.2.0-SNAPSHOT"
 
 repositories {
 //  mavenLocal()
@@ -23,6 +23,9 @@ repositories {
   maven{
         url "https://maven.scijava.org/content/groups/public"
   }
+    // kept because it is the normal way of importing dependencies but never used because not recognized by gradle
+    // the repo used is a local repo, inside the maven folder of the project
+    // "File:\qupath\maven\repo\fr\igred\simple-omero-client\5.9.2\simple-omero-client-5.9.2.pom"
     maven{
         url "https://artifacts.igred.fr/releases"
    }
@@ -55,7 +58,10 @@ dependencies {
     implementation "org.openmicroscopy:omero-gateway:5.6.5"
     implementation "org.openmicroscopy:omero-model:5.6.0"
     implementation "info.picocli:picocli:4.3.2"
-    shadow "fr.igred:simple-omero-client:5.9.1"
+
+    // if new version, update all files in here : "File:\qupath\maven\repo\fr\igred\simple-omero-client\5.9.2\simple-omero-client-5.9.2.pom"
+    // This is only for development ; for the user side, you need to add simple-omero-client-x.x.x in the extension folder.
+    implementation "fr.igred:simple-omero-client:5.9.2"
 }
 
 processResources {

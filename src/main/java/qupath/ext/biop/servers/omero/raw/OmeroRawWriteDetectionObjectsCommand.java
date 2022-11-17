@@ -33,6 +33,7 @@ import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
+import omero.gateway.model.TableData;
 import org.apache.commons.lang3.StringUtils;
 
 import javafx.scene.control.Label;
@@ -42,6 +43,7 @@ import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.objects.PathObject;
+import qupath.lib.scripting.QP;
 
 /**
  * Command to write path objects back to the OMERO server where the
@@ -153,28 +155,27 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
             return;
 
         // Write path object(s)
-        try {
-            // give to each pathObject a unique name
-            objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
+        // give to each pathObject a unique name
+        objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
 
-            // send detections to OMERO
-            OmeroRawTools.writePathObjects(objs, omeroServer, deleteRois);
+        // send detections to OMERO
+        boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
 
-            if(!onlyDetections) {
-                // get detection measurements
-                ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
-                ob.setImageData(qupath.getImageData(), objs);
-                OmeroRawTools.writeMeasurementTableData(objs, ob, qupath.getProject().getName().split("/")[0], omeroServer);
-            }
+        if(!onlyDetections) {
+            // get detection measurements
+            ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+            ob.setImageData(qupath.getImageData(), objs);
 
-            objs.forEach(pathObject -> pathObject.setName(null));
+            // send table to OMERO
+            OmeroRawScripting.sendDetectionMeasurementTable(objs, omeroServer, qupath.getImageData());
+        }
+
+        objs.forEach(pathObject -> pathObject.setName(null));
+
+        if(hasBeenSaved)
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),
                     objectString,
                     (objs.size() == 1 ? "was" : "were")));
-        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e) {
-            objs.forEach(pathObject -> pathObject.setName(null));
-            throw new RuntimeException(e);
-        }
     }
 }

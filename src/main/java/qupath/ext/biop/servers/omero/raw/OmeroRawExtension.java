@@ -73,10 +73,12 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 
 		// for OMERO raw extension
 		var actionRawClients = ActionTools.createAction(new OmeroRawClientsCommand(qupath), "Manage server connections");
-		var actionRawSendAnnotationObjects = ActionTools.createAction(new OmeroRawWriteAnnotationObjectsCommand(qupath), "Send annotations to OMERO");
-		var actionRawSendMetadataObjects = ActionTools.createAction(new OmeroRawWriteMetadataCommand(qupath), "Send metadata to OMERO");
-		var actionRawImportAnnotationObjects = ActionTools.createAction(new OmeroRawImportAnnotationObjectsCommand(qupath), "Import annotations from OMERO");
-		var actionRawImportMetadataObjects = ActionTools.createAction(new OmeroRawImportMetadataCommand(qupath), "Import metadata from OMERO");
+		var actionRawSendAnnotationObjects = ActionTools.createAction(new OmeroRawWriteAnnotationObjectsCommand(qupath), "Annotations");
+		var actionRawSendMetadataObjects = ActionTools.createAction(new OmeroRawWriteMetadataCommand(qupath), "Metadata");
+		var actionRawSendDisplaySettingsObjects = ActionTools.createAction(new OmeroRawWriteViewSettingsCommand(qupath), "View settings");
+		var actionRawImportAnnotationObjects = ActionTools.createAction(new OmeroRawImportAnnotationObjectsCommand(qupath), "Annotation");
+		var actionRawImportMetadataObjects = ActionTools.createAction(new OmeroRawImportMetadataCommand(qupath), "Metadata");
+		var actionRawImportDisplaySettingsObjects = ActionTools.createAction(new OmeroRawImportViewSettingsCommand(qupath), "View settings");
 	//	var actionRawSendDetectionObjects = ActionTools.createAction(new OmeroRawWriteDetectionObjectsCommand(qupath), "Send detections to OMERO");
 		Menu browseRawServerMenu = new Menu("Browse server...");
 
@@ -86,16 +88,16 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		actionRawImportAnnotationObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		actionRawSendMetadataObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		actionRawImportMetadataObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		actionRawSendDisplaySettingsObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
+		actionRawImportDisplaySettingsObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		//actionRawSendDetectionObjects.disabledProperty().bind(qupath.imageDataProperty().isNull());
 		MenuTools.addMenuItems(qupath.getMenu("Extensions", false),
 				MenuTools.createMenu("OMERO-RAW",
 						browseRawServerMenu,
 						actionRawClients,
 						null,
-						actionRawSendAnnotationObjects,
-						actionRawSendMetadataObjects,
-						actionRawImportAnnotationObjects,
-						actionRawImportMetadataObjects
+						MenuTools.createMenu("Send to OMERO", actionRawSendAnnotationObjects, actionRawSendMetadataObjects, actionRawSendDisplaySettingsObjects),
+						MenuTools.createMenu("Import from OMERO", actionRawImportAnnotationObjects, actionRawImportMetadataObjects, actionRawImportDisplaySettingsObjects)
 			//			actionRawSendDetectionObjects
 				)
 		);
