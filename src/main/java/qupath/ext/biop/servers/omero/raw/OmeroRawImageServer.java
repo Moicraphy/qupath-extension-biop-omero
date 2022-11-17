@@ -407,6 +407,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 					}
 					// In some VSI images, the calculated downsamples for width & height can be wildly discordant,
 					// and we are better off using defaults
+					// Fix vsi issue see https://forum.image.sc/t/qupath-omero-weird-pyramid-levels/65484
 					if (imageFormat.equals("CellSens")) {
 						double downsampleX = (double)width / w;
 						double downsampleY = (double)height / h;
