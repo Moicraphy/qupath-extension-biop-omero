@@ -26,6 +26,7 @@ import java.awt.Color;
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -100,20 +101,25 @@ class OmeroRawShapes {
         PathObject pathObject;
         boolean isValidClass = !(roiClass == null || roiClass.isEmpty() || roiClass.equalsIgnoreCase("noclass"));
 
+        // get all potential classes of a ROI
+        List<String> classes = new ArrayList<>();
+        if(isValidClass)
+            classes.addAll(Arrays.stream(roiClass.split("&")).collect(Collectors.toList()));
+
         switch(roiType.toLowerCase()){
             case "cell": roiType = "detection";
             case "detection":
                 if (!isValidClass)
                     pathObject = PathObjects.createDetectionObject(roi);
                 else
-                    pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(roiClass));
+                    pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(classes));
                 break;
             case "annotation":
             default:
                 if (!isValidClass)
                     pathObject = PathObjects.createAnnotationObject(roi);
                 else
-                    pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(roiClass));
+                    pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(classes));
                 break;
         }
 
@@ -385,10 +391,14 @@ class OmeroRawShapes {
      * @return
      */
     private static String setRoiComment(PathObject src, String objectID, String parentID){
+
+        // format classes to OMERO-compatible string
+        String pathClass = src.getPathClass() == null ? "NoClass" : src.getPathClass().toString().replaceAll(" ","").replaceAll(":","&");
+
         if (src.isDetection()) {
-             return src.getPathClass() != null ? "Detection:"+src.getPathClass().getName()+":"+objectID+":"+parentID : "Detection:NoClass:"+objectID+":"+parentID;
+             return "Detection:"+pathClass+":"+objectID+":"+parentID;
         } else {
-            return src.getPathClass() != null ? "Annotation:"+src.getPathClass().getName()+":"+objectID+":"+parentID : "Annotation:NoClass:"+objectID+":"+parentID;
+            return "Annotation:"+pathClass+":"+objectID+":"+parentID;
         }
     }
 
