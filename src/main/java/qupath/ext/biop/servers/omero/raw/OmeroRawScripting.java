@@ -29,14 +29,16 @@ import java.util.stream.Collectors;
 public class OmeroRawScripting {
 
     /**
-     * This method creates an instance of {@code fr.igred.omero.Client} object to get access to the full
-     * simple-omero-client API, developed by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
+     * This method creates an instance of simple-omero-client object to get access to the full simple-omero-client API,
+     * developed by Pierre Pouchin (https://github.com/GReD-Clermont/simple-omero-client).
      *
-     * @return the Client object
+     * @param imageServer : ImageServer of an image loaded from OMERO
+     *
+     * @return  fr.igred.omero.Client object
      */
-    public static Client getSimpleOmeroClientInstance(OmeroRawImageServer server) throws DSOutOfServiceException {
+    public static Client getSimpleOmeroClientInstance(OmeroRawImageServer imageServer) throws DSOutOfServiceException {
         // get the current OmeroRawClient
-        OmeroRawClient omerorawclient = server.getClient();
+        OmeroRawClient omerorawclient = imageServer.getClient();
 
         // build the simple-omero-client using the ID of the current session
         Client simpleClient = new Client();
@@ -47,10 +49,13 @@ public class OmeroRawScripting {
 
 
     /**
-     * Read ROIs from OMERO and add them to the current image
+     * - Read ROIs from OMERO
+     * - Remove all annotations and detections on the current image
+     * - Convert ROIs to annotations/detections (i.e. pathObjects)
+     * - Add new pathObjects to the current image
      *
-     * @param imageServer
-     * @return
+     * @param imageServer : ImageServer of an image loaded from OMERO
+     * @return the list of OMERO rois converted into pathObjects.
      */
     public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer) {
         return importOmeroROIsToQuPath(imageServer, true);
@@ -58,12 +63,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Read ROIs from OMERO and add them to the current image
+     * - Read ROIs from OMERO
+     * - Check if current annotations/detection have to be deleted or not (from {@param removeAnnotations})
+     * - Convert ROIs to annotations/detections (i.e. pathObjects)
+     * - Add new pathObjects to the current image
      *
-     * @param imageServer
-     * @return
+     * @param imageServer : ImageServer of an image loaded from OMERO
+     * @param removePathObjects : Boolean to delete or keep pathObjects (annotations, detections) on the current image.
+     *
+     * @return  the list of OMERO rois converted into pathObjects
      */
-    public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removeAnnotations) {
+    public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removePathObjects) {
         // read OMERO ROIs
         Collection<PathObject> pathObjects = imageServer.readPathObjects();
 
@@ -71,7 +81,7 @@ public class OmeroRawScripting {
         PathObjectHierarchy hierarchy = QP.getCurrentHierarchy();
 
         // remove current annotations
-        if (removeAnnotations)
+        if (removePathObjects)
             hierarchy.removeObjects(hierarchy.getAnnotationObjects(), false);
 
         // add pathObjects to the current hierarchy
