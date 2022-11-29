@@ -838,7 +838,7 @@ public class OmeroRawScripting {
             ImageData<BufferedImage> newImageData = QPEx.getQuPath().getViewer().getImageDisplay().getImageData();
 
             // generate thumbnail
-            BufferedImage thumbnail = ProjectCommands.getThumbnailRGB(newImageData.getServer());
+            BufferedImage thumbnail = QPEx.getQuPath().getViewer().getRGBThumbnail();
 
             // get and save the new thumbnail
             ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(newImageData);
