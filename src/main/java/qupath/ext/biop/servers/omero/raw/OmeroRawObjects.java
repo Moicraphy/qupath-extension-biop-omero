@@ -278,7 +278,7 @@ final class OmeroRawObjects {
      * contain orphaned images, <b>not</b> orphaned datasets (like the OMERO webclient).
      * <p>
      * It should only be used once per {@code OmeroRawImageServerBrowser}, with its children objects loaded
-     * in an executor (see {@link OmeroRawTools#readOrphanedImages}). This class keeps track of:
+     * in an executor (see {@link OmeroRawTools#readOmeroOrphanedImagesPerUser}). This class keeps track of:
      * <li>Total child count: total amount of orphaned images on the server.</li>
      * <li>Current child count: what is displayed in the current {@code OmeroRawServerImageBrowser}, which depends on what is loaded and the current Group/Owner.</li>
      * <li>Child count: total amount of orphaned images currently loaded (always smaller than total child count).</li>
