@@ -45,7 +45,7 @@ final class OmeroRawAnnotations {
 
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawAnnotations.class);
 
-    public static enum OmeroRawAnnotationType {
+    public enum OmeroRawAnnotationType {
         TAG("TagAnnotationI", "tag"),
         MAP("MapAnnotationI", "map"),
         ATTACHMENT("FileAnnotationI", "file"),
@@ -55,7 +55,7 @@ final class OmeroRawAnnotations {
 
         private final String name;
         private final String urlName;
-        private OmeroRawAnnotationType(String name, String urlName) {
+        OmeroRawAnnotationType(String name, String urlName) {
             this.name = name;
             this.urlName = urlName;
         }
@@ -265,7 +265,7 @@ final class OmeroRawAnnotations {
      */
     static class TagAnnotation extends OmeroAnnotation {
 
-        private String value;
+        private final String value;
 
         protected String getValue() {
             return value;
@@ -297,7 +297,7 @@ final class OmeroRawAnnotations {
      */
     static class MapAnnotation extends OmeroAnnotation {
 
-        private Map<String, String> values;
+        private final Map<String, String> values;
         protected Map<String, String> getValues() {
             return values;
         }
@@ -341,9 +341,9 @@ final class OmeroRawAnnotations {
      */
     static class FileAnnotation extends OmeroAnnotation {
 
-        private String name;
-        private String mimeType;
-        private long size;
+        private final String name;
+        private final String mimeType;
+        private final long size;
 
         protected String getFilename() {
             return this.name;
@@ -389,7 +389,7 @@ final class OmeroRawAnnotations {
      */
     static class CommentAnnotation extends OmeroAnnotation {
 
-        private String value;
+        private final String value;
 
         protected String getValue() {
             return value;
@@ -426,7 +426,7 @@ final class OmeroRawAnnotations {
      */
     static class LongAnnotation extends OmeroAnnotation {
 
-        private int value;
+        private final int value;
 
         protected int getValue() {
             return value;

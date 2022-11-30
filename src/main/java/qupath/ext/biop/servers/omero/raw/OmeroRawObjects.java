@@ -56,7 +56,7 @@ final class OmeroRawObjects {
 
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawObjects.class);
 
-    public static enum OmeroRawObjectType {
+    public enum OmeroRawObjectType {
         SERVER("#Server", "Server"),
         PROJECT("http://www.openmicroscopy.org/Schemas/OME/2016-06#Project", "Project"),
         DATASET("http://www.openmicroscopy.org/Schemas/OME/2016-06#Dataset", "Dataset"),
@@ -73,7 +73,7 @@ final class OmeroRawObjects {
 
         private final String APIName;
         private final String displayedName;
-        private OmeroRawObjectType(String APIName, String displayedName) {
+        OmeroRawObjectType(String APIName, String displayedName) {
             this.APIName = APIName;
             this.displayedName = displayedName;
         }
@@ -253,7 +253,7 @@ final class OmeroRawObjects {
 
     static class Server extends OmeroRawObject {
 
-        private String url;
+        private final String url;
 
         public Server(URI uri) {
             super.id = -1;
@@ -290,20 +290,20 @@ final class OmeroRawObjects {
         /**
          * Number of children currently to display (based on Group/Owner and loaded objects)
          */
-        private IntegerProperty currentChildCount;
+        private final IntegerProperty currentChildCount;
 
         /**
          * Number of children objects loaded
          */
-        private AtomicInteger loadedChildCount;
+        private final AtomicInteger loadedChildCount;
 
         /**
          * Total number of children (loaded + unloaded)
          */
-        private AtomicInteger totalChildCount;
+        private final AtomicInteger totalChildCount;
 
-        private BooleanProperty isLoading;
-        private ObservableList<OmeroRawObject> orphanedImageList;
+        private final BooleanProperty isLoading;
+        private final ObservableList<OmeroRawObject> orphanedImageList;
 
         public OrphanedFolder(ObservableList<OmeroRawObject> orphanedImageList) {
             this.name = "Orphaned Images";
@@ -356,9 +356,9 @@ final class OmeroRawObjects {
 
     static class Project extends OmeroRawObject {
 
-        private String url;
-        private String description;
-        private int childCount;
+        private final String url;
+        private final String description;
+        private final int childCount;
 
         @Override
         String getAPIURLString() {
@@ -400,9 +400,9 @@ final class OmeroRawObjects {
 
     static class Dataset extends OmeroRawObject {
 
-        private String url;
-        private String description;
-        private int childCount;
+        private final String url;
+        private final String description;
+        private final int childCount;
 
         @Override
         String getAPIURLString() {
@@ -443,9 +443,9 @@ final class OmeroRawObjects {
     }
 
     static class Image extends OmeroRawObject {
-        private String url;
+        private final String url;
         private long acquisitionDate = -1;
-        private PixelInfo pixels;
+        private final PixelInfo pixels;
 
 
         @Override
@@ -503,7 +503,7 @@ final class OmeroRawObjects {
 
 
     static class Owner {
-        private long id;
+        private final long id;
         private String firstName = "";
         private String middleName = "";
         private String lastName = "";
@@ -568,8 +568,8 @@ final class OmeroRawObjects {
     }
 
     static class Group implements Comparable {
-        private long id;
-        private String name;
+        private final long id;
+        private final String name;
 
         // Singleton (with static factory)
         private static final Group ALL_GROUPS = new Group(-1, "All groups");
@@ -622,15 +622,15 @@ final class OmeroRawObjects {
     }
 
     static class PixelInfo {
-        private int width;
-        private int height;
-        private int z;
-        private int c;
-        private int t;
-        private PhysicalSize physicalSizeX;
-        private PhysicalSize physicalSizeY;
-        private PhysicalSize physicalSizeZ;
-        private ImageType imageType;
+        private final int width;
+        private final int height;
+        private final int z;
+        private final int c;
+        private final int t;
+        private final PhysicalSize physicalSizeX;
+        private final PhysicalSize physicalSizeY;
+        private final PhysicalSize physicalSizeZ;
+        private final ImageType imageType;
 
         int[] getImageDimensions() {
             return new int[] {width, height, c, z, t};
@@ -659,8 +659,8 @@ final class OmeroRawObjects {
 
     static class PhysicalSize {
 
-        private String symbol;
-        private double value;
+        private final String symbol;
+        private final double value;
 
 
         String getSymbol() {
@@ -679,7 +679,7 @@ final class OmeroRawObjects {
 
     static class ImageType {
 
-        private String value;
+        private final String value;
 
         String getValue() {
             return value;
@@ -697,28 +697,28 @@ final class OmeroRawObjects {
      */
     static class Permission {
 
-        private boolean canDelete;
+        private final boolean canDelete;
 
-        private boolean canAnnotate;
+        private final boolean canAnnotate;
 
-        private boolean canLink;
+        private final boolean canLink;
 
-        private boolean canEdit;
+        private final boolean canEdit;
 
         // Only in OmeroRawObjects
-        private boolean isUserWrite;
+        private final boolean isUserWrite;
 
-        private boolean isUserRead;
+        private final boolean isUserRead;
 
-        private boolean isWorldWrite;
+        private final boolean isWorldWrite;
 
-        private boolean isWorldRead;
+        private final boolean isWorldRead;
 
-        private boolean isGroupWrite;
+        private final boolean isGroupWrite;
 
-        private boolean isGroupRead;
+        private final boolean isGroupRead;
 
-        private boolean isGroupAnnotate;
+        private final boolean isGroupAnnotate;
 
         private String perm;
 
@@ -743,7 +743,7 @@ final class OmeroRawObjects {
 
         private int id;
 
-        private Owner owner;
+        private final Owner owner;
 
         public Link(Owner owner){
             this.owner = owner;
@@ -757,10 +757,10 @@ final class OmeroRawObjects {
 
     static class Experimenter {
 
-        private int id;
-        private String omeName;
-        private String firstName;
-        private String lastName;
+        private final int id;
+        private final String omeName;
+        private final String firstName;
+        private final String lastName;
 
         /**
          * Return the Id of this {@code Experimenter}.

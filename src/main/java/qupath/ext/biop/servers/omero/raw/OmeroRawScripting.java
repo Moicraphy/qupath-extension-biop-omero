@@ -64,7 +64,7 @@ public class OmeroRawScripting {
 
     /**
      * - Read ROIs from OMERO
-     * - Check if current annotations/detection have to be deleted or not (from {@param removeAnnotations})
+     * - Check if current annotations/detection have to be deleted or not
      * - Convert ROIs to annotations/detections (i.e. pathObjects)
      * - Add new pathObjects to the current image
      *
@@ -337,7 +337,6 @@ public class OmeroRawScripting {
      * Add metadata to the current image in the QuPath project
      *
      * @param keyValues
-     * @return
      */
     public static void addMetadata(Map<String,String> keyValues) {
         // get project entry
@@ -375,7 +374,6 @@ public class OmeroRawScripting {
      * Add metadata to the current image in QuPath. Update existing metadata with new values and add new ones.
      *
      * @param keyValues
-     * @return
      */
     public static void addAndUpdateMetadata(Map<String,String> keyValues) {
         // get project entry
@@ -432,7 +430,6 @@ public class OmeroRawScripting {
      * Delete all current metadata and add OMERO key value pairs to the current image in QuPath.
      *
      * @param imageServer
-     * @return
      */
     public static void addOmeroKeyValuesAndDeleteMetadata(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
@@ -450,7 +447,6 @@ public class OmeroRawScripting {
      * Delete all current metadata and add key value pairs to the current image in QuPath.
      *
      * @param keyValues
-     * @return
      */
     public static void addAndDeleteMetadata(Map<String,String> keyValues) {
         // get project entry
@@ -786,7 +782,6 @@ public class OmeroRawScripting {
      * Only works for fluorescent images
      *
      * @param imageServer
-     * @return
      */
     public static void setChannelsColorFromOmeroChannel(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
@@ -859,7 +854,6 @@ public class OmeroRawScripting {
      * Only works for fluorescent images
      *
      * @param imageServer
-     * @return
      */
     public static void setChannelsNameFromOmeroChannel(OmeroRawImageServer imageServer){
         // get the number of the channels in OMERO

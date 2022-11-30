@@ -11,7 +11,7 @@ import java.awt.image.BufferedImage;
 
 public class OmeroRawWriteViewSettingsCommand implements Runnable {
     private final String title = "Sending view settings";
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
     public OmeroRawWriteViewSettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }

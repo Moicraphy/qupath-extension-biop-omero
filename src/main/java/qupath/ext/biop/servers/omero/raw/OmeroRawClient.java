@@ -81,22 +81,22 @@ public class OmeroRawClient {
     /**
      * List of all URIs supported by this client.
      */
-    private ObservableList<URI> uris = FXCollections.observableArrayList();
+    private final ObservableList<URI> uris = FXCollections.observableArrayList();
 
     /**
      * 'Clean' URI representing the server's URI (<b>not</b> its images). <p> See {@link OmeroRawTools#getServerURI(URI)}.
      */
-    private URI serverURI;
+    private final URI serverURI;
 
     /**
      * The username might be empty (public), and might also change (user switching account)
      */
-    private StringProperty username;
+    private final StringProperty username;
 
     /**
      * Logged in property (modified by login/loggedIn/logout/timer)
      */
-    private BooleanProperty loggedIn;
+    private final BooleanProperty loggedIn;
 
     // TODO check if we need to keep the connection alive
 
@@ -204,8 +204,6 @@ public class OmeroRawClient {
      * switch the current group to another group where the user is also part of
      *
      * @param groupId
-     * @throws DSOutOfServiceException
-     * @throws ServerError
      */
     public void switchGroup(long groupId)  {
         // check if the user is member of the group

@@ -12,7 +12,7 @@ import java.awt.image.BufferedImage;
 public class OmeroRawImportViewSettingsCommand implements Runnable{
 
     private final String title = "Import view settings from OMERO";
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
     public OmeroRawImportViewSettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }

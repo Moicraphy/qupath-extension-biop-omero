@@ -24,7 +24,7 @@ import java.util.*;
 public class OmeroRawWriteMetadataCommand  implements Runnable{
 
     private final String title = "Sending metadata";
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
     public OmeroRawWriteMetadataCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }

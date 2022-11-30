@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class OmeroRawImportMetadataCommand implements Runnable{
 
     private final String title = "Import KeyValues from OMERO";
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
     public OmeroRawImportMetadataCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }

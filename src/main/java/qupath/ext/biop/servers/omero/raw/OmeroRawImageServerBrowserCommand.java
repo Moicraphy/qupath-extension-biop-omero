@@ -150,7 +150,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
     // GUI right
     private TableView<Integer> description;
     private Canvas canvas;
-    private int imgPrefSize = 256;
+    private final int imgPrefSize = 256;
 
     // GUI top and down
     private Label loadingChildrenLabel;
@@ -827,11 +827,11 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         return list.stream()
                 .filter(e -> {
                     if (group == null) return true;
-                    return group == OmeroRawObjects.Group.getAllGroupsGroup() ? true : e.getGroup().equals(group);
+                    return group == OmeroRawObjects.Group.getAllGroupsGroup() || e.getGroup().equals(group);
                 })
                 .filter(e -> {
                     if (owner == null) return true;
-                    return owner == OmeroRawObjects.Owner.getAllMembersOwner() ? true : e.getOwner().equals(owner);
+                    return owner == OmeroRawObjects.Owner.getAllMembersOwner() || e.getOwner().equals(owner);
                 })
                 .filter(e -> matchesSearch(e, filter))
                 .collect(Collectors.toList());
@@ -1056,8 +1056,8 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
      */
     private class OmeroObjectCell extends TreeCell<OmeroRawObjects.OmeroRawObject> {
 
-        private Canvas iconCanvas = new Canvas();
-        private Canvas tooltipCanvas = new Canvas();
+        private final Canvas iconCanvas = new Canvas();
+        private final Canvas tooltipCanvas = new Canvas();
 
         @Override
         public void updateItem(OmeroRawObjects.OmeroRawObject item, boolean empty) {
@@ -1117,14 +1117,14 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
  //                   if (isUint8((Image)item)) {
  //                       uint8.setText("- uint8 " + Character.toString((char)10003));
  //                   } else {
-                        uint8.setText("- uint8 " + Character.toString((char)10007));
+                        uint8.setText("- uint8 " + (char) 10007);
                         uint8.setStyle("-fx-text-fill: red;");
  //                   }
                     Label has3Channels = new Label();
  //                   if (has3Channels((Image)item)) {
   //                      has3Channels.setText("- 3 channels " + Character.toString((char)10003));
   //                  } else {
-                        has3Channels.setText("- 3 channels " + Character.toString((char)10007));
+                        has3Channels.setText("- 3 channels " + (char) 10007);
                         has3Channels.setStyle("-fx-text-fill: red;");
   //                  }
                     gp.addRow(1, notSupportedLabel, new HBox(uint8, has3Channels));
@@ -1521,22 +1521,22 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         private final TableView<SearchResult> resultsTableView = new TableView<>();
         private final ObservableList<SearchResult> obsResults = FXCollections.observableArrayList();
 
-        private TextField searchTf;
-        private CheckBox restrictedByName;
-        private CheckBox restrictedByDesc;
-        private CheckBox searchForImages;
-        private CheckBox searchForDatasets;
-        private CheckBox searchForProjects;
-        private CheckBox searchForWells;
-        private CheckBox searchForPlates;
-        private CheckBox searchForScreens;
-        private ComboBox<OmeroRawObjects.Owner> ownedByCombo;
-        private ComboBox<OmeroRawObjects.Group> groupCombo;
+        private final TextField searchTf;
+        private final CheckBox restrictedByName;
+        private final CheckBox restrictedByDesc;
+        private final CheckBox searchForImages;
+        private final CheckBox searchForDatasets;
+        private final CheckBox searchForProjects;
+        private final CheckBox searchForWells;
+        private final CheckBox searchForPlates;
+        private final CheckBox searchForScreens;
+        private final ComboBox<OmeroRawObjects.Owner> ownedByCombo;
+        private final ComboBox<OmeroRawObjects.Group> groupCombo;
 
         private final int prefScale = 50;
 
-        private Button searchBtn;
-        private ProgressIndicator progressIndicator2;
+        private final Button searchBtn;
+        private final ProgressIndicator progressIndicator2;
 
         // Search query in separate thread
         private final ExecutorService executorQuery = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("query-processing", true));
@@ -1728,9 +1728,9 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                         return;
                     }
 
-                    if (item.type.toLowerCase().equals("project"))
+                    if (item.type.equalsIgnoreCase("project"))
                         img = omeroIcons.get(OmeroRawObjects.OmeroRawObjectType.PROJECT);
-                    else if (item.type.toLowerCase().equals("dataset"))
+                    else if (item.type.equalsIgnoreCase("dataset"))
                         img = omeroIcons.get(OmeroRawObjects.OmeroRawObjectType.DATASET);
                     else {
                         // To avoid ConcurrentModificationExceptions
@@ -1749,7 +1749,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     if (img != null) {
                         var wi = paintBufferedImageOnCanvas(img, canvas, prefScale);
                         Tooltip tooltip = new Tooltip();
-                        if (item.type.toLowerCase().equals("image")) {
+                        if (item.type.equalsIgnoreCase("image")) {
                             // Setting tooltips on hover
                             ImageView imageView = new ImageView(wi);
                             imageView.setFitHeight(250);
@@ -1962,14 +1962,14 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
 
     private class SearchResult {
-        private String type;
-        private int id;
-        private DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-        private String name;
-        private Date acquired;
-        private Date imported;
-        private String group;
-        private URL link;
+        private final String type;
+        private final int id;
+        private final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+        private final String name;
+        private final Date acquired;
+        private final Date imported;
+        private final String group;
+        private final URL link;
 
         private SearchResult(String[] values) throws ParseException, MalformedURLException {
             this.type = values[0];

@@ -58,7 +58,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 	/**
 	 * To handle the different stages of browsers (only allow one per OMERO server)
 	 */
-	private static Map<OmeroRawClient, OmeroRawImageServerBrowserCommand> rawBrowsers = new HashMap<>();
+	private static final Map<OmeroRawClient, OmeroRawImageServerBrowserCommand> rawBrowsers = new HashMap<>();
 
 	private static boolean alreadyInstalled = false;
 	
@@ -168,7 +168,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 					URI uriServer = OmeroRawTools.getServerURI(uri);
 
 					if (uriServer == null)
-						throw new MalformedURLException("Could not parse server from " + uri.toString());
+						throw new MalformedURLException("Could not parse server from " + uri);
 
 					// Check if client exist and if browser is already opened
 					var client = OmeroRawClients.getClientFromServerURI(uriServer);
@@ -176,7 +176,7 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 						client = OmeroRawClients.createClientAndLogin(uriServer);
 
 					if (client == null)
-						throw new IOException("Could not parse server from " + uri.toString());
+						throw new IOException("Could not parse server from " + uri);
 
 					var browser = rawBrowsers.get(client);
 					if (browser == null || browser.getStage() == null) {

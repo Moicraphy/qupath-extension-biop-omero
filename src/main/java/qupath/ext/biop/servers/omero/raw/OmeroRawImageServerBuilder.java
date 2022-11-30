@@ -36,12 +36,12 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
     /**
      * Last username for login
      */
-    private String lastUsername = "";
+    private final String lastUsername = "";
     /**
      * Encoding differences
      */
-    private String equalSign = "%3D";
-    private String vertBarSign = "%7C";
+    private final String equalSign = "%3D";
+    private final String vertBarSign = "%7C";
 
     static boolean canConnectToOmero(URI uri, String... args) {
         try {
@@ -115,7 +115,7 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
                 OmeroRawClient client = OmeroRawClients.getClientFromServerURI(serverUri);
                 return new OmeroRawImageServer(uri, client, args);
             } catch (IOException e) {
-                Dialogs.showErrorNotification("OMERO raw server", uri.toString() + " - " + e.getLocalizedMessage());
+                Dialogs.showErrorNotification("OMERO raw server", uri + " - " + e.getLocalizedMessage());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -207,7 +207,7 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
         }
 
         // At this point, no valid URI pattern was found
-        throw new IOException("URI not recognized: " + uri.toString());
+        throw new IOException("URI not recognized: " + uri);
     }
 
     private URI getStandardURI(URI uri, String... args) throws IOException {
@@ -227,7 +227,7 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
         if (matcherType.find())
             type = matcherType.group(1);
         else
-            throw new IOException("URI not recognized: " + uri.toString());
+            throw new IOException("URI not recognized: " + uri);
 
         var patternId = Pattern.compile(type + "(\\d+)");
         var matcherId = patternId.matcher(query);
@@ -279,14 +279,14 @@ public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedIm
 
             case "image-":
                 if (ids.isEmpty())
-                    throw new IOException("No image found in URI: " + uri.toString());
+                    throw new IOException("No image found in URI: " + uri);
                 for (int i = 0; i < ids.size(); i++) {
                     String imgId = (i == ids.size() - 1) ? ids.get(i) : ids.get(i) + vertBarSign + "image-";
                     sb.append(imgId);
                 }
                 break;
             default:
-                throw new IOException("No image found in URI: " + uri.toString());
+                throw new IOException("No image found in URI: " + uri);
         }
 
         return URI.create(sb.toString());

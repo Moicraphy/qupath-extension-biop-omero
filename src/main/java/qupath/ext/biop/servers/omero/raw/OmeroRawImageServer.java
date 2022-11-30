@@ -108,7 +108,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	/**
 	 * Manager to help keep multithreading under control.
 	 */
-	private static OmeroReaderManager manager = new OmeroRawImageServer.OmeroReaderManager();
+	private static final OmeroReaderManager manager = new OmeroRawImageServer.OmeroReaderManager();
 
 	/**
 	 * ColorModel to use with all BufferedImage requests.
@@ -752,8 +752,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
 	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
 	 *
-	 * *********************** BE CAREFUL *****************************
-	 * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
+	 * *********************** BE CAREFUL ****************************
+	 * For the z and t in the ImagePlane, if z &lt; 0 and t &lt; 0 (meaning that roi should be present on all the slices/frames),
 	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
 	 * ****************************************************************
 	 *
@@ -794,32 +794,32 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		 */
 		static class OmeroReaderManager {
 
-			private static Cleaner cleaner = Cleaner.create();
+			private static final Cleaner cleaner = Cleaner.create();
 
 			/**
 			 * Map of reads for each calling thread.  Care should be taking by the calling code to ensure requests are only made for 'lightweight' readers to avoid memory problems.
 			 */
-			private static ThreadLocal<LocalReaderWrapper> localReader = new ThreadLocal<>();
+			private static final ThreadLocal<LocalReaderWrapper> localReader = new ThreadLocal<>();
 
 			/**
 			 * Map of memoization file sizes.
 			 */
-			private static Map<String, Long> memoizationSizeMap = new HashMap<>();
+			private static final Map<String, Long> memoizationSizeMap = new HashMap<>();
 
 			/**
 			 * Temporary directory for storing memoization files
 			 */
-			private static File dirMemoTemp = null;
+			private static final File dirMemoTemp = null;
 
 			/**
 			 * A set of primary readers, to avoid needing to regenerate these for all servers.
 			 */
-			private static Set<LocalReaderWrapper> primaryReaders = Collections.newSetFromMap(new WeakHashMap<>());
+			private static final Set<LocalReaderWrapper> primaryReaders = Collections.newSetFromMap(new WeakHashMap<>());
 
 			/**
 			 * Set of created temp memo files
 			 */
-			private static Set<File> tempMemoFiles = new HashSet<>();
+			private static final Set<File> tempMemoFiles = new HashSet<>();
 
 			/**
 			 * Request a IFormatReader for a specified path that is unique for the calling thread.
@@ -978,14 +978,14 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 */
 			static class LocalReaderWrapper {
 
-				private RawPixelsStorePrx reader;
-				private PixelsData pixelsData;
+				private final RawPixelsStorePrx reader;
+				private final PixelsData pixelsData;
 				int nLevels;
 				int[] imageSizeX;
 				int[] imageSizeY;
 				private Map<String, String> readerOptions;
 
-				private OmeroRawClient client;
+				private final OmeroRawClient client;
 
 				LocalReaderWrapper(RawPixelsStorePrx reader, PixelsData pixelsData, OmeroRawClient client) {
 					this.reader = reader;
@@ -1030,8 +1030,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 */
 			static class ReaderCleaner implements Runnable {
 
-				private String name;
-				private RawPixelsStorePrx reader;
+				private final String name;
+				private final RawPixelsStorePrx reader;
 
 				ReaderCleaner(String name, RawPixelsStorePrx reader) {
 					this.name = name;

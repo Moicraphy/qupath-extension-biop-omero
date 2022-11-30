@@ -56,7 +56,7 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
 
     private final String title = "Send objects to OMERO";
 
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
 
     OmeroRawWriteDetectionObjectsCommand(QuPathGUI qupath) {
         this.qupath = qupath;

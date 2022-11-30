@@ -546,7 +546,7 @@ public final class OmeroRawTools {
             return "";
         }
     }
-;
+
     /**
      * Convert a QuPath measurement table to an OMERO table
      *
@@ -1200,7 +1200,7 @@ public final class OmeroRawTools {
 
     /**
      * Read key value pairs from OMERO and convert them into NamedValues. This OMERO-compatible object is more flexible
-     * than a Map<String, String> and therefore allows for two identical keys (Name).
+     * than a Map&lt;String, String&gt; and therefore allows for two identical keys (Name).
      *
      * @param client
      * @param imageId
@@ -1485,9 +1485,11 @@ public final class OmeroRawTools {
      * the specified {@code uri} to be formed properly (with at least a scheme and a host).
      * <p>
      * A few notes:
+     * <ul>
      * <li> If the URI does not contain a host (but does a path), it will be returned without modification. </li>
      * <li> If no host <b>and</b> no path is found, {@code null} is returned. </li>
      * <li> If the specified {@code uri} does not contain a scheme, {@code https://} will be used. </li>
+     * </ul>
      * <p>
      * E.g. {@code https://www.my-server.com/show=image-462} returns {@code https://www.my-server.com/}
      *
@@ -1509,7 +1511,7 @@ public final class OmeroRawTools {
                 scheme = "https://";
             return new URL(scheme, host, uri.getPort(), "").toURI();
         } catch (MalformedURLException | URISyntaxException ex) {
-            logger.error("Could not parse server from {}: {}", uri.toString(), ex.getLocalizedMessage());
+            logger.error("Could not parse server from {}: {}", uri, ex.getLocalizedMessage());
         }
         return null;
     }
@@ -1612,7 +1614,7 @@ public final class OmeroRawTools {
         }
 
         // At this point, no valid URI pattern was found
-        throw new IOException("URI not recognized: " + uri.toString());
+        throw new IOException("URI not recognized: " + uri);
     }
 
     static URI getStandardURI(URI uri, OmeroRawClient client) throws IOException, ExecutionException, DSOutOfServiceException, DSAccessException {
@@ -1631,7 +1633,7 @@ public final class OmeroRawTools {
         if (matcherType.find())
             type = OmeroRawObjects.OmeroRawObjectType.fromString(matcherType.group(1).replace("-", ""));
         else
-            throw new IOException("URI not recognized: " + uri.toString());
+            throw new IOException("URI not recognized: " + uri);
 
         var patternId = Pattern.compile(type.toString().toLowerCase() + "-(\\d+)");
         var matcherId = patternId.matcher(query);
@@ -1683,14 +1685,14 @@ public final class OmeroRawTools {
 
             case IMAGE:
                 if (ids.isEmpty())
-                    logger.info("No image found in URI: " + uri.toString());
+                    logger.info("No image found in URI: " + uri);
                 for (int i = 0; i < ids.size(); i++) {
                     String imgId = (i == ids.size()-1) ? ids.get(i) : ids.get(i) + vertBarSign + "image-";
                     sb.append(imgId);
                 }
                 break;
             default:
-                throw new IOException("No image found in URI: " + uri.toString());
+                throw new IOException("No image found in URI: " + uri);
         }
 
         return URI.create(sb.toString());

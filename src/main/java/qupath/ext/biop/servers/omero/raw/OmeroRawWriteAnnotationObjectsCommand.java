@@ -47,7 +47,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
     private final String title = "Sending annotations";
 
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
 
     OmeroRawWriteAnnotationObjectsCommand(QuPathGUI qupath) {
         this.qupath = qupath;

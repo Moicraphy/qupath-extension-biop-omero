@@ -66,9 +66,9 @@ public class OmeroRawClientsCommand implements Runnable {
 
     final private static Logger logger = LoggerFactory.getLogger(OmeroRawClientsCommand.class);
 
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
     private Stage dialog;
-    private ObservableSet<ServerInfo> clientsDisplayed;
+    private final ObservableSet<ServerInfo> clientsDisplayed;
     private ExecutorService executor;
 
     // GUI
@@ -174,10 +174,10 @@ public class OmeroRawClientsCommand implements Runnable {
      */
     class ServerInfo {
 
-        private OmeroRawClient client;
-        private GridPane pane;
+        private final OmeroRawClient client;
+        private final GridPane pane;
 
-        private IntegerProperty nImages;
+        private final IntegerProperty nImages;
 
         private ServerInfo(OmeroRawClient client) {
             this.client = client;

@@ -35,7 +35,6 @@ public class OmeroRawBrowserTools {
      * @param client
      * @param parent
      * @return list of OmeroRawObjects
-     * @throws IOException
      */
     public static List<OmeroRawObjects.OmeroRawObject> readOmeroObjectsItems(OmeroRawObjects.OmeroRawObject parent, OmeroRawClient client,
                                                                              OmeroRawObjects.Group group, OmeroRawObjects.Owner owner) {

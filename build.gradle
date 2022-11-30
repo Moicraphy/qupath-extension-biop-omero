@@ -92,6 +92,10 @@ java {
     }
 }
 
+javadoc {
+    options.addBooleanOption('html5', true)
+    destinationDir = new File(project.rootDir,"docs")
+}
 
 jar {
     // Important to set version so this can be queried within QuPath

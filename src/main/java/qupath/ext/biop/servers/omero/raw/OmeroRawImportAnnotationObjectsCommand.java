@@ -24,7 +24,7 @@ import java.util.Collection;
 public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
 
     private final String title = "Import objects from OMERO";
-    private QuPathGUI qupath;
+    private final QuPathGUI qupath;
     public OmeroRawImportAnnotationObjectsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }
