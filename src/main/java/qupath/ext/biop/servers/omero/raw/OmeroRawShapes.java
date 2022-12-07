@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import qupath.lib.geom.Point2;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
+import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.classes.PathClassFactory;
 import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.*;
@@ -78,8 +79,8 @@ class OmeroRawShapes {
 
         // check if the color is not the default color (yellow) for selected objects
         if(color == null || color.equals(Color.YELLOW))
-            pathObject.setColorRGB(Color.RED.getRGB());
-        else pathObject.setColorRGB(color.getRGB());
+            pathObject.setColor(Color.RED.getRGB());
+        else pathObject.setColor(color.getRGB());
 
         return pathObject;
     }
@@ -129,19 +130,19 @@ class OmeroRawShapes {
                 if (!isValidClass)
                     pathObject = PathObjects.createDetectionObject(roi);
                 else
-                    pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(classes));
+                    pathObject = PathObjects.createDetectionObject(roi, PathClass.fromCollection(classes));
                 break;
             case "annotation":
             default:
                 if (!isValidClass)
                     pathObject = PathObjects.createAnnotationObject(roi);
                 else
-                    pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(classes));
+                    pathObject = PathObjects.createAnnotationObject(roi, PathClass.fromCollection(classes));
                 break;
         }
 
         if(!isValidClass)
-            pathObject.setColorRGB(Color.RED.getRGB());
+            pathObject.setColor(Color.RED.getRGB());
 
         return pathObject;
     }
@@ -244,7 +245,6 @@ class OmeroRawShapes {
                 list.add(ROIs.createPolylineROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
                         s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
                         ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
-
 
             }else if(shape instanceof omero.model.Polygon){
                 PolygonData s = new PolygonData(shape);

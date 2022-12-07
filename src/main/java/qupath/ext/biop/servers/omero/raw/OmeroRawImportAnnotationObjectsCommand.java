@@ -86,7 +86,7 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
 
         // add rois from OMERO
         if(!roiFromOmero.isEmpty()) {
-            hierarchy.addPathObjects(roiFromOmero);
+            hierarchy.addObjects(roiFromOmero);
             hierarchy.resolveHierarchy();
         }
         else{

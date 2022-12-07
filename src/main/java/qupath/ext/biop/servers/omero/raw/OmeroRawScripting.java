@@ -85,7 +85,7 @@ public class OmeroRawScripting {
 
         // add pathObjects to the current hierarchy
         if (!pathObjects.isEmpty()) {
-            hierarchy.addPathObjects(pathObjects);
+            hierarchy.addObjects(pathObjects);
             hierarchy.resolveHierarchy();
         }
 

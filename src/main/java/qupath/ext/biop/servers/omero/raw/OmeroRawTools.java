@@ -1015,7 +1015,7 @@ public final class OmeroRawTools {
         idParentIdMap.keySet().forEach(objID->{
             // if the current object has a valid id and has a parent
             if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID)) == null))
-                idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
+                idObjectMap.get(idParentIdMap.get(objID)).addChildObject(idObjectMap.get(objID));
             else
                 // if no valid id for object or if the object has no parent
                 pathObjects.add(idObjectMap.get(objID));
