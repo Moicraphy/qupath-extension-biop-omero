@@ -42,10 +42,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import omero.ServerError;
-import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
+import org.controlsfx.glyphfont.GlyphFontRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,7 +103,6 @@ import qupath.lib.gui.commands.ProjectCommands;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.prefs.PathPrefs;
 import qupath.lib.gui.tools.GuiTools;
-import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.images.servers.ImageServerProvider;
 import qupath.ext.biop.servers.omero.raw.OmeroRawAnnotations.CommentAnnotation;
@@ -1452,7 +1450,12 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     }
 
                     for (int i = 0; i < Math.round(rating/anns.size()); i++)
-                        gp.add(IconFactory.createNode(QuPathGUI.TOOLBAR_ICON_SIZE, QuPathGUI.TOOLBAR_ICON_SIZE, IconFactory.PathIcons.STAR), i, 0);
+                        gp.add(GlyphFontRegistry
+                                .font("icomoon") // font style of the icon
+                                .create("\u2605") // icon type (a star)
+                                .size(QuPathGUI.TOOLBAR_ICON_SIZE) // size of the icon
+                                .color(javafx.scene.paint.Color.GRAY), // color the icon
+                                i, 0);
                     gp.setHgap(10.0);
                     break;
                 default:

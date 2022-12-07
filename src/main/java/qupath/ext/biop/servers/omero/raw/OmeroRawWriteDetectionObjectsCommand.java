@@ -21,19 +21,14 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Date;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
-import omero.gateway.exception.DSAccessException;
-import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.model.TableData;
 import org.apache.commons.lang3.StringUtils;
 
 import javafx.scene.control.Label;
@@ -43,7 +38,6 @@ import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.tools.PaneTools;
 import qupath.lib.objects.PathObject;
-import qupath.lib.scripting.QP;
 
 /**
  * Command to write path objects back to the OMERO server where the

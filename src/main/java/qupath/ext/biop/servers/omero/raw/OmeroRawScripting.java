@@ -9,7 +9,6 @@ import omero.model.NamedValue;
 import omero.model.RenderingDef;
 import omero.rtypes;
 import qupath.lib.display.ChannelDisplayInfo;
-import qupath.lib.gui.commands.ProjectCommands;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.scripting.QPEx;

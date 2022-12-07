@@ -23,14 +23,10 @@ package qupath.ext.biop.servers.omero.raw;
 
 import java.net.ConnectException;
 import java.net.URI;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 import javafx.collections.*;
-import javafx.scene.layout.Pane;
-import omero.gateway.exception.DSOutOfServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

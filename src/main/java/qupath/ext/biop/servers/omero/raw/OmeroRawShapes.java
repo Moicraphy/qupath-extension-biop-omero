@@ -31,28 +31,22 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import omero.gateway.model.ShapeData;
 import omero.model.*;
 import org.locationtech.jts.geom.*;
-import org.locationtech.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import qupath.lib.geom.Point2;
-import qupath.lib.gui.QuPathGUI;
-import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
-import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.classes.PathClassFactory;
 import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.*;
 import qupath.lib.roi.interfaces.ROI;
 
 import omero.gateway.model.*;
-import qupath.lib.scripting.QP;
+
 
 class OmeroRawShapes {
 
