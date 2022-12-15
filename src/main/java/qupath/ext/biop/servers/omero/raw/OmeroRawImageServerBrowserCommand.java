@@ -593,7 +593,6 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     .flatMap(item -> {
                         OmeroRawObjects.OmeroRawObject uri = item.getValue();
                         if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-                            //System.out.println("ImportBtn -> objType == project");
                             var temp = getChildren(uri,comboGroup.getSelectionModel().getSelectedItem(), comboOwner.getSelectionModel().getSelectedItem());
                             List<OmeroRawObjects.OmeroRawObject> out = new ArrayList<>();
                             for (var subTemp: temp) {
@@ -687,7 +686,6 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             OmeroRawExtension.getOpenedRawBrowsers().remove(client);
         });
         dialog.showAndWait();
-       // System.out.println("end of run");
     }
 
     /**

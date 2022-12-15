@@ -355,8 +355,9 @@ public final class OmeroRawTools {
     public static RenderingDef readOmeroRenderingSettings(OmeroRawClient client, long imageId){
         try {
             // get pixel id
+            System.out.println("image ID in rendering settings : "+imageId );
             long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
-
+            System.out.println("pixel ID in rendering settiongs : "+pixelsId );
             // get rendering settings
             RenderingDef renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
 
@@ -374,7 +375,7 @@ public final class OmeroRawTools {
             }
             return renderingDef;
 
-        } catch(ExecutionException | DSOutOfServiceException | ServerError e){
+        } catch(ExecutionException | DSOutOfServiceException | ServerError | NullPointerException e){
             Dialogs.showErrorNotification("Rendering def reading","Could not read rendering settings on OMERO.");
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
@@ -531,9 +532,7 @@ public final class OmeroRawTools {
     public static String readImageFileType(OmeroRawClient client, long imageId){
         try {
             ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
-            String format = imageData.asImage().getFormat().getValue().getValue();
-            System.out.println("format : "+format);
-            return format;
+            return imageData.asImage().getFormat().getValue().getValue();
         } catch(ExecutionException | DSOutOfServiceException e) {
             Dialogs.showErrorNotification("Reading OMERO annotations", "Cannot get annotations from OMERO for the image "+imageId);
             logger.error(""+e);
@@ -758,25 +757,46 @@ public final class OmeroRawTools {
 
         // get the current image
         ImageData image = readOmeroImage(client, imageId);
+        System.out.println("image id when update thumbnail : " +imageId);
+        System.out.println("rendering settings id when update thumbnail : "+objectId);
+
+        ThumbnailStorePrx store = null;
+        try {
+            store = client.getGateway().getThumbnailService(client.getContext());
+        } catch(DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot get the Thumbnail service for image " + imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+           return false;
+        }
+
+        if(store == null){
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot get the Thumbnail service for image " + imageId);
+            return false;
+        }
 
         try {
             // get the pixel id to retrieve the correct thumbnail
             long pixelId = image.getDefaultPixels().getId();
-            // get thumbnail factory
-            ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
+            System.out.println("pixel id   " + pixelId);
             // get current thumbnail
             store.setPixelsId(pixelId);
             //set the new settings
             store.setRenderingDefId(objectId);
             // update the thumbnail
+            Thread.sleep(1000);
             store.createThumbnails();
-            // close the factory
-            store.close();
-        } catch (DSOutOfServiceException | ServerError | NullPointerException e) {
-            Dialogs.showErrorNotification( "Update OMERO Thumbnail","Thumbnail cannot be updated for image "+imageId);
+        } catch (ServerError | NullPointerException | InterruptedException e) {
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Thumbnail cannot be updated for image " + imageId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             wasAdded = false;
+        }
+
+        try {
+            store.close();
+        } catch (ServerError e) {
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot close the ThumbnailStore");
         }
 
         return wasAdded;
