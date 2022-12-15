@@ -966,7 +966,7 @@ public final class OmeroRawTools {
         Map<PathObject,String> idObjectMap = new HashMap<>();
 
         // create unique ID for each object
-        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()));
+        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getID().toString()));
 
         pathObjects.forEach(pathObject -> {
             // computes OMERO-readable ROIs

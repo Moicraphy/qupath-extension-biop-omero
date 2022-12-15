@@ -112,11 +112,6 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         if (!confirm)
             return;
 
-        // Write path object(s)
-        // give to each pathObject a unique name
-        //TODO remove this unique id in qupath 0.4.0
-        objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
-
         // send annotations to OMERO
         boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
         if(hasBeenSaved)
@@ -150,10 +145,6 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             }
             else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
         }
-
-        // remove the name to not interfere with QuPath ROI display.
-        //TODO remove this unique id in qupath 0.4.0
-        objs.forEach(pathObject -> pathObject.setName(null));
 
         if(detectionMap || annotationMap)
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully sent to OMERO server",

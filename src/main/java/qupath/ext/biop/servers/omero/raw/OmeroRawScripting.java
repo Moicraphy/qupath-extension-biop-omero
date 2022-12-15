@@ -199,13 +199,8 @@ public class OmeroRawScripting {
      * @return
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects, boolean deleteROIsOnOMERO) {
-        // set pathObjectName with a unique ID
-        //TODO remove this unique id in qupath 0.4.0
-        pathObjects.forEach(pathObject -> pathObject.setName("" + (new Date()).getTime() + pathObject.hashCode()));
         // convert pathObjects to OMERO ROIs
         List<ROIData> omeroROIs = OmeroRawTools.createOmeroROIsFromPathObjects(pathObjects);
-        // set pathObjectName to null to not interfere with qupath display
-        pathObjects.forEach(pathObject -> pathObject.setName(null));
 
         // get omero client and image id to send ROIs to the correct image
         OmeroRawClient client = imageServer.getClient();

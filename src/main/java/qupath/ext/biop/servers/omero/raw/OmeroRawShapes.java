@@ -109,7 +109,7 @@ class OmeroRawShapes {
 
         // code breaks all the current project
         // do not use
-        // and wait for the version TODO 0.4.0
+        // and wait for the version TODO
 
        /* // create new PathClasses if they are not already created
         List<PathClass> availablePathClasses = QPEx.getQuPath().getProject().getPathClasses();
