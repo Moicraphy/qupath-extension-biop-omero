@@ -212,6 +212,12 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		return browseServerMenu;
 	}
 
+	/**
+	 * read the txt file where the omero server is stored. If there is no file, or if the file is corrupted,
+	 * then it returns an empty string.
+	 *
+	 * @return
+	 */
 	private static String getDefaultOmeroServer(){
 		String extensionPath = PathPrefs.getExtensionsPath();
 		if(extensionPath == null)
@@ -243,6 +249,12 @@ public class OmeroRawExtension implements QuPathExtension, GitHubProject {
 		return omeroServer;
 	}
 
+	/**
+	 * create a txt file with the omero server entered by the user.
+	 * This is to avoid typing it each time you want to connect to OMERO server
+	 *
+	 * @param omeroDefaultServer
+	 */
 	private static void createOmeroDefaultServerFile(String omeroDefaultServer) {
 		String extensionPath = PathPrefs.getExtensionsPath();
 		if(extensionPath == null || !new File(extensionPath).exists()) return;
