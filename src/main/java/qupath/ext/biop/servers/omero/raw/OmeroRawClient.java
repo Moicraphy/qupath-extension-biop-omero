@@ -46,7 +46,15 @@ import qupath.lib.gui.dialogs.Dialogs;
 
 import javax.naming.OperationNotSupportedException;
 import java.io.IOException;
-import java.net.*;
+
+import java.net.Authenticator;
+import java.net.ConnectException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.PasswordAuthentication;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

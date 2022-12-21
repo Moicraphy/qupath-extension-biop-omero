@@ -1,16 +1,14 @@
 package qupath.ext.biop.servers.omero.raw;
 
 import fr.igred.omero.Client;
-import omero.ServerError;
-import omero.api.RenderingEnginePrx;
-import omero.api.ThumbnailStorePrx;
-import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
-import omero.gateway.facility.BrowseFacility;
-import omero.gateway.facility.DataManagerFacility;
-import omero.gateway.facility.MetadataFacility;
-import omero.gateway.model.*;
+
+import omero.gateway.model.ChannelData;
+import omero.gateway.model.MapAnnotationData;
+import omero.gateway.model.ROIData;
+import omero.gateway.model.TableData;
+import omero.gateway.model.TagAnnotationData;
 import omero.model.ChannelBinding;
 import omero.model.NamedValue;
 import omero.model.RenderingDef;
@@ -29,8 +27,13 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.ExecutionException;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class OmeroRawScripting {
@@ -988,7 +991,6 @@ public class OmeroRawScripting {
             Dialogs.showErrorNotification("OMERO channel settings", "Cannot access to rendering settings of the image " + imageServer.getId());
             return false;
         }
-        System.out.println("renderingSettings.getId().getValue() : "+renderingSettings.getId().getValue());
 
         // get the number of the channels in OMERO
         int omeroNChannels = OmeroRawTools.readOmeroChannels(imageServer.getClient(), imageServer.getId()).size();
@@ -1019,139 +1021,8 @@ public class OmeroRawScripting {
         boolean updateImageDisplay = OmeroRawTools.updateObjectOnOmero(imageServer.getClient(), renderingSettings);
 
         // update the image thumbnail on OMERO
-        System.out.println("renderingSettings.getId().getValue() : "+renderingSettings.getId().getValue());
         boolean updateThumbnail = OmeroRawTools.updateOmeroThumbnail(imageServer.getClient(), imageServer.getId(), renderingSettings.getId().getValue());
 
         return updateImageDisplay && updateThumbnail;
     }
-
-/*
-    public static void testThumbnailError(OmeroRawImageServer imageServer){
-        // client and imageId are given as input arguments
-        System.out.println(Thread.currentThread());
-        OmeroRawClient client = imageServer.getClient();
-        long imageId = imageServer.getId();
-// get rendering settings
-        RenderingDef renderingDef = null;
-
-        try {
-            // get pixel id
-            long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
-            System.out.println(Thread.currentThread());
-            // get rendering settings
-            renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
-
-            if(renderingDef == null) {
-                // load rendering settings if they were not automatically loaded
-                RenderingEnginePrx re = client.getGateway().getRenderingService(client.getContext(), pixelsId);
-                re.lookupPixels(pixelsId);
-                if (!(re.lookupRenderingDef(pixelsId))) {
-                    re.resetDefaultSettings(true);
-                    re.lookupRenderingDef(pixelsId);
-                }
-                re.load();
-                re.close();
-                renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
-            }
-            System.out.println(Thread.currentThread());
-        } catch(ExecutionException | DSOutOfServiceException | ServerError | DSAccessException e){
-            return ;
-        }
-
-
-// get the current image
-        System.out.println(Thread.currentThread());
-        omero.gateway.model.ImageData image = null;
-        int nChannels = 1;
-        try {
-            image =  client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
-            nChannels = client.getGateway().getFacility(MetadataFacility.class).getChannelData(client.getContext(), imageId).size();
-        }catch(ExecutionException | DSOutOfServiceException | DSAccessException | NoSuchElementException e){
-            System.out.println("An error occurs when reading OMERO image "+imageId);
-            return ;
-        }
-        System.out.println(Thread.currentThread());
-// change renderdef settings to change channel color
-        for(int c = 0; c < nChannels; c++) {
-            // get min/max display
-            Color color = new Color(100 + c, c, 255 - c);
-
-            // set the rendering settings with new min/max values
-            ChannelBinding binding = renderingDef.getChannelBinding(c);
-            binding.setBlue(rtypes.rint(color.getBlue()));
-            binding.setRed(rtypes.rint(color.getRed()));
-            binding.setGreen(rtypes.rint(color.getGreen()));
-            binding.setAlpha(rtypes.rint(color.getAlpha()));
-        }
-
-// update the object
-        try{
-            // update the object on OMERO
-            System.out.println(Thread.currentThread());
-            client.getGateway().getFacility(DataManagerFacility.class).updateObject(client.getContext(), renderingDef, null);
-        } catch (ExecutionException | DSOutOfServiceException | DSAccessException e){
-            System.out.println("Error during updating object on OMERO.");
-            System.out.println(OmeroRawTools.getErrorStackTraceAsString(e));
-            return;
-        }
-
-
-        RenderingDef renderingDef2 = null;
-
-        try {
-            // get pixel id
-            long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
-            System.out.println(Thread.currentThread());
-            // get rendering settings
-            renderingDef2 = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
-
-            if(renderingDef2 == null) {
-                // load rendering settings if they were not automatically loaded
-                RenderingEnginePrx re = client.getGateway().getRenderingService(client.getContext(), pixelsId);
-                re.lookupPixels(pixelsId);
-                if (!(re.lookupRenderingDef(pixelsId))) {
-                    re.resetDefaultSettings(true);
-                    re.lookupRenderingDef(pixelsId);
-                }
-                re.load();
-                re.close();
-                renderingDef2 = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
-            }
-            System.out.println(Thread.currentThread());
-        } catch(ExecutionException | DSOutOfServiceException | ServerError | DSAccessException e){
-            return ;
-        }
-
-// update the thumbnail
-        ThumbnailStorePrx store = null;
-        try {
-            // get the pixel id to retrieve the correct thumbnail
-            System.out.println(Thread.currentThread());
-            long pixelId = image.getDefaultPixels().getId();
-            // get thumbnail factory
-            store = client.getGateway().getThumbnailService(client.getContext());
-            System.out.println(Thread.currentThread());
-            // get current thumbnail
-            store.setPixelsId(pixelId);
-            System.out.println(Thread.currentThread());
-            //set the new settings
-            store.setRenderingDefId(renderingDef2.getId().getValue());
-            System.out.println(Thread.currentThread());
-            // update the thumbnail
-            store.createThumbnails();
-            System.out.println(Thread.currentThread());
-        } catch (DSOutOfServiceException | ServerError | NullPointerException e) {
-            System.out.println("Thumbnail cannot be updated for image "+imageId);
-            System.out.println(e);
-            System.out.println(OmeroRawTools.getErrorStackTraceAsString(e));
-        } finally {
-            try {
-                if(store!=null)
-                    store.close();
-            }catch(ServerError e){
-                Dialogs.showErrorNotification("Update OMERO Thumbnail","Cannot close the ThumbnailStore");
-            }
-        }
-    }*/
-
 }

@@ -21,16 +21,29 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
-import java.awt.*;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
-import java.io.*;
+
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,14 +55,48 @@ import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.*;
-import omero.gateway.model.*;
-import omero.model.*;
+
+import omero.gateway.facility.BrowseFacility;
+import omero.gateway.facility.DataManagerFacility;
+import omero.gateway.facility.MetadataFacility;
+import omero.gateway.facility.ROIFacility;
+import omero.gateway.facility.TablesFacility;
+
+import omero.gateway.model.AnnotationData;
+import omero.gateway.model.ChannelData;
+import omero.gateway.model.DatasetData;
+import omero.gateway.model.EllipseData;
+import omero.gateway.model.ImageData;
+import omero.gateway.model.LineData;
+import omero.gateway.model.MapAnnotationData;
+import omero.gateway.model.PixelsData;
+import omero.gateway.model.PointData;
+import omero.gateway.model.PolygonData;
+import omero.gateway.model.PolylineData;
+import omero.gateway.model.ProjectData;
+import omero.gateway.model.ROIData;
+import omero.gateway.model.ROIResult;
+import omero.gateway.model.RectangleData;
+import omero.gateway.model.ShapeData;
+import omero.gateway.model.TableData;
+import omero.gateway.model.TableDataColumn;
+import omero.gateway.model.TagAnnotationData;
+import omero.model.Dataset;
+import omero.model.Ellipse;
+import omero.model.Experimenter;
+import omero.model.ExperimenterGroup;
+import omero.model.IObject;
 import omero.model.Image;
 import omero.model.Label;
+import omero.model.Line;
+import omero.model.Mask;
+import omero.model.NamedValue;
 import omero.model.Point;
 import omero.model.Polygon;
+import omero.model.Polyline;
 import omero.model.Rectangle;
+import omero.model.RenderingDef;
+import omero.model.Roi;
 import omero.model.Shape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -355,9 +402,7 @@ public final class OmeroRawTools {
     public static RenderingDef readOmeroRenderingSettings(OmeroRawClient client, long imageId){
         try {
             // get pixel id
-            System.out.println("image ID in rendering settings : "+imageId );
             long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
-            System.out.println("pixel ID in rendering settiongs : "+pixelsId );
             // get rendering settings
             RenderingDef renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
 
@@ -757,14 +802,11 @@ public final class OmeroRawTools {
 
         // get the current image
         ImageData image = readOmeroImage(client, imageId);
-        System.out.println("image id when update thumbnail : " +imageId);
-        System.out.println("rendering settings id when update thumbnail : "+objectId);
 
         ThumbnailStorePrx store = null;
         try {
             store = client.getGateway().getThumbnailService(client.getContext());
         } catch(DSOutOfServiceException e){
-            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot get the Thumbnail service for image " + imageId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
            return false;
@@ -778,7 +820,6 @@ public final class OmeroRawTools {
         try {
             // get the pixel id to retrieve the correct thumbnail
             long pixelId = image.getDefaultPixels().getId();
-            System.out.println("pixel id   " + pixelId);
             // get current thumbnail
             store.setPixelsId(pixelId);
             //set the new settings
@@ -1799,6 +1840,6 @@ public final class OmeroRawTools {
     }
 
     public static String getErrorStackTraceAsString(Exception e){
-        return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a,b)->a + "     at "+b+"\n");
+        return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a, b)->a + "     at "+b+"\n");
     }
 }

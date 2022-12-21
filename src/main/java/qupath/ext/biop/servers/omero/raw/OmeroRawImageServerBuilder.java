@@ -8,8 +8,18 @@ import qupath.lib.images.servers.ImageServerBuilder;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.*;
-import java.util.*;
+
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class OmeroRawImageServerBuilder implements ImageServerBuilder<BufferedImage> {

@@ -31,9 +31,25 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import omero.gateway.model.EllipseData;
+import omero.gateway.model.LineData;
+import omero.gateway.model.PointData;
+import omero.gateway.model.PolygonData;
+import omero.gateway.model.PolylineData;
+import omero.gateway.model.ROIData;
+import omero.gateway.model.RectangleData;
 import omero.gateway.model.ShapeData;
-import omero.model.*;
-import org.locationtech.jts.geom.*;
+
+import omero.model.Ellipse;
+import omero.model.Label;
+import omero.model.Line;
+import omero.model.Mask;
+import omero.model.Polyline;
+import omero.model.Rectangle;
+import omero.model.Roi;
+import omero.model.Shape;
+
+import org.locationtech.jts.geom.Coordinate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,12 +57,18 @@ import qupath.lib.geom.Point2;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.classes.PathClass;
-import qupath.lib.objects.classes.PathClassFactory;
 import qupath.lib.regions.ImagePlane;
-import qupath.lib.roi.*;
-import qupath.lib.roi.interfaces.ROI;
 
-import omero.gateway.model.*;
+import qupath.lib.roi.EllipseROI;
+import qupath.lib.roi.GeometryROI;
+import qupath.lib.roi.LineROI;
+import qupath.lib.roi.PointsROI;
+import qupath.lib.roi.PolygonROI;
+import qupath.lib.roi.PolylineROI;
+import qupath.lib.roi.ROIs;
+import qupath.lib.roi.RectangleROI;
+import qupath.lib.roi.RoiTools;
+import qupath.lib.roi.interfaces.ROI;
 
 
 class OmeroRawShapes {

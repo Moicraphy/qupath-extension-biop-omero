@@ -30,7 +30,16 @@ import java.net.URL;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -164,7 +173,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
     // Browser data 'storage'
    // private List<OmeroRawObject> serverChildrenList;
-    private Map<OmeroRawObjects.Group, Map<OmeroRawObjects.Owner,List<OmeroRawObjects.OmeroRawObject>>> groupOwnersChildrenMap;
+    private Map<OmeroRawObjects.Group, Map<OmeroRawObjects.Owner, List<OmeroRawObjects.OmeroRawObject>>> groupOwnersChildrenMap;
     private ObservableList<OmeroRawObjects.OmeroRawObject> orphanedImageList;
     private Map<OmeroRawObjects.Group, List<OmeroRawObjects.Owner>> groupMap;
     private Map<OmeroRawObjects.OmeroRawObject, List<OmeroRawObjects.OmeroRawObject>> projectMap;

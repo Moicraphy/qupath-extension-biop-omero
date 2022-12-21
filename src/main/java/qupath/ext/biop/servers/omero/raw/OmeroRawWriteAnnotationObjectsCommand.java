@@ -23,7 +23,6 @@ package qupath.ext.biop.servers.omero.raw;
 
 import java.net.URI;
 import java.util.Collection;
-import java.util.Date;
 
 import javafx.scene.control.CheckBox;
 import org.apache.commons.lang3.StringUtils;
