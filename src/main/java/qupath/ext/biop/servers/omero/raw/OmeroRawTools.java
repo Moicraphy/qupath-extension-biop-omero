@@ -783,10 +783,17 @@ public final class OmeroRawTools {
             store.setPixelsId(pixelId);
             //set the new settings
             store.setRenderingDefId(objectId);
-            // update the thumbnail
-            Thread.sleep(1000);
-            store.createThumbnails();
-        } catch (ServerError | NullPointerException | InterruptedException e) {
+
+            try {
+                // update the thumbnail
+                store.createThumbnails();
+            } catch (ServerError e) {
+                logger.error("Error during thumbnail creation but thumbnail is updated ");
+                logger.error("" + e);
+                logger.error(getErrorStackTraceAsString(e));
+            }
+
+        } catch (NullPointerException | ServerError e) {
             Dialogs.showErrorNotification("Update OMERO Thumbnail", "Thumbnail cannot be updated for image " + imageId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
@@ -794,9 +801,12 @@ public final class OmeroRawTools {
         }
 
         try {
+            // close the store
             store.close();
         } catch (ServerError e) {
             Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot close the ThumbnailStore");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
         }
 
         return wasAdded;
