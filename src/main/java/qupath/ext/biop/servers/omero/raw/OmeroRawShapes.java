@@ -77,24 +77,28 @@ class OmeroRawShapes {
 
 
     /**
-     * Create a PathObject with of certain type (annotation, detection,...)
-     * with no class and the default red color
+     * Create a PathObject of type annotation or detection from a QuPath ROI object
+     * without any class and with the default red color.
+     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass)} for the full documentation.
      *
-     * @param roi
-     * @param roiType
-     * @return
+     * @param roi roi to convert
+     * @param roiType annotation or detection type
+     * @return a new pathObject
      */
     public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType){
         return createPathObjectFromQuPathRoi(roi, roiType,"");
     }
 
     /**
-     * Create a PathObject with of certain type (annotation, detection,...)
-     * with a certain color and without any class
+     * Create a PathObject of type annotation or detection from a QuPath ROI object, with a certain color. If the
+     * color is yellow (i.e. default color on OMERO), it is automatically converted to QuPath default red color.
+     * No class is assigned to the new PathObject.
+     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass)} for the full documentation.
      *
-     * @param roi
-     * @param roiType
-     * @return
+     * @param roi roi to convert
+     * @param roiType annotation or detection type
+     * @param color color to assign to the pathObject
+     * @return a new pathObject
      */
     public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, Color color){
         PathObject pathObject = createPathObjectFromQuPathRoi(roi, roiType, "");
@@ -109,16 +113,17 @@ class OmeroRawShapes {
 
 
     /**
-     * Create a PathObject with of type annotation or detection
-     * with the specified class and the color associated to the class.
-     *
+     * Create a PathObject of type annotation or detection from a QuPath ROI object.
+     * with the specified class. If the class is not a valid class, no class is assigned to the pathObject and
+     * the default red color is assigned to it.
+     * <br>
      * Currently, pathObjects of "cell" type are not supported and are considered as detections.
-     * All pathObjects of other type are automatically assigned to annotation type.
+     * All pathObjects of other type (i.e. non recognized types) are automatically assigned to annotation type.
      *
-     * @param roi
-     * @param roiType
-     * @param roiClass
-     * @return
+     * @param roi roi to convert
+     * @param roiType annotation or detection type
+     * @param roiClass pathClasses assigned to the roi
+     * @return a new pathObject
      */
     public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass){
         PathObject pathObject;
@@ -171,12 +176,12 @@ class OmeroRawShapes {
 
 
     /**
-     * convert Omero ROIs To QuPath ROIs.
-     * For annotations, takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality.
-     * For detections, no complex ROIs are possible. So, each shape = one ROI
+     * Convert OMERO ROIs To QuPath ROIs. <br>
+     * For annotations, it takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality. <br>
+     * For detections, no complex ROIs are possible (i.e. one shape = one ROI)
      *
-     * @param roiDatum
-     * @return
+     * @param roiDatum OMERO ROI to convert
+     * @return QuPath ROI
      */
     public static ROI convertOmeroROIsToQuPathROIs(ROIData roiDatum) {
         // Convert OMERO ROIs into QuPath ROIs
@@ -229,15 +234,15 @@ class OmeroRawShapes {
     }
 
     /**
-     * convert Omero ROIs To QuPath ROIs.
+     * Convert OMERO shapes To QuPath ROIs.
      * <br>
      * ***********************BE CAREFUL***************************** <br>
      * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
      * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame) <br>
      * ****************************************************************
      *
-     * @param roiData
-     * @return list of QuPath ROIs
+     * @param roiData OMERO Roi to convert
+     * @return List of QuPath ROIs (one OMERO shape = one QuPath ROI)
      */
     private static List<ROI> convertOmeroShapesToQuPathROIs(ROIData roiData){
         // get the ROI
@@ -295,7 +300,7 @@ class OmeroRawShapes {
 
 
     /**
-     * Output the ROI result of the XOR operation between the 2 input ROIs
+     * Output the ROI result of the XOR operation between the roi1 and roi2
      * <br>
      * ***********************BE CAREFUL***************************** <br>
      * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
@@ -304,7 +309,7 @@ class OmeroRawShapes {
      *
      * @param roi1
      * @param roi2
-     * @return ROI resulting of the XOR operation
+     * @return Results of the XOR operation between the two ROIs
      */
     private static ROI linkShapes(ROI roi1, ROI roi2){
         // get the area of the first roi
@@ -329,11 +334,13 @@ class OmeroRawShapes {
 
 
     /**
-     * Convert PathObjects into OMERO-readable objects. In case the PathObject contains holes, it is split
+     * Convert a PathObject into OMERO-readable objects. In case the PathObject contains holes (i.e. complex annotation), it is split
      * into individual shapes and each shape will be part of the same OMERO ROI (nested hierarchy in OMERO.web).
      *
      * @param src : pathObject to convert
-     * @return
+     * @param objectID pathObject's ID
+     * @param parentID pathObject parent's ID
+     * @return list of OMERO shapes
      */
     public static List<ShapeData> convertQuPathRoiToOmeroRoi(PathObject src, String objectID, String parentID) {
         ROI roi = src.getROI();
@@ -411,7 +418,7 @@ class OmeroRawShapes {
             // process each individual shape
             for (ROI value : rois) {
                 if(!(value ==null))
-                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value, src.getPathClass()),objectID,parentID));
+                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value, src.getPathClass()), objectID, parentID));
             }
 
         } else {
@@ -423,12 +430,13 @@ class OmeroRawShapes {
 
 
     /**
-     * Write a string to populate ROI comment and have access to the type,class and parent of each object.
+     * Write the formatted ROI comment  => "type:class1&class2:objectID:parentID"
      *
-     * @param src
-     * @param objectID
-     * @param parentID
-     * @return
+     * @param src : pathObject to get pathClasses from
+     * @param objectID pathObject's ID
+     * @param parentID pathObject parent's ID
+     *
+     * @return formatted comment
      */
     private static String setRoiComment(PathObject src, String objectID, String parentID){
 
@@ -446,8 +454,8 @@ class OmeroRawShapes {
     /**
      * Split holes and envelop of the same polygon into independent ROIs.
      *
-     * @param rois List of split ROIs
-     * @return list of ROIs of decoupling external and internal rings
+     * @param rois List of ROIs
+     * @return list of external and internal rings from ROIs
      */
     private static List<ROI> splitHolesAndShape(List<ROI> rois) {
         List<ROI> polygonROIs = new ArrayList<>();

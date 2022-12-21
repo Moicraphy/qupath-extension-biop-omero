@@ -201,7 +201,18 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		// Add URI to the client's list of URIs
 		client.addURI(uri);
 	}
-	
+
+	/**
+	 * read image metadata and build a QuPath ImageServerMetadata object.
+	 *
+	 * @return
+	 * @throws IOException
+	 * @throws ServerError
+	 * @throws DSOutOfServiceException
+	 * @throws ExecutionException
+	 * @throws DSAccessException
+	 * @throws URISyntaxException
+	 */
 	protected ImageServerMetadata buildMetadata() throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 
 		long startTime = System.currentTimeMillis();
@@ -793,10 +804,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * Retrieve any ROIs stored with this image as annotation objects.
 	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
 	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
-	 *
-	 * *********************** BE CAREFUL ****************************
+	 * <br>
+	 * ***********************BE CAREFUL****************************<br>
 	 * For the z and t in the ImagePlane, if z &lt; 0 and t &lt; 0 (meaning that roi should be present on all the slices/frames),
-	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
+	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)<br>
 	 * ****************************************************************
 	 *
 	 * @return list of path objects

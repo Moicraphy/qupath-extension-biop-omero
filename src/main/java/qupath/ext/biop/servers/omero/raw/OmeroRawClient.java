@@ -397,6 +397,10 @@ public class OmeroRawClient {
                 getUsername().equals(((OmeroRawClient)obj).getUsername());
     }
 
+    /**
+     * check if the current client is connected to the server
+     * @return log in status
+     */
     public boolean checkIfLoggedIn() {
         if(this.gateway == null) // if we invoke the method "createClientAndLogin" in OmeroRawExtension->createRawServerListMenu, the gateway is null
             return false;
