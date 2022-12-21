@@ -31,28 +31,45 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javafx.application.Platform;
-import javafx.collections.ObservableList;
+import omero.gateway.model.EllipseData;
+import omero.gateway.model.LineData;
+import omero.gateway.model.PointData;
+import omero.gateway.model.PolygonData;
+import omero.gateway.model.PolylineData;
+import omero.gateway.model.ROIData;
+import omero.gateway.model.RectangleData;
 import omero.gateway.model.ShapeData;
-import omero.model.*;
-import org.locationtech.jts.geom.*;
-import org.locationtech.jts.geom.Polygon;
+
+import omero.model.Ellipse;
+import omero.model.Label;
+import omero.model.Line;
+import omero.model.Mask;
+import omero.model.Polyline;
+import omero.model.Rectangle;
+import omero.model.Roi;
+import omero.model.Shape;
+
+import org.locationtech.jts.geom.Coordinate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import qupath.lib.geom.Point2;
-import qupath.lib.gui.QuPathGUI;
-import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.classes.PathClass;
-import qupath.lib.objects.classes.PathClassFactory;
 import qupath.lib.regions.ImagePlane;
-import qupath.lib.roi.*;
+
+import qupath.lib.roi.EllipseROI;
+import qupath.lib.roi.GeometryROI;
+import qupath.lib.roi.LineROI;
+import qupath.lib.roi.PointsROI;
+import qupath.lib.roi.PolygonROI;
+import qupath.lib.roi.PolylineROI;
+import qupath.lib.roi.ROIs;
+import qupath.lib.roi.RectangleROI;
+import qupath.lib.roi.RoiTools;
 import qupath.lib.roi.interfaces.ROI;
 
-import omero.gateway.model.*;
-import qupath.lib.scripting.QP;
 
 class OmeroRawShapes {
 
@@ -60,48 +77,53 @@ class OmeroRawShapes {
 
 
     /**
-     * Create a PathObject with of certain type (annotation, detection,...)
-     * with no class and the default red color
+     * Create a PathObject of type annotation or detection from a QuPath ROI object
+     * without any class and with the default red color.
+     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass)} for the full documentation.
      *
-     * @param roi
-     * @param roiType
-     * @return
+     * @param roi roi to convert
+     * @param roiType annotation or detection type
+     * @return a new pathObject
      */
     public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType){
         return createPathObjectFromQuPathRoi(roi, roiType,"");
     }
 
     /**
-     * Create a PathObject with of certain type (annotation, detection,...)
-     * with a certain color and without any class
+     * Create a PathObject of type annotation or detection from a QuPath ROI object, with a certain color. If the
+     * color is yellow (i.e. default color on OMERO), it is automatically converted to QuPath default red color.
+     * No class is assigned to the new PathObject.
+     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass)} for the full documentation.
      *
-     * @param roi
-     * @param roiType
-     * @return
+     * @param roi roi to convert
+     * @param roiType annotation or detection type
+     * @param color color to assign to the pathObject
+     * @return a new pathObject
      */
     public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, Color color){
         PathObject pathObject = createPathObjectFromQuPathRoi(roi, roiType, "");
 
         // check if the color is not the default color (yellow) for selected objects
         if(color == null || color.equals(Color.YELLOW))
-            pathObject.setColorRGB(Color.RED.getRGB());
-        else pathObject.setColorRGB(color.getRGB());
+            pathObject.setColor(Color.RED.getRGB());
+        else pathObject.setColor(color.getRGB());
 
         return pathObject;
     }
 
 
     /**
-     * Create a PathObject with of type annotation or detection
-     * with the specified class and the color associated to the class.
-     *
+     * Create a PathObject of type annotation or detection from a QuPath ROI object.
+     * with the specified class. If the class is not a valid class, no class is assigned to the pathObject and
+     * the default red color is assigned to it.
+     * <br>
      * Currently, pathObjects of "cell" type are not supported and are considered as detections.
-     * All pathObjects of other type are automatically assigned to annotation type.
+     * All pathObjects of other type (i.e. non recognized types) are automatically assigned to annotation type.
      *
-     * @param roi
-     * @param roiType
-     * @param roiClass
-     * @return
+     * @param roi roi to convert
+     * @param roiType annotation or detection type
+     * @param roiClass pathClasses assigned to the roi
+     * @return a new pathObject
      */
     public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass){
         PathObject pathObject;
@@ -114,7 +136,7 @@ class OmeroRawShapes {
 
         // code breaks all the current project
         // do not use
-        // and wait for the version TODO 0.4.0
+        // and wait for the version TODO
 
        /* // create new PathClasses if they are not already created
         List<PathClass> availablePathClasses = QPEx.getQuPath().getProject().getPathClasses();
@@ -135,31 +157,31 @@ class OmeroRawShapes {
                 if (!isValidClass)
                     pathObject = PathObjects.createDetectionObject(roi);
                 else
-                    pathObject = PathObjects.createDetectionObject(roi, PathClassFactory.getPathClass(classes));
+                    pathObject = PathObjects.createDetectionObject(roi, PathClass.fromCollection(classes));
                 break;
             case "annotation":
             default:
                 if (!isValidClass)
                     pathObject = PathObjects.createAnnotationObject(roi);
                 else
-                    pathObject = PathObjects.createAnnotationObject(roi, PathClassFactory.getPathClass(classes));
+                    pathObject = PathObjects.createAnnotationObject(roi, PathClass.fromCollection(classes));
                 break;
         }
 
         if(!isValidClass)
-            pathObject.setColorRGB(Color.RED.getRGB());
+            pathObject.setColor(Color.RED.getRGB());
 
         return pathObject;
     }
 
 
     /**
-     * convert Omero ROIs To QuPath ROIs.
-     * For annotations, takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality.
-     * For detections, no complex ROIs are possible. So, each shape = one ROI
+     * Convert OMERO ROIs To QuPath ROIs. <br>
+     * For annotations, it takes into account complex ROIs (with multiple shapes) by applying a XOR operation to reduce the dimensionality. <br>
+     * For detections, no complex ROIs are possible (i.e. one shape = one ROI)
      *
-     * @param roiDatum
-     * @return
+     * @param roiDatum OMERO ROI to convert
+     * @return QuPath ROI
      */
     public static ROI convertOmeroROIsToQuPathROIs(ROIData roiDatum) {
         // Convert OMERO ROIs into QuPath ROIs
@@ -212,15 +234,15 @@ class OmeroRawShapes {
     }
 
     /**
-     * convert Omero ROIs To QuPath ROIs.
-     *
-     * *********************** BE CAREFUL *****************************
+     * Convert OMERO shapes To QuPath ROIs.
+     * <br>
+     * ***********************BE CAREFUL***************************** <br>
      * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
-     * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
+     * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame) <br>
      * ****************************************************************
      *
-     * @param roiData
-     * @return list of QuPath ROIs
+     * @param roiData OMERO Roi to convert
+     * @return List of QuPath ROIs (one OMERO shape = one QuPath ROI)
      */
     private static List<ROI> convertOmeroShapesToQuPathROIs(ROIData roiData){
         // get the ROI
@@ -251,7 +273,6 @@ class OmeroRawShapes {
                         s.getPoints().stream().mapToDouble(Point2D.Double::getY).toArray(),
                         ImagePlane.getPlaneWithChannel(s.getC(),Math.max(s.getZ(), 0), Math.max(s.getT(), 0))));
 
-
             }else if(shape instanceof omero.model.Polygon){
                 PolygonData s = new PolygonData(shape);
                 list.add(ROIs.createPolygonROI(s.getPoints().stream().mapToDouble(Point2D.Double::getX).toArray(),
@@ -279,16 +300,16 @@ class OmeroRawShapes {
 
 
     /**
-     * Output the ROI result of the XOR operation between the 2 input ROIs
-     *
-     * 	 * *********************** BE CAREFUL *****************************
-     * 	 * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
-     * 	 * the new composite ROI are set on the lowest c/z/t plane
-     * 	 * ****************************************************************
+     * Output the ROI result of the XOR operation between the roi1 and roi2
+     * <br>
+     * ***********************BE CAREFUL***************************** <br>
+     * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
+     * the new composite ROI are set on the lowest c/z/t plane <br>
+     * ****************************************************************
      *
      * @param roi1
      * @param roi2
-     * @return ROI resulting of the XOR operation
+     * @return Results of the XOR operation between the two ROIs
      */
     private static ROI linkShapes(ROI roi1, ROI roi2){
         // get the area of the first roi
@@ -313,10 +334,13 @@ class OmeroRawShapes {
 
 
     /**
-     * Convert PathObjects into OMERO-readable objects. In case the PathObject contains holes, it is split
+     * Convert a PathObject into OMERO-readable objects. In case the PathObject contains holes (i.e. complex annotation), it is split
      * into individual shapes and each shape will be part of the same OMERO ROI (nested hierarchy in OMERO.web).
-     * @param src : pathObject
-     * @return
+     *
+     * @param src : pathObject to convert
+     * @param objectID pathObject's ID
+     * @param parentID pathObject parent's ID
+     * @return list of OMERO shapes
      */
     public static List<ShapeData> convertQuPathRoiToOmeroRoi(PathObject src, String objectID, String parentID) {
         ROI roi = src.getROI();
@@ -394,7 +418,7 @@ class OmeroRawShapes {
             // process each individual shape
             for (ROI value : rois) {
                 if(!(value ==null))
-                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value, src.getPathClass()),objectID,parentID));
+                    shapes.addAll(convertQuPathRoiToOmeroRoi(PathObjects.createAnnotationObject(value, src.getPathClass()), objectID, parentID));
             }
 
         } else {
@@ -406,12 +430,13 @@ class OmeroRawShapes {
 
 
     /**
-     * Write a string to populate ROI comment and have access to the type,class and parent of each object.
+     * Write the formatted ROI comment  => "type:class1&class2:objectID:parentID"
      *
-     * @param src
-     * @param objectID
-     * @param parentID
-     * @return
+     * @param src : pathObject to get pathClasses from
+     * @param objectID pathObject's ID
+     * @param parentID pathObject parent's ID
+     *
+     * @return formatted comment
      */
     private static String setRoiComment(PathObject src, String objectID, String parentID){
 
@@ -429,8 +454,8 @@ class OmeroRawShapes {
     /**
      * Split holes and envelop of the same polygon into independent ROIs.
      *
-     * @param rois List of split ROIs
-     * @return list of ROIs of decoupling external and internal rings
+     * @param rois List of ROIs
+     * @return list of external and internal rings from ROIs
      */
     private static List<ROI> splitHolesAndShape(List<ROI> rois) {
         List<ROI> polygonROIs = new ArrayList<>();

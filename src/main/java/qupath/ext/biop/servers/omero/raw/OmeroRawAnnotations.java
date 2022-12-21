@@ -22,10 +22,19 @@
 package qupath.ext.biop.servers.omero.raw;
 
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
-import omero.gateway.model.*;
+import omero.gateway.model.FileAnnotationData;
+import omero.gateway.model.MapAnnotationData;
+import omero.gateway.model.PermissionData;
+import omero.gateway.model.RatingAnnotationData;
+import omero.gateway.model.TagAnnotationData;
+import omero.gateway.model.TextualAnnotationData;
 import omero.model.NamedValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

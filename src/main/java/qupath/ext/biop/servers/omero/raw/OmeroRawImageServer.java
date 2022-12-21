@@ -34,10 +34,17 @@ import omero.api.ResolutionDescription;
 import omero.gateway.SecurityContext;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.BrowseFacility;
 import omero.gateway.facility.MetadataFacility;
-import omero.gateway.model.*;
-import omero.model.*;
+
+import omero.gateway.model.ChannelData;
+import omero.gateway.model.ImageData;
+import omero.gateway.model.PixelsData;
+import omero.gateway.model.ROIData;
+
+import omero.model.ChannelBinding;
+import omero.model.ExperimenterGroup;
+import omero.model.Length;
+import omero.model.RenderingDef;
 import omero.model.enums.UnitsLength;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,21 +52,56 @@ import qupath.lib.color.ColorModelFactory;
 import qupath.lib.common.ColorTools;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.dialogs.Dialogs;
-import qupath.lib.images.servers.*;
+
+import qupath.lib.images.servers.AbstractTileableImageServer;
+import qupath.lib.images.servers.ImageChannel;
+import qupath.lib.images.servers.ImageServerBuilder;
 import qupath.lib.images.servers.ImageServerBuilder.ServerBuilder;
+import qupath.lib.images.servers.ImageServerMetadata;
+import qupath.lib.images.servers.PixelType;
+import qupath.lib.images.servers.TileRequest;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
 
-import java.awt.image.*;
+import java.awt.image.BandedSampleModel;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.ComponentSampleModel;
+import java.awt.image.DataBuffer;
+import java.awt.image.DataBufferByte;
+import java.awt.image.DataBufferDouble;
+import java.awt.image.DataBufferFloat;
+import java.awt.image.DataBufferInt;
+import java.awt.image.DataBufferShort;
+import java.awt.image.DataBufferUShort;
+import java.awt.image.PixelInterleavedSampleModel;
+import java.awt.image.SampleModel;
+import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.*;
-import java.util.*;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.DoubleBuffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -159,7 +201,18 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		// Add URI to the client's list of URIs
 		client.addURI(uri);
 	}
-	
+
+	/**
+	 * read image metadata and build a QuPath ImageServerMetadata object.
+	 *
+	 * @return
+	 * @throws IOException
+	 * @throws ServerError
+	 * @throws DSOutOfServiceException
+	 * @throws ExecutionException
+	 * @throws DSAccessException
+	 * @throws URISyntaxException
+	 */
 	protected ImageServerMetadata buildMetadata() throws IOException, ServerError, DSOutOfServiceException, ExecutionException, DSAccessException, URISyntaxException {
 
 		long startTime = System.currentTimeMillis();
@@ -751,10 +804,10 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * Retrieve any ROIs stored with this image as annotation objects.
 	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
 	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
-	 *
-	 * *********************** BE CAREFUL ****************************
+	 * <br>
+	 * ***********************BE CAREFUL****************************<br>
 	 * For the z and t in the ImagePlane, if z &lt; 0 and t &lt; 0 (meaning that roi should be present on all the slices/frames),
-	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
+	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)<br>
 	 * ****************************************************************
 	 *
 	 * @return list of path objects

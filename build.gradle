@@ -8,7 +8,7 @@ plugins {
 ext.moduleName = 'qupath.extension.biop.omero'
 archivesBaseName = 'qupath-extension-biop-omero'
 description = "QuPath extension to support image reading using OMERO's Java API."
-version = "0.2.1-SNAPSHOT"
+version = "0.2.2-SNAPSHOT"
 
 repositories {
 //  mavenLocal()
@@ -25,7 +25,7 @@ repositories {
   }
     // kept because it is the normal way of importing dependencies but never used because not recognized by gradle
     // the repo used is a local repo, inside the maven folder of the project
-    // "File:\qupath\maven\repo\fr\igred\simple-omero-client\5.9.2\simple-omero-client-5.9.2.pom"
+    // "File:\qupath\maven\repo\fr\igred\simple-omero-client\x.x.x"
     maven{
         url "https://artifacts.igred.fr/releases"
    }
@@ -37,7 +37,7 @@ configurations {
 }
 
 dependencies {
-    def qupathVersion = "0.3.0" // For now
+    def qupathVersion = "0.4.0" // For now
 
     implementation "org.apache.commons:commons-text:1.9"
 
@@ -59,8 +59,19 @@ dependencies {
     implementation "org.openmicroscopy:omero-model:5.6.0"
     implementation "info.picocli:picocli:4.3.2"
 
-    // if new version, update all files in here : "File:\qupath\maven\repo\fr\igred\simple-omero-client\5.9.2\simple-omero-client-5.9.2.pom"
-    // This is only for development ; for the user side, you need to add simple-omero-client-x.x.x in the extension folder.
+    /*
+     if new version, update all files in here :
+        "File:\qupath\maven\repo\fr\igred\simple-omero-client\x.x.x\simple-omero-client-x.x.x.pom"
+        "File:\qupath\maven\repo\fr\igred\simple-omero-client\x.x.x\simple-omero-client-x.x.x.jar"
+
+     This is only for development ; for the user side, you need to add simple-omero-client-x.x.x in the extension folder.
+
+     If it doesn't exists, create the following tree in qupath/maven/repo folder : fr/igred/simple-omero-client/x.x.x
+     download from here : https://github.com/GReD-Clermont/simple-omero-client/packages/379369
+        simple-omero-client-x.x.x.pom
+        simple-omero-client-x.x.x.jar
+     and copy these file the folder : File:\qupath\maven\repo\fr\igred\simple-omero-client\x.x.x\
+    */
     implementation "fr.igred:simple-omero-client:5.9.2"
 }
 

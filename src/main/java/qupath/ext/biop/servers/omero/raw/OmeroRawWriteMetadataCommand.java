@@ -11,7 +11,7 @@ import qupath.lib.images.servers.ImageServer;
 import qupath.lib.projects.ProjectImageEntry;
 
 import java.awt.image.BufferedImage;
-import java.util.*;
+import java.util.Map;
 
 
 /**

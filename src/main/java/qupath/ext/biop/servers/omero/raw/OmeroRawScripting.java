@@ -3,13 +3,17 @@ package qupath.ext.biop.servers.omero.raw;
 import fr.igred.omero.Client;
 import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
-import omero.gateway.model.*;
+
+import omero.gateway.model.ChannelData;
+import omero.gateway.model.MapAnnotationData;
+import omero.gateway.model.ROIData;
+import omero.gateway.model.TableData;
+import omero.gateway.model.TagAnnotationData;
 import omero.model.ChannelBinding;
 import omero.model.NamedValue;
 import omero.model.RenderingDef;
 import omero.rtypes;
 import qupath.lib.display.ChannelDisplayInfo;
-import qupath.lib.gui.commands.ProjectCommands;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
 import qupath.lib.gui.scripting.QPEx;
@@ -23,7 +27,13 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class OmeroRawScripting {
@@ -49,13 +59,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * - Read ROIs from OMERO
-     * - Remove all annotations and detections on the current image
-     * - Convert ROIs to annotations/detections (i.e. pathObjects)
-     * - Add new pathObjects to the current image
+     * Import ROIs from OMERO to QuPath and remove all current annotations/detections in QuPath.
+     * See {@link #importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removePathObjects)}
      *
      * @param imageServer : ImageServer of an image loaded from OMERO
-     * @return the list of OMERO rois converted into pathObjects.
+     * @return The list of OMERO rois converted into pathObjects.
      */
     public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer) {
         return importOmeroROIsToQuPath(imageServer, true);
@@ -63,15 +71,19 @@ public class OmeroRawScripting {
 
 
     /**
-     * - Read ROIs from OMERO
-     * - Check if current annotations/detection have to be deleted or not
-     * - Convert ROIs to annotations/detections (i.e. pathObjects)
-     * - Add new pathObjects to the current image
+     * Import ROIs from OMERO to QuPath
+     * <p>
+     * <ul>
+     * <li> Read ROIs from OMERO </li>
+     * <li> Check if current annotations/detection have to be deleted or not </li>
+     * <li> Add new pathObjects to the current image </li>
+     * </ul>
+     * <p>
      *
-     * @param imageServer : ImageServer of an image loaded from OMERO
-     * @param removePathObjects : Boolean to delete or keep pathObjects (annotations, detections) on the current image.
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param removePathObjects Boolean to delete or keep pathObjects (annotations, detections) on the current image.
      *
-     * @return  the list of OMERO rois converted into pathObjects
+     * @return The list of OMERO rois converted into pathObjects
      */
     public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removePathObjects) {
         // read OMERO ROIs
@@ -86,7 +98,7 @@ public class OmeroRawScripting {
 
         // add pathObjects to the current hierarchy
         if (!pathObjects.isEmpty()) {
-            hierarchy.addPathObjects(pathObjects);
+            hierarchy.addObjects(pathObjects);
             hierarchy.resolveHierarchy();
         }
 
@@ -95,11 +107,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send all pathObjects (annotations and detections) to OMERO and deletes ROIs already stored on OMERO
+     * Send all QuPath objects (annotations and detections) to OMERO and deletes ROIs already stored on OMERO
      * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
      *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer) {
         return sendPathObjectsToOmero(imageServer, true);
@@ -107,13 +119,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send all pathObjects (annotations and detections) to OMERO. The user can choose
-     * if he wants to delete existing ROIs or not.
+     * Send all QuPath objects (annotations and detections) to OMERO.
      * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
      *
-     * @param imageServer
-     * @param deleteROIsOnOMERO
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
         Collection<PathObject> pathObjects = QP.getAnnotationObjects();
@@ -123,10 +134,10 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send all annotations to OMERO without deleting existing ROIs.
+     * Send all QuPath annotation objects to OMERO, without deleting current ROIs on OMERO.
      *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer) {
         return sendAnnotationsToOmero(imageServer, false);
@@ -134,11 +145,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send all annotations to OMERO. The user can choose if he wants to delete existing ROIs or not.
+     * Send all QuPath annotation objects to OMERO.
      *
-     * @param imageServer
-     * @param deleteROIsOnOMERO
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
         Collection<PathObject> annotations = QP.getAnnotationObjects();
@@ -147,10 +158,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send all detections to OMERO without deleting existing ROIs.
+     * Send all QuPath detection objects to OMERO without deleting existing ROIs.
      *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer) {
         return sendDetectionsToOmero(imageServer, false);
@@ -158,11 +170,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send all detections to OMERO. The user can choose if he wants to delete existing ROIs or not.
+     * Send all QuPath detections to OMERO and delete existing ROIs is specified.
      *
-     * @param imageServer
-     * @param deleteROIsOnOMERO
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
         Collection<PathObject> detections = QP.getDetectionObjects();
@@ -171,34 +184,38 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send a collection of PathObjects to OMERO, without deleting existing ROIs
+     * Send a collection of QuPath objects (annotations and/or detections) to OMERO, without deleting existing ROIs
      *
-     * @param imageServer
-     * @param annotations
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param pathObjects QuPath annotations or detections objects
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
-    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> annotations) {
-        return sendPathObjectsToOmero(imageServer, annotations, false);
+    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects) {
+        return sendPathObjectsToOmero(imageServer, pathObjects, false);
     }
 
 
     /**
      * Send a collection of pathObjects to OMERO.
-     * The user can choose if he wants to delete existing ROIs or not.
      *
-     * @param imageServer
-     * @param pathObjects
-     * @param deleteROIsOnOMERO
-     * @return
+     * <p>
+     * <ul>
+     * <li> Convert pathObjects to OMERO ROIs </li>
+     * <li> Delete all current ROIs on OMERO if explicitly asked </li>
+     * <li> Send ROIs to the current image on OMERO </li>
+     * </ul>
+     * <p>
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param pathObjects QuPath annotations or detections objects
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects, boolean deleteROIsOnOMERO) {
-        // set pathObjectName with a unique ID
-        //TODO remove this unique id in qupath 0.4.0
-        pathObjects.forEach(pathObject -> pathObject.setName("" + (new Date()).getTime() + pathObject.hashCode()));
         // convert pathObjects to OMERO ROIs
         List<ROIData> omeroROIs = OmeroRawTools.createOmeroROIsFromPathObjects(pathObjects);
-        // set pathObjectName to null to not interfere with qupath display
-        pathObjects.forEach(pathObject -> pathObject.setName(null));
 
         // get omero client and image id to send ROIs to the correct image
         OmeroRawClient client = imageServer.getClient();
@@ -214,12 +231,19 @@ public class OmeroRawScripting {
 
 
     /**
-     * Save on OMERO some key-values contained in a Map. It does not delete any of the existing key value pairs.
-     * Moreover, if keys already exist on OMERO, it does not update them neither adding the new ones.
+     * Send QuPath metadata to OMERO as Key-Value pairs. Check if OMERO keys are unique. If they are not, metadata are not sent
+     * <br>
+     * Existing keys on OMERO are :
+     * <p>
+     * <ul>
+     * <li> deleted : NO </li>
+     * <li> updated : NO </li>
+     * </ul>
+     * <p>
      *
-     * @param qpMetadata
-     * @param imageServer
-     * @return
+     * @param qpMetadata Map of key-value
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if key-value pairs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMetadataOnOmero(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique
@@ -252,11 +276,19 @@ public class OmeroRawScripting {
 
 
     /**
-     * Delete all existing key value pairs attach to the current image on OMERO
-     * and save some new key-values contained in the Map.
+     * Send QuPath metadata to OMERO as Key-Value pairs. Check if OMERO keys are unique. If they are not, metadata are not sent
+     * <br>
+     * Existing keys on OMERO are :
+     * <p>
+     * <ul>
+     * <li> deleted : YES </li>
+     * <li> updated : NO </li>
+     * </ul>
+     * <p>
      *
-     * @param qpMetadata
-     * @param imageServer
+     * @param qpMetadata Map of key-value
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if key-value pairs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMetadataOnOmeroAndDeleteKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read current key-value on OMERO ==> used for the later deletion
@@ -287,11 +319,19 @@ public class OmeroRawScripting {
 
 
     /**
-     * Update existing key value pairs on OMERO with new values from the metadata and save new ones.
+     * Send QuPath metadata to OMERO as Key-Value pairs. Check if OMERO keys are unique. If they are not, metadata are not sent.
+     * <br>
+     * Existing keys on OMERO are :
+     * <p>
+     * <ul>
+     * <li> deleted : NO </li>
+     * <li> updated : YES </li>
+     * </ul>
+     * <p>
      *
-     * @param qpMetadata
-     * @param imageServer
-     * @return
+     * @param qpMetadata Map of key-value
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if key-value pairs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMetadataOnOmeroAndUpdateKeyValues(Map<String, String> qpMetadata, OmeroRawImageServer imageServer) {
         // read current key-value on OMERO ==> used for the later deletion
@@ -334,9 +374,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Add metadata to the current image in the QuPath project
+     * Add new QuPath metadata to the current image in the QuPath project.
+     * <br>
+     * Existing keys in QuPath are :
+     * <p>
+     * <ul>
+     * <li> deleted : NO </li>
+     * <li> updated : NO </li>
+     * </ul>
+     * <p>
      *
-     * @param keyValues
+     * @param keyValues map of key-values
      */
     public static void addMetadata(Map<String,String> keyValues) {
         // get project entry
@@ -355,9 +403,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Add OMERO key value pairs as metadata to the current image in the QuPath project
+     * Read and add OMERO Key-Value pairs as QuPath metadata to the current image in the QuPath project.
+     * <br>
+     * Existing keys in QuPath are :
+     * <p>
+     * <ul>
+     * <li> deleted : NO </li>
+     * <li> updated : NO </li>
+     * </ul>
+     * <p>
      *
-     * @param imageServer
+     * @param imageServer ImageServer of an image loaded from OMERO
      */
     public static void addOmeroKeyValues(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
@@ -371,9 +427,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Add metadata to the current image in QuPath. Update existing metadata with new values and add new ones.
+     * Add new QuPath metadata to the current image in the QuPath project.
+     * <br>
+     * Existing keys in QuPath are :
+     * <p>
+     * <ul>
+     * <li> deleted : NO </li>
+     * <li> updated : YES </li>
+     * </ul>
+     * <p>
      *
-     * @param keyValues
+     * @param keyValues map of key-values
      */
     public static void addAndUpdateMetadata(Map<String,String> keyValues) {
         // get project entry
@@ -410,9 +474,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Add OMERO key value pairs to the current image in QuPath. Update existing metadata with new values and add new ones.
+     * Read and add OMERO Key-Value pairs as QuPath metadata to the current image in the QuPath project.
+     * <br>
+     * Existing keys in QuPath are :
+     * <p>
+     * <ul>
+     * <li> deleted : NO </li>
+     * <li> updated : YES </li>
+     * </ul>
+     * <p>
      *
-     * @param imageServer
+     * @param imageServer ImageServer of an image loaded from OMERO
      */
     public static void addOmeroKeyValuesAndUpdateMetadata(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
@@ -427,9 +499,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Delete all current metadata and add OMERO key value pairs to the current image in QuPath.
+     * Read and add OMERO Key-Value pairs as QuPath metadata to the current image in the QuPath project.
+     * <br>
+     * Existing keys in QuPath are :
+     * <p>
+     * <ul>
+     * <li> deleted : YES </li>
+     * <li> updated : NO </li>
+     * </ul>
+     * <p>
      *
-     * @param imageServer
+     * @param imageServer ImageServer of an image loaded from OMERO
      */
     public static void addOmeroKeyValuesAndDeleteMetadata(OmeroRawImageServer imageServer) {
         // read OMERO key-values and check if they are unique. If not, stop the process
@@ -444,9 +524,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Delete all current metadata and add key value pairs to the current image in QuPath.
+     * Add new QuPath metadata to the current image in the QuPath project.
+     * <br>
+     * Existing keys in QuPath are :
+     * <p>
+     * <ul>
+     * <li> deleted : YES </li>
+     * <li> updated : NO </li>
+     * </ul>
+     * <p>
      *
-     * @param keyValues
+     * @param keyValues map of key-values
      */
     public static void addAndDeleteMetadata(Map<String,String> keyValues) {
         // get project entry
@@ -461,10 +549,10 @@ public class OmeroRawScripting {
 
 
     /**
-     * read key value pairs from OMERO and check if all keys are unique
+     * Read, from OMERO, Key-Value pairs attached to the current image and check if all keys are unique. If they are not unique, no Key-Values are returned.
      *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return map of OMERO Key-Value pairs
      */
     public static Map<String,String> importOmeroKeyValues(OmeroRawImageServer imageServer) {
         // read current key-value on OMERO
@@ -488,10 +576,10 @@ public class OmeroRawScripting {
 
 
     /**
-     * get all tags linked to the current image on OMERO
+     * Read, from OMERO, tags attached to the current image.
      *
-     * @param imageServer
-     * @return list of read tags
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return list of OMERO tags.
      */
     public static List<String> importOmeroTags(OmeroRawImageServer imageServer) {
         // read tags
@@ -503,11 +591,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * send a list of tags to OMERO
+     * Send a list of tags to OMERO. If tags are already attached to the image, these tags are not sent.
      *
-     * @param tags
-     * @param imageServer
-     * @return if tags has been added
+     * @param tags List of tags to add to the image
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if tags have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendTagsToOmero(List<String> tags, OmeroRawImageServer imageServer){
         // get current OMERO tags
@@ -535,11 +623,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * send a tag to OMERO
+     * Send a tag to OMERO. If the tag is already attached to the image, it is not sent.
      *
-     * @param tag
-     * @param imageServer
-     * @return if tags has been added
+     * @param tag The tag to add to the image
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if tag has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendTagToOmero(String tag, OmeroRawImageServer imageServer){
         // get current OMERO tags
@@ -560,13 +648,13 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to the specified pathObjects as an OMERO.table
+     * Send pathObjects' measurements to OMERO as an OMERO.table
      *
-     * @param pathObjects
-     * @param imageServer
-     * @param imageData
-     * @param tableName
-     * @return
+     * @param pathObjects QuPath annotations or detections objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @param tableName Name of the OMERO.table
+     * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     private static boolean sendMeasurementTableToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName){
         // get the measurement table
@@ -582,11 +670,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to all annotation objects as an OMERO.table
+     * Send all annotations measurements to OMERO as an OMERO.table
      *
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendAnnotationMeasurementTable(QP.getAnnotationObjects(), imageServer, imageData);
@@ -594,12 +682,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to specified annotation objects as an OMERO.table
+     * Send pathObjects' measurements to OMERO as an OMERO.table  with a default table name referring to annotations
      *
-     * @param annotationObjects
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param annotationObjects QuPath annotations objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationMeasurementTable(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the table name
@@ -610,11 +698,11 @@ public class OmeroRawScripting {
     }
 
     /**
-     * Send to OMERO the measurement table corresponding to all detection objects as an OMERO.table
+     * Send all detections measurements to OMERO as an OMERO.table
      *
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendDetectionMeasurementTable(QP.getDetectionObjects(), imageServer, imageData);
@@ -622,12 +710,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to specified detection objects as an OMERO.table
+     * Send pathObjects' measurements to OMERO as an OMERO.table with a default table name referring to detections
      *
-     * @param detectionObjects
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param detectionObjects QuPath detection objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionMeasurementTable(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the table name
@@ -639,11 +727,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to all annotation objects as a csv file
+     * Send all annotations measurements to OMERO as a CSV file
      *
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationMeasurementTableAsCSV(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendAnnotationMeasurementTableAsCSV(QP.getAnnotationObjects(), imageServer, imageData);
@@ -651,12 +739,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to specified annotation objects as a csv file
+     * Send pathObjects' measurements to OMERO as a CSV file with a default table name referring to annotation
      *
-     * @param annotationObjects
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param annotationObjects QuPath annotation objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationMeasurementTableAsCSV(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the file name
@@ -668,11 +756,11 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to all detection objects as a csv file
+     * Send all detections measurements to OMERO as a CSV file
      *
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionMeasurementTableAsCSV(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendDetectionMeasurementTableAsCSV(QP.getDetectionObjects(), imageServer, imageData);
@@ -680,12 +768,12 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to specified detection objects as a csv file
+     * Send pathObjects' measurements to OMERO as a CSV file with a default table name referring to annotation
      *
-     * @param detectionObjects
-     * @param imageServer
-     * @param imageData
-     * @return
+     * @param detectionObjects QuPath detection objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionMeasurementTableAsCSV(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the file name
@@ -697,13 +785,13 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send to OMERO the measurement table corresponding to the specified pathObjects as a csv file
+     * Send pathObjects' measurements to OMERO as an OMERO.table
      *
-     * @param pathObjects
-     * @param imageServer
-     * @param imageData
-     * @param filename
-     * @return
+     * @param pathObjects QuPath annotations or detections objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @param filename Name of the CSV file
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename){
         // get the measurement table
@@ -730,12 +818,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Set the minimum and maximum display range value for each channel on QuPath, based on OMERO settings.
+     * Set the minimum and maximum display range value of each channel on QuPath, based on OMERO settings.<br>
+     * QuPath image and thumbnail are updated accordingly.<br>
      * Channel indices are taken as reference.
      *
-     * Only works for fluorescent images
+     * <p>
+     * <ul>
+     * <li> Only works for fluorescence images </li>
+     * </ul>
+     * <p>
      *
-     * @param imageServer
+     * @param imageServer ImageServer of an image loaded from OMERO
      */
     public static void setChannelsDisplayRangeFromOmeroChannel(OmeroRawImageServer imageServer) {
         // get the OMERO rendering settings to get channel info
@@ -776,12 +869,16 @@ public class OmeroRawScripting {
 
 
     /**
-     * Set the color for each channel on QuPath, based on OMERO settings.
+     * Set the color of each channel on QuPath, based on OMERO settings.<br>
+     * QuPath image and thumbnail are updated accordingly.<br>
      * Channel indices are taken as reference.
+     * <p>
+     * <ul>
+     * <li> Only works for fluorescence images </li>
+     * </ul>
+     * <p>
      *
-     * Only works for fluorescent images
-     *
-     * @param imageServer
+     * @param imageServer ImageServer of an image loaded from OMERO
      */
     public static void setChannelsColorFromOmeroChannel(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
@@ -822,7 +919,7 @@ public class OmeroRawScripting {
     }
 
     /**
-     * Update thumbnail with the new view settings
+     * Update QuPath thumbnail
      */
     private static void updateQuPathThumbnail(){
         try {
@@ -848,12 +945,15 @@ public class OmeroRawScripting {
     }
 
     /**
-     * Set the name for each channel on QuPath, based on OMERO settings.
+     * Set the name of each channel on QuPath, based on OMERO settings.
      * Channel indices are taken as reference.
+     * <p>
+     * <ul>
+     * <li> Only works for fluorescence images </li>
+     * </ul>
+     * <p>
      *
-     * Only works for fluorescent images
-     *
-     * @param imageServer
+     * @param imageServer ImageServer of an image loaded from OMERO
      */
     public static void setChannelsNameFromOmeroChannel(OmeroRawImageServer imageServer){
         // get the number of the channels in OMERO
@@ -882,13 +982,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Set the minimum and maximum display range value for each channel on OMERO, based on QuPath settings.
+     * Set the minimum and maximum display range value of each channel on OMERO, based on QuPath settings.<br>
+     * OMERO image and thumbnail are updated accordingly. <br>
      * Channel indices are taken as reference.
+     * <p>
+     * <ul>
+     * <li> Only works for fluorescence images </li>
+     * </ul>
+     * <p>
      *
-     * Only works for fluorescent images
-     *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if the image and thumbnail on OMERO has been updated ; false if there were troubles during the sending process)
      */
     public static boolean sendChannelsDisplayRangeToOmero(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
@@ -934,13 +1038,16 @@ public class OmeroRawScripting {
 
 
     /**
-     * Set the name for each channel on OMERO, based on QuPath settings.
+     * Set the name of each channel on OMERO, based on QuPath settings.
      * Channel indices are taken as reference.
+     * <p>
+     * <ul>
+     * <li> Only works for fluorescence images </li>
+     * </ul>
+     * <p>
      *
-     * Only works for fluorescent images
-     *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if the image and thumbnail on OMERO has been updated ; false if there were troubles during the sending process)
      */
     public static boolean sendChannelsNameToOmero(OmeroRawImageServer imageServer){
         // get the number of the channels in OMERO
@@ -969,13 +1076,17 @@ public class OmeroRawScripting {
 
 
     /**
-     * Set the color for each channel on OMERO, based on QuPath settings.
+     * Set the color of each channel on OMERO, based on QuPath settings.
+     * OMERO image and thumbnail are updated accordingly. <br>
      * Channel indices are taken as reference.
+     * <p>
+     * <ul>
+     * <li> Only works for fluorescence images </li>
+     * </ul>
+     * <p>
      *
-     * Only works for fluorescent images
-     *
-     * @param imageServer
-     * @return
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if the image and thumbnail on OMERO has been updated ; false if there were troubles during the sending process)
      */
     public static boolean sendChannelsColorToOmero(OmeroRawImageServer imageServer){
         // get the OMERO rendering settings to get channel info
@@ -1020,5 +1131,4 @@ public class OmeroRawScripting {
 
         return updateImageDisplay && updateThumbnail;
     }
-
 }

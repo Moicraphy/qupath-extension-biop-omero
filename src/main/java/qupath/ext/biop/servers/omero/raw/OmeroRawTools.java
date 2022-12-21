@@ -21,16 +21,29 @@
 
 package qupath.ext.biop.servers.omero.raw;
 
-import java.awt.*;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
-import java.io.*;
+
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,14 +55,48 @@ import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.*;
-import omero.gateway.model.*;
-import omero.model.*;
+
+import omero.gateway.facility.BrowseFacility;
+import omero.gateway.facility.DataManagerFacility;
+import omero.gateway.facility.MetadataFacility;
+import omero.gateway.facility.ROIFacility;
+import omero.gateway.facility.TablesFacility;
+
+import omero.gateway.model.AnnotationData;
+import omero.gateway.model.ChannelData;
+import omero.gateway.model.DatasetData;
+import omero.gateway.model.EllipseData;
+import omero.gateway.model.ImageData;
+import omero.gateway.model.LineData;
+import omero.gateway.model.MapAnnotationData;
+import omero.gateway.model.PixelsData;
+import omero.gateway.model.PointData;
+import omero.gateway.model.PolygonData;
+import omero.gateway.model.PolylineData;
+import omero.gateway.model.ProjectData;
+import omero.gateway.model.ROIData;
+import omero.gateway.model.ROIResult;
+import omero.gateway.model.RectangleData;
+import omero.gateway.model.ShapeData;
+import omero.gateway.model.TableData;
+import omero.gateway.model.TableDataColumn;
+import omero.gateway.model.TagAnnotationData;
+import omero.model.Dataset;
+import omero.model.Ellipse;
+import omero.model.Experimenter;
+import omero.model.ExperimenterGroup;
+import omero.model.IObject;
 import omero.model.Image;
 import omero.model.Label;
+import omero.model.Line;
+import omero.model.Mask;
+import omero.model.NamedValue;
 import omero.model.Point;
 import omero.model.Polygon;
+import omero.model.Polyline;
 import omero.model.Rectangle;
+import omero.model.RenderingDef;
+import omero.model.Roi;
 import omero.model.Shape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,12 +163,12 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Retrieve a user on OMERO based on its id
+     * Retrieve a user on OMERO based on its ID
      *
      * @param client
      * @param userId
      * @param username
-     * @return
+     * @return The specified OMERO user
      */
     public static Experimenter getOmeroUser(OmeroRawClient client, long userId, String username){
         try {
@@ -140,7 +187,7 @@ public final class OmeroRawTools {
      *
      * @param client
      * @param groupId
-     * @return
+     * @return A list of all OMERO user within the specified group
      */
     public static List<Experimenter> getOmeroUsersInGroup(OmeroRawClient client, long groupId){
         try {
@@ -159,7 +206,7 @@ public final class OmeroRawTools {
      *
      * @param client
      * @param groupId
-     * @return
+     * @return The specified OMERO group
      */
     public static ExperimenterGroup getOmeroGroup(OmeroRawClient client, long groupId, String groupName){
         try {
@@ -176,7 +223,7 @@ public final class OmeroRawTools {
     /**
      * get all the groups where the current user is member of
      *
-     * @return
+     * @return The list of user's OMERO groups
      */
     public static List<ExperimenterGroup> getUserOmeroGroups(OmeroRawClient client, long userId) {
         try {
@@ -191,9 +238,10 @@ public final class OmeroRawTools {
 
 
     /**
-     * get all the groups on OMERO server (only for admin people)
+     * get all the groups on OMERO server. This functionality is reserved to Admin people. In case you are not
+     * Admin, {@link #getUserOmeroGroups(OmeroRawClient client, long userId)} method is called instead.
      *
-     * @return
+     * @return The list of all groups on OMERO server
      */
     public static List<ExperimenterGroup> getAllOmeroGroups(OmeroRawClient client) {
         try {
@@ -213,10 +261,10 @@ public final class OmeroRawTools {
 
 
     /**
-     * return the default {@link ExperimenterGroup} object of a certain user
+     * Get the default OMERO group of the specified user
      *
      * @param client
-     * @return
+     * @return User's OMERO default group
      */
     public static ExperimenterGroup getDefaultOmeroGroup(OmeroRawClient client, long userId) {
         try {
@@ -230,6 +278,13 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * Retrieve the group of which an image is part of.
+     *
+     * @param client
+     * @param imageId
+     * @return The group id
+     */
     public static long getGroupIdFromImageId(OmeroRawClient client, long imageId){
         try {
             // request an imageData object for the image id by searching in all groups on OMERO
@@ -247,10 +302,10 @@ public final class OmeroRawTools {
 
 
     /**
-     * get all the orphaned datasets from the OMERO server for a certain user.
+     * Get user's orphaned datasets from the OMERO server
      *
      * @param client the client {@link OmeroRawClient} object
-     * @return list of orphaned datasets
+     * @return List orphaned of datasets
      */
     public static Collection<DatasetData> readOmeroOrphanedDatasetsPerOwner(OmeroRawClient client, long userId) {
         try {
@@ -285,10 +340,10 @@ public final class OmeroRawTools {
 
 
     /**
-     * get all the orphaned datasets from the OMERO server for the current group (contained in the security context of the current client).
+     * Get all orphaned datasets from the OMERO server linked to the current group (contained in the security context of the current client).
      *
      * @param client
-     * @return
+     * @return List of orphaned datasets
      */
     public static Collection<DatasetData> readOmeroOrphanedDatasets(OmeroRawClient client)  {
         Collection<DatasetData> orphanedDatasets;
@@ -326,10 +381,10 @@ public final class OmeroRawTools {
 
 
     /**
-     * Get all the orphaned {@code OmeroRawObject}s of type Image from the server.
+     * Get user's orphaned images from the OMERO server
      *
-     * @param client the client {@code OmeroRawClient} object
-     * @return list of orphaned images
+     * @param client
+     * @return List of orphaned images
      */
     public static Collection<ImageData> readOmeroOrphanedImagesPerUser(OmeroRawClient client, long userId) {
         try {
@@ -345,18 +400,17 @@ public final class OmeroRawTools {
 
 
     /**
-     * read rendering settings of an image to get access to channel information
+     * Get the rendering settings object linked to the specified image.
      * Code partially copied from Pierre Pouchin from {simple-omero-client} project, {ImageWrapper} class, {getChannelColor} method
      *
      * @param client
      * @param imageId
-     * @return
+     * @return Image's rendering settings object
      */
     public static RenderingDef readOmeroRenderingSettings(OmeroRawClient client, long imageId){
         try {
             // get pixel id
             long pixelsId = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels().getId();
-
             // get rendering settings
             RenderingDef renderingDef = client.getGateway().getRenderingSettingsService(client.getContext()).getRenderingSettings(pixelsId);
 
@@ -374,7 +428,7 @@ public final class OmeroRawTools {
             }
             return renderingDef;
 
-        } catch(ExecutionException | DSOutOfServiceException | ServerError e){
+        } catch(ExecutionException | DSOutOfServiceException | ServerError | NullPointerException e){
             Dialogs.showErrorNotification("Rendering def reading","Could not read rendering settings on OMERO.");
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
@@ -387,12 +441,13 @@ public final class OmeroRawTools {
         }
     }
 
+
     /**
-     * read all project represented by the list of ids
+     * Get all OMERO projects corresponding to the list of ids
      *
      * @param client
      * @param projectIds
-     * @return
+     * @return List of OMERO project objects
      */
     public static Collection<ProjectData> readOmeroProjects(OmeroRawClient client, List<Long> projectIds){
         try {
@@ -412,11 +467,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * read all projects for a certain user.
+     * Get all OMERO projects linked to the specified user.
      *
      * @param client
      * @param userId
-     * @return
+     * @return User's list of OMERO project objects
      */
     public static Collection<ProjectData> readOmeroProjectsByUser(OmeroRawClient client, long userId){
         try {
@@ -435,11 +490,11 @@ public final class OmeroRawTools {
     }
 
     /**
-     * read all datasets given by the list of ids
+     * Get all OMERO datasets corresponding to the list of ids
      *
      * @param client
      * @param datasetIds
-     * @return
+     * @return List of OMERO dataset objects
      */
     public static Collection<DatasetData> readOmeroDatasets(OmeroRawClient client, List<Long> datasetIds){
         try {
@@ -458,6 +513,13 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * Get an image from OMERO server, corresponding to the specified id.
+     *
+     * @param client
+     * @param imageId
+     * @return OMERO image object
+     */
     public static ImageData readOmeroImage(OmeroRawClient client, long imageId){
         try {
             return client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
@@ -475,11 +537,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * read image channels
+     * Get OMERO image's channels
      *
      * @param client
      * @param imageId
-     * @return
+     * @return List of channels objects of the specified image
      */
     public static List<ChannelData> readOmeroChannels(OmeroRawClient client, long imageId){
         try {
@@ -500,11 +562,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * read all annotations attached to an image on OMERO
+     * Get annotations (i.e. tag, key-value, comment...) attached to an image on OMERO, specified by its id.
      *
      * @param client
      * @param imageId
-     * @return
+     * @return List of annotation objects
      */
     public static List<AnnotationData> readOmeroAnnotations(OmeroRawClient client, long imageId){
         try {
@@ -528,12 +590,17 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * Get the image file format (ex. .lif, .vsi,...)
+     *
+     * @param client
+     * @param imageId
+     * @return Image file format
+     */
     public static String readImageFileType(OmeroRawClient client, long imageId){
         try {
             ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
-            String format = imageData.asImage().getFormat().getValue().getValue();
-            System.out.println("format : "+format);
-            return format;
+            return imageData.asImage().getFormat().getValue().getValue();
         } catch(ExecutionException | DSOutOfServiceException e) {
             Dialogs.showErrorNotification("Reading OMERO annotations", "Cannot get annotations from OMERO for the image "+imageId);
             logger.error(""+e);
@@ -552,7 +619,7 @@ public final class OmeroRawTools {
      *
      * @param pathObjects
      * @param ob
-     * @return
+     * @return The corresponding OMERO.Table
      */
     public static TableData convertMeasurementTableToOmeroTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, OmeroRawClient client, long imageId) {
         List<TableDataColumn> columns = new ArrayList<>();
@@ -601,13 +668,13 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Send an OMERO.table to OMERO
+     * Send an OMERO.table to OMERO server and attach it to the image specified by its ID.
      *
-     * @param table
-     * @param name
+     * @param table OMERO.table
+     * @param name table name
      * @param client
      * @param imageId
-     * @return
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
     public static boolean addTableToOmero(TableData table, String name, OmeroRawClient client, long imageId) {
         boolean wasAdded = true;
@@ -633,39 +700,41 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Send an attachment to OMERO
+     * Send an attachment to OMERO server and attached it to an image specified by its ID.
      *
      * @param file
      * @param client
      * @param imageId
-     * @return
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
     public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId) {
         return addAttachmentToOmero(file, client, imageId, null,"");
     }
 
     /**
-     *  Send an attachment to OMERO, specifying the mimetype
+     *  Send an attachment to OMERO server and attached it to an image specified by its ID.
+     *  You can specify the mimetype of the file.
      *
      * @param file
      * @param client
      * @param imageId
      * @param miemtype
-     * @return
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
     public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId, String miemtype) {
         return addAttachmentToOmero(file, client, imageId, miemtype,"");
     }
 
     /**
-     * Send an attachment to OMERO, specifying the mimetype and description
+     * Send an attachment to OMERO server and attached it to an image specified by its ID, specifying the mimetype and
+     * a description of what the file is and how it works.
      *
      * @param file
      * @param client
      * @param imageId
      * @param miemtype
      * @param description
-     * @return
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
     public static boolean addAttachmentToOmero(File file, OmeroRawClient client, long imageId, String miemtype, String description) {
         boolean wasAdded = true;
@@ -692,11 +761,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * update a list of object on OMERO
+     * Update a list of OMERO objects
      *
      * @param client
      * @param objects
-     * @return
+     * @return Updating status (True if updated ; false with error message otherwise)
      */
     public static boolean updateObjectsOnOmero(OmeroRawClient client, List<IObject> objects){
        boolean wasAdded = true;
@@ -719,11 +788,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * update an existing object on OMERO.
+     * Update an OMERO object.
      *
      * @param client
      * @param object
-     * @return
+     * @return Updating status (True if updated ; false with error message otherwise)
      */
     public static boolean updateObjectOnOmero(OmeroRawClient client, IObject object){
         boolean wasAdded = true;
@@ -744,14 +813,16 @@ public final class OmeroRawTools {
         return wasAdded;
     }
 
+
     /**
-     * update thumbnail image on OMERO giving the ID of the updated RenderingDef object.
-     * Be careful : the object should already have an OMERO Id.
+     * Update the thumbnail of an OMERO image, specified by its id, and given the ID of the updated RenderingDef object linked to that image.
+     * <br> <br>
+     * Be careful : the image should already have an OMERO ID.
      *
      * @param client
      * @param imageId
      * @param objectId
-     * @return
+     * @return Updating status (True if updated ; false with error message otherwise)
      */
     public static boolean updateOmeroThumbnail(OmeroRawClient client, long imageId, long objectId){
         boolean wasAdded = true;
@@ -759,24 +830,52 @@ public final class OmeroRawTools {
         // get the current image
         ImageData image = readOmeroImage(client, imageId);
 
+        // get OMERO thumbnail store
+        ThumbnailStorePrx store = null;
+        try {
+            store = client.getGateway().getThumbnailService(client.getContext());
+        } catch(DSOutOfServiceException e){
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+           return false;
+        }
+
+        if(store == null){
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot get the Thumbnail service for image " + imageId);
+            return false;
+        }
+
         try {
             // get the pixel id to retrieve the correct thumbnail
             long pixelId = image.getDefaultPixels().getId();
-            // get thumbnail factory
-            ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
             // get current thumbnail
             store.setPixelsId(pixelId);
             //set the new settings
             store.setRenderingDefId(objectId);
-            // update the thumbnail
-            store.createThumbnails();
-            // close the factory
-            store.close();
-        } catch (DSOutOfServiceException | ServerError | NullPointerException e) {
-            Dialogs.showErrorNotification( "Update OMERO Thumbnail","Thumbnail cannot be updated for image "+imageId);
+
+            try {
+                // update the thumbnail
+                store.createThumbnails();
+            } catch (ServerError e) {
+                logger.error("Error during thumbnail creation but thumbnail is updated ");
+                logger.error("" + e);
+                logger.error(getErrorStackTraceAsString(e));
+            }
+
+        } catch (NullPointerException | ServerError e) {
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Thumbnail cannot be updated for image " + imageId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             wasAdded = false;
+        }
+
+        try {
+            // close the store
+            store.close();
+        } catch (ServerError e) {
+            Dialogs.showErrorNotification("Update OMERO Thumbnail", "Cannot close the ThumbnailStore");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
         }
 
         return wasAdded;
@@ -784,11 +883,15 @@ public final class OmeroRawTools {
 
 
     /**
-     * write the measurement table as a csv file
+     * Convert a QuPath measurement table into a CSV file,
+     * including the OMERO image ID on which the measurements are referring to.
      *
      * @param pathObjects
      * @param ob
-     * @param path
+     * @param imageId
+     * @param name file name
+     * @param path where to save the newly created CSV file.
+     * @return CSV file of measurement table.
      */
     public static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, long imageId, String name, String path) {
         StringBuilder tableString = new StringBuilder();
@@ -836,7 +939,7 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Delete all existing ROIs on OMERO that are linked to the current image
+     * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
      *
      * @param client
      * @param imageId
@@ -867,12 +970,12 @@ public final class OmeroRawTools {
 
 
     /**
-     * Save ROIs to OMERO, to the current image.
+     * Send ROIs to OMERO server and attached them to the specified image.
      *
      * @param client
      * @param imageId
      * @param omeroRois
-     * @return
+     * @return Sending status (True if sent ; false with error message otherwise)
      */
     public static boolean writeOmeroROIs(OmeroRawClient client, long imageId, List<ROIData> omeroRois) {
         boolean roiSaved = false;
@@ -900,11 +1003,11 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Read ROIs from OMERO, from the current image
+     * Read ROIs from OMERO server attached to an image specified by its id.
      *
      * @param client
      * @param imageId
-     * @return
+     * @return Image's list of OMERO ROIs
      */
     public static List<ROIData> readOmeroROIs(OmeroRawClient client, long imageId){
         List<ROIResult> roiList;
@@ -937,16 +1040,17 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Convert a collection of pathObjects to a list of OMERO ROIs
+     * Convert QuPath pathObjects into OMERO ROIs.
+     *
      * @param pathObjects
-     * @return
+     * @return List of OMERO ROIs
      */
     public static List<ROIData> createOmeroROIsFromPathObjects(Collection<PathObject> pathObjects){
         List<ROIData> omeroRois = new ArrayList<>();
         Map<PathObject,String> idObjectMap = new HashMap<>();
 
         // create unique ID for each object
-        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getName()));
+        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getID().toString()));
 
         pathObjects.forEach(pathObject -> {
             // computes OMERO-readable ROIs
@@ -967,9 +1071,10 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Convert a list of OMERO ROIs to a collection of pathObjects
+     * Convert OMERO ROIs into QuPath pathObjects
+     *
      * @param roiData
-     * @return
+     * @return List of QuPath pathObjects
      */
     public static Collection<PathObject> createPathObjectsFromOmeroROIs(List<ROIData> roiData){
         Map<Double,Double> idParentIdMap = new HashMap<>();
@@ -1015,7 +1120,7 @@ public final class OmeroRawTools {
         idParentIdMap.keySet().forEach(objID->{
             // if the current object has a valid id and has a parent
             if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID)) == null))
-                idObjectMap.get(idParentIdMap.get(objID)).addPathObject(idObjectMap.get(objID));
+                idObjectMap.get(idParentIdMap.get(objID)).addChildObject(idObjectMap.get(objID));
             else
                 // if no valid id for object or if the object has no parent
                 pathObjects.add(idObjectMap.get(objID));
@@ -1025,10 +1130,10 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Get the comment attached to one shape of the OMERO ROI.
+     * Read the comment attached to one shape of an OMERO ROI.
      *
      * @param shape
-     * @return
+     * @return The shape comment
      */
     public static String getROIComment(Shape shape){
         if(shape instanceof Rectangle){
@@ -1063,10 +1168,10 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Read the comments attach to the current ROI in OMERO (i.e. read each comment attached to each shape)
+     * Read the comments attach to an OMERO ROI (i.e. read each comment attached to each shape of the ROI)
      *
      * @param roiData
-     * @return
+     * @return List of comments
      */
     public static List<String> getROIComment(ROIData roiData) {
         // get the ROI
@@ -1087,10 +1192,10 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Parse the comment based on the standardization introduced in "OmeroRawShapes.setRoiComment()"
+     * Parse the comment based on the format introduced in {OmeroRawShapes.setRoiComment(PathObject src, String objectID, String parentID)}
      *
      * @param comment
-     * @return
+     * @return The split comment
      */
     public static String[] parseROIComment(String comment) {
         // default parsing
@@ -1137,12 +1242,12 @@ public final class OmeroRawTools {
 
 
     /**
-     * Splits the "target" map into two : one containing key/values that are referenced in the "reference" map and
+     * Splits the "target" map into two parts : one part containing key/values that are referenced in the "reference" map and
      * the other containing remaining key/values that are not referenced in the "reference".
      *
      * @param reference
      * @param target
-     * @return
+     * @return List of new kvp and existing kvp maps
      */
     public static List<Map<String, String>> splitNewAndExistingKeyValues(Map<String, String> reference, Map<String, String> target){
         Map<String, String> existingKVP = new HashMap<>();
@@ -1167,12 +1272,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * Read key value pairs from OMERO server.
-     *
-     * Code partially taken from Pierre Pouchin, from his "simple-omero-client" project
+     * Get key-value pairs from OMERO server attached to the specified image.
      *
      * @param client
      * @param imageId
+     * @return List of Key-Value pairs as annotation objects
      */
     public static List<MapAnnotationData> readKeyValues(OmeroRawClient client, long imageId) {
         List<AnnotationData> annotations;
@@ -1199,12 +1303,11 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Read key value pairs from OMERO and convert them into NamedValues. This OMERO-compatible object is more flexible
-     * than a Map&lt;String, String&gt; and therefore allows for two identical keys (Name).
+     * Read key value pairs from OMERO server and convert them into NamedValue OMERO-compatible-objects.
      *
      * @param client
      * @param imageId
-     * @return
+     * @return List of NamedValue objects.
      */
     public static List<NamedValue> readKeyValuesAsNamedValue(OmeroRawClient client, long imageId) {
         return readKeyValues(client, imageId).stream()
@@ -1214,11 +1317,12 @@ public final class OmeroRawTools {
 
 
     /**
-     * Add new key value pairs to an image on OMERO.
+     * Send key value pairs on OMERO and attach them to the specified image.
      *
      * @param keyValuePairs
      * @param client
      * @param imageId
+     * @return Sending status (True if sent ; false with error message otherwise)
      */
     public static boolean addKeyValuesOnOmero(MapAnnotationData keyValuePairs, OmeroRawClient client, long imageId) {
         boolean wasAdded = true;
@@ -1244,10 +1348,11 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Update specified key value pairs on OMERO
+     * Update specified key value pairs on OMERO server.
      *
      * @param keyValuePairs
      * @param client
+     * @return Updating status (True if updated ; false with error message otherwise)
      */
     public static boolean updateKeyValuesOnOmero(List<MapAnnotationData> keyValuePairs, OmeroRawClient client) {
         boolean wasUpdated = true;
@@ -1269,10 +1374,11 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Delete specified key value pairs on OMERO
+     * Delete specified key value pairs on OMERO server
      *
      * @param keyValuePairs
      * @param client
+     * @return Deleting status (True if deleted ; false with error message otherwise)
      */
     public static boolean deleteKeyValuesOnOmero(List<MapAnnotationData> keyValuePairs, OmeroRawClient client) {
         boolean wasDeleted = true;
@@ -1291,13 +1397,12 @@ public final class OmeroRawTools {
 
 
     /**
-     * Try to solve an error in OMERO regarding the creation keys.
+     * Try to solve an error in OMERO regarding the keys creation.
      * On OMERO, it is possible to have two identical keys with a different value. This should normally never append.
-     * This method check if all keys are unique and output false if there is at least two identical keys.
-     *
+     * This method checks if all keys are unique and output false if there is at least two identical keys.
      *
      * @param keyValues
-     * @return
+     * @return Check status (True if all keys unique ; false otherwise)
      */
     public static boolean checkUniqueKeyInAnnotationMap(List<NamedValue> keyValues){ // not possible to have a map because it allows only unique keys
         boolean uniqueKey = true;
@@ -1317,11 +1422,11 @@ public final class OmeroRawTools {
 
 
     /**
-     * Read tags from OMERO server.
+     * Read tags from OMERO server, attached to the specified image.
      *
      * @param client
      * @param imageId
-     * @return
+     * @return List of Tag objects attached to the image
      */
     public static List<TagAnnotationData> readTags(OmeroRawClient client, long imageId) {
         List<AnnotationData> annotations;
@@ -1354,12 +1459,12 @@ public final class OmeroRawTools {
 
 
     /**
-     *  Add a new tag to an image on OMERO.
+     *  Send a new tag on OMERO server and attach it to the specified image.
      *
      * @param tags
      * @param client
      * @param imageId
-     * @return
+     * @return Sending status (True if sent ; false with error message otherwise)
      */
     public static boolean addTagsOnOmero(TagAnnotationData tags, OmeroRawClient client, long imageId) {
         boolean wasAdded = true;
@@ -1385,15 +1490,15 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Return the thumbnail of the OMERO image corresponding to the specified {@code imageId}.
-     *
+     * Get the thumbnail of the specified OMERO image.
+     * <br> <br>
      * Code copied from Pierre Pouchin from {simple-omero-client} project, {ImageWrapper} class, {getThumbnail} method
      * and adapted for QuPath compatibility.
      *
      * @param client
      * @param imageId
      * @param prefSize
-     * @return thumbnail
+     * @return The image's thumbnail
      */
     public static BufferedImage getThumbnail(OmeroRawClient client, long imageId, int prefSize) {
 
@@ -1458,7 +1563,7 @@ public final class OmeroRawTools {
      * read an image stored in the resource folder of the main class
      *
      * @param imageName
-     * @return
+     * @return The read image or null if cannot be read
      */
     public static BufferedImage readLocalImage(String imageName){
         try {
@@ -1769,6 +1874,6 @@ public final class OmeroRawTools {
     }
 
     public static String getErrorStackTraceAsString(Exception e){
-        return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a,b)->a + "     at "+b+"\n");
+        return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a, b)->a + "     at "+b+"\n");
     }
 }

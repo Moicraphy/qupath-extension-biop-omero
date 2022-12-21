@@ -10,8 +10,6 @@ import omero.model.ProjectDatasetLink;
 import omero.model.DatasetImageLink;
 import omero.model.IObject;
 
-import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

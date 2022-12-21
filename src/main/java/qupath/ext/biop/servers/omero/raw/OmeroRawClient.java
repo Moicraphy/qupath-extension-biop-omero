@@ -32,13 +32,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
-import omero.ServerError;
 import omero.gateway.Gateway;
 import omero.gateway.LoginCredentials;
 import omero.gateway.SecurityContext;
-import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
-import omero.gateway.facility.AdminFacility;
 import omero.gateway.model.ExperimenterData;
 import omero.log.SimpleLogger;
 import omero.model.Experimenter;
@@ -49,12 +46,19 @@ import qupath.lib.gui.dialogs.Dialogs;
 
 import javax.naming.OperationNotSupportedException;
 import java.io.IOException;
-import java.net.*;
+
+import java.net.Authenticator;
+import java.net.ConnectException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.PasswordAuthentication;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /**
@@ -393,6 +397,10 @@ public class OmeroRawClient {
                 getUsername().equals(((OmeroRawClient)obj).getUsername());
     }
 
+    /**
+     * check if the current client is connected to the server
+     * @return log in status
+     */
     public boolean checkIfLoggedIn() {
         if(this.gateway == null) // if we invoke the method "createClientAndLogin" in OmeroRawExtension->createRawServerListMenu, the gateway is null
             return false;

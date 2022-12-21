@@ -385,7 +385,6 @@ final class OmeroRawObjects {
             super.setType(type.toString());
             super.setParent(parent);
 
-            //TODO change the way to extract user info because it is only the one which is logged
             super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
                     user.getFirstName()==null ? "" : user.getFirstName().getValue(),
                     user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
