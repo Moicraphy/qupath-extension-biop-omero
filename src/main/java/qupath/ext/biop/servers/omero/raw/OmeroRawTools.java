@@ -277,6 +277,13 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * retrieve the group of which an image is part of
+     *
+     * @param client
+     * @param imageId
+     * @return the group id
+     */
     public static long getGroupIdFromImageId(OmeroRawClient client, long imageId){
         try {
             // request an imageData object for the image id by searching in all groups on OMERO
@@ -504,6 +511,13 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * read an image from OMERO server, based on its ID.
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
     public static ImageData readOmeroImage(OmeroRawClient client, long imageId){
         try {
             return client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
@@ -574,6 +588,13 @@ public final class OmeroRawTools {
     }
 
 
+    /**
+     * read the image file format (ex. .lif, .vis,...)
+     *
+     * @param client
+     * @param imageId
+     * @return
+     */
     public static String readImageFileType(OmeroRawClient client, long imageId){
         try {
             ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
@@ -790,7 +811,7 @@ public final class OmeroRawTools {
 
     /**
      * update thumbnail image on OMERO giving the ID of the updated RenderingDef object.
-     * Be careful : the object should already have an OMERO Id.
+     * Be careful : the object should already have an OMERO ID.
      *
      * @param client
      * @param imageId
@@ -803,6 +824,7 @@ public final class OmeroRawTools {
         // get the current image
         ImageData image = readOmeroImage(client, imageId);
 
+        // get OMERO thumbnail store
         ThumbnailStorePrx store = null;
         try {
             store = client.getGateway().getThumbnailService(client.getContext());

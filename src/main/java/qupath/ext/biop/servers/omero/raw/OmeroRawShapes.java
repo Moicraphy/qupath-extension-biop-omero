@@ -230,10 +230,10 @@ class OmeroRawShapes {
 
     /**
      * convert Omero ROIs To QuPath ROIs.
-     *
-     * *********************** BE CAREFUL *****************************
+     * <br>
+     * ***********************BE CAREFUL***************************** <br>
      * For the z and t in the ImagePlane, if z < 0 and t < 0 (meaning that roi should be present on all the slices/frames),
-     * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)
+     * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame) <br>
      * ****************************************************************
      *
      * @param roiData
@@ -296,11 +296,11 @@ class OmeroRawShapes {
 
     /**
      * Output the ROI result of the XOR operation between the 2 input ROIs
-     *
-     * 	 * *********************** BE CAREFUL *****************************
-     * 	 * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
-     * 	 * the new composite ROI are set on the lowest c/z/t plane
-     * 	 * ****************************************************************
+     * <br>
+     * ***********************BE CAREFUL***************************** <br>
+     * For the c, z and t in the ImagePlane, if the rois contains in the general ROI are not contained in the same plane,
+     * the new composite ROI are set on the lowest c/z/t plane <br>
+     * ****************************************************************
      *
      * @param roi1
      * @param roi2
@@ -331,7 +331,8 @@ class OmeroRawShapes {
     /**
      * Convert PathObjects into OMERO-readable objects. In case the PathObject contains holes, it is split
      * into individual shapes and each shape will be part of the same OMERO ROI (nested hierarchy in OMERO.web).
-     * @param src : pathObject
+     *
+     * @param src : pathObject to convert
      * @return
      */
     public static List<ShapeData> convertQuPathRoiToOmeroRoi(PathObject src, String objectID, String parentID) {
