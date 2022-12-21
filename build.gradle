@@ -8,7 +8,7 @@ plugins {
 ext.moduleName = 'qupath.extension.biop.omero'
 archivesBaseName = 'qupath-extension-biop-omero'
 description = "QuPath extension to support image reading using OMERO's Java API."
-version = "0.2.1-SNAPSHOT"
+version = "0.2.1"
 
 repositories {
 //  mavenLocal()
