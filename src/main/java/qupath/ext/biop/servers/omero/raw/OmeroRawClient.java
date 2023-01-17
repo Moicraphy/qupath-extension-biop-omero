@@ -71,15 +71,10 @@ public class OmeroRawClient {
 
     final private static Logger logger = LoggerFactory.getLogger(OmeroRawClient.class);
 
-
     private SecurityContext securityContext;
     private Gateway gateway;
-
-    // TODO Dfine port in some optional way
     private int port = 4064;
-
     private boolean isAdminUser = false;
-
     private Experimenter loggedInUser;
 
     /**
@@ -331,6 +326,8 @@ public class OmeroRawClient {
             if (authentication == null)
                 return false;
 
+            // get omero port
+            port = OmeroAuthenticatorFX.getPort();
             boolean result = authenticate(authentication);
 
             Arrays.fill(authentication.getPassword(), (char)0);
@@ -416,6 +413,7 @@ public class OmeroRawClient {
     private static class OmeroAuthenticatorFX extends Authenticator {
 
         private String lastUsername = "";
+        private static String port = "4064";
 
         @Override
         protected PasswordAuthentication getPasswordAuthentication() {
@@ -426,6 +424,16 @@ public class OmeroRawClient {
 
             lastUsername = authentication.getUserName();
             return authentication;
+        }
+
+        static int getPort(){
+            try {
+                return Integer.parseInt(port);
+            }catch(Exception e) {
+                Dialogs.showWarningNotification("Wrong port"," Port "+port+" is not recognized as a correct port. Default port 4064 is used instead");
+                port = "4064";
+                return Integer.parseInt(port);
+            }
         }
 
         static PasswordAuthentication getPasswordAuthentication(String prompt, String host, String lastUsername) {
@@ -439,6 +447,10 @@ public class OmeroRawClient {
             PasswordField tfPassword = new PasswordField();
             labPassword.setLabelFor(tfPassword);
 
+            Label labPort = new Label("Port");
+            TextField tfPort = new TextField(port);
+            labPort.setLabelFor(tfPort);
+
             int row = 0;
             if (prompt != null && !prompt.isBlank())
                 pane.add(new Label(prompt), 0, row++, 2, 1);
@@ -447,6 +459,8 @@ public class OmeroRawClient {
             pane.add(tfUsername, 1, row++);
             pane.add(labPassword, 0, row);
             pane.add(tfPassword, 1, row++);
+            pane.add(labPort, 0, row);
+            pane.add(tfPort, 1, row);
 
             pane.setHgap(5);
             pane.setVgap(5);
@@ -460,6 +474,9 @@ public class OmeroRawClient {
             for (int i = 0; i < passLength; i++) {
                 password[i] = tfPassword.getCharacters().charAt(i);
             }
+
+            // set omero port
+            port = tfPort.getText();
 
             return new PasswordAuthentication(userName, password);
         }
