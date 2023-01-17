@@ -441,7 +441,7 @@ class OmeroRawShapes {
     private static String setRoiComment(PathObject src, String objectID, String parentID){
 
         // format classes to OMERO-compatible string
-        String pathClass = src.getPathClass() == null ? "NoClass" : src.getPathClass().toString().replaceAll(" ","").replaceAll(":","&");
+        String pathClass = src.getPathClass() == null ? "NoClass" : src.getPathClass().toString().replaceAll(":","&");
 
         if (src.isDetection()) {
              return "Detection:"+pathClass+":"+objectID+":"+parentID;
