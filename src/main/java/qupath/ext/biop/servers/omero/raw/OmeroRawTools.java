@@ -640,7 +640,7 @@ public final class OmeroRawTools {
         for (String col : ob.getAllNames()) {
             if (ob.isNumericMeasurement(col)) {
                 // feature name
-                columns.add(new TableDataColumn(col.replace("/","-"), i++, Double.class)); // OMERO table does not support "/"
+                columns.add(new TableDataColumn(col.replace("/","-").replace(GeneralTools.micrometerSymbol(),"um"), i++, Double.class)); // OMERO table does not support "/" and remove "mu" character
 
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
@@ -652,7 +652,7 @@ public final class OmeroRawTools {
 
             if (ob.isStringMeasurement(col)) {
                 // feature name
-                columns.add(new TableDataColumn(col.replace("/","-"), i++, String.class)); // OMERO table does not support "/"
+                columns.add(new TableDataColumn(col.replace("/","-").replace(GeneralTools.micrometerSymbol(),"um"), i++, String.class)); // OMERO table does not support "/" and remove "mu" character
 
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
@@ -898,7 +898,9 @@ public final class OmeroRawTools {
 
         // get the header
         tableString.append("Image_ID").append(",");
-        for (String col : ob.getAllNames()) {
+        List<String> allColumnNames = ob.getAllNames();
+        for (String col : allColumnNames) {
+            col = col.replace(GeneralTools.micrometerSymbol(),"um"); // remove "mu" character
             tableString.append(col).append(",");
         }
         tableString.delete(tableString.lastIndexOf(","),tableString.lastIndexOf(","));

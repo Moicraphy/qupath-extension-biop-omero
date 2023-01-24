@@ -123,12 +123,13 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             return;
         }
 
+        int nWrittenTables = 0;
         if(annotationMap) {
             // send table to OMERO
-            OmeroRawScripting.sendAnnotationMeasurementTable(objs, omeroServer, qupath.getImageData());
+            if(OmeroRawScripting.sendAnnotationMeasurementTable(objs, omeroServer, qupath.getImageData())) nWrittenTables++;
 
             // send the corresponding csv file
-            OmeroRawScripting.sendAnnotationMeasurementTableAsCSV(objs, omeroServer, qupath.getImageData());
+            if(OmeroRawScripting.sendAnnotationMeasurementTableAsCSV(objs, omeroServer, qupath.getImageData())) nWrittenTables++;
         }
         if(detectionMap){
             // get detection objects
@@ -137,17 +138,24 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             // send detection measurement map
             if(detections.size() > 0) {
                 // send table to OMERO
-                OmeroRawScripting.sendDetectionMeasurementTable(detections, omeroServer, qupath.getImageData());
+                if(OmeroRawScripting.sendDetectionMeasurementTable(detections, omeroServer, qupath.getImageData())) nWrittenTables++;
 
                 // send the corresponding csv file
-                OmeroRawScripting.sendDetectionMeasurementTableAsCSV(detections, omeroServer, qupath.getImageData());
+                if(OmeroRawScripting.sendDetectionMeasurementTableAsCSV(detections, omeroServer, qupath.getImageData())) nWrittenTables++;
             }
             else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
         }
 
         if(detectionMap || annotationMap)
-            Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement maps were successfully sent to OMERO server",
-                    detectionMap && annotationMap ? 4 : 2));
+            if(nWrittenTables > 0) {
+                Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement %s were successfully sent to OMERO server",
+                        nWrittenTables, nWrittenTables == 1 ? "table" : "tables"));
+                if(nWrittenTables < 4)
+                    Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " writing failure", String.format("%d measurement %s were not sent to OMERO server",
+                            4-nWrittenTables, 4-nWrittenTables == 1 ? "table" : "tables"));
+            }
+            else
+                Dialogs.showErrorNotification(StringUtils.capitalize(objectString) + " writing failure", String.format("No measurement tables were sent to OMERO"));
 
     }
 }
