@@ -37,7 +37,7 @@ configurations {
 }
 
 dependencies {
-    def qupathVersion = "0.4.1" // For now
+    def qupathVersion = "0.4.2" // For now
 
     implementation "org.apache.commons:commons-text:1.9"
 
