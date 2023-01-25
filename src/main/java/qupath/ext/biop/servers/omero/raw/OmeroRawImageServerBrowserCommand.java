@@ -51,6 +51,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javafx.event.EventHandler;
+import javafx.geometry.Rectangle2D;
+import javafx.stage.Screen;
+import javafx.stage.Window;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
 import org.controlsfx.glyphfont.GlyphFontRegistry;
@@ -1352,6 +1356,17 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     .content(bp)
                     .title("More info")
                     .build();
+
+            final Window window = dialog.getDialogPane().getScene().getWindow();
+            window.addEventHandler(WindowEvent.WINDOW_SHOWN, new EventHandler<WindowEvent>() {
+                @Override
+                public void handle(WindowEvent event) {
+                    Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
+                    if(window.getHeight() > screenBounds.getHeight()) {
+                        window.setY(0);
+                    }
+                }
+            });
 
             // Resize Dialog when expanding/collapsing any TitledPane
             gp.getChildren().forEach(e -> {
