@@ -150,9 +150,10 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             if(nWrittenTables > 0) {
                 Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d measurement %s were successfully sent to OMERO server",
                         nWrittenTables, nWrittenTables == 1 ? "table" : "tables"));
-                if(nWrittenTables < 4)
+                int totalNumberOfTable = (detectionMap && annotationMap ? 4 : 2);
+                if(nWrittenTables < totalNumberOfTable)
                     Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " writing failure", String.format("%d measurement %s were not sent to OMERO server",
-                            4-nWrittenTables, 4-nWrittenTables == 1 ? "table" : "tables"));
+                            totalNumberOfTable-nWrittenTables, totalNumberOfTable-nWrittenTables == 1 ? "table" : "tables"));
             }
             else
                 Dialogs.showErrorNotification(StringUtils.capitalize(objectString) + " writing failure", String.format("No measurement tables were sent to OMERO"));
