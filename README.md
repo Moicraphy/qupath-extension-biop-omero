@@ -3,22 +3,25 @@
 Welcome to the OMERO extension for [QuPath](http://qupath.github.io)!
 
 This adds support for accessing images hosted on an [OMERO](https://www.openmicroscopy.org/omero/) 
-server through OMERO gateway API.
+server through OMERO-ICE API.
 
-The extension is intended for the (at the time of writing) not-yet-released 
-QuPath v0.3.
-It is not compatible with earlier QuPath versions.
+The extension is intended for QuPath v0.4 (at the time of writing).
+It is not compatible with earlier QuPath versions. However, the 0.2.0 version of this extension is the last compatible one with QuPath 0.3.2.
 
 ## Installing
 
-To install the OMERO extension, download the latest `qupath-extension-biop-omero-[version].jar` file from [releases](https://github.com/qupath/qupath-extension-biop-omero/releases) and drag it onto the main QuPath window.
+*Downloads*
 
-If you haven't installed any extensions before, you'll be prompted to select a QuPath user directory.
+- To install the OMERO extension, download the latest `qupath-extension-biop-omero-[version].zip` file from [releases](https://github.com/BIOP/qupath-extension-biop-omero/releases/latest), unzip it and drag the two .jars onto the main QuPath window.
+
+- If you haven't installed any extensions before, you'll be prompted to select a QuPath user directory.
 The extension will then be copied to a location inside that directory.
 
-The `OMERO-java dependencies` are required to make this extension working. Download the .zip file from the [OMERO download page](https://www.openmicroscopy.org/omero/downloads/), under "OMERO Java". Unzip it and copy "libs" folder in `C:\QuPath_Common_Data_0.3\extensions`.
+- The `OMERO-java dependencies` are required to make this extension working. Download the .zip file from the [OMERO download page](https://www.openmicroscopy.org/omero/downloads/), under "OMERO Java". Unzip it and copy "libs" folder in your extension directory.
 
-You might then need to restart QuPath (but not your computer).
+
+*Update*
+- You might then need to restart QuPath (but not your computer).
 
 
 ## Building
