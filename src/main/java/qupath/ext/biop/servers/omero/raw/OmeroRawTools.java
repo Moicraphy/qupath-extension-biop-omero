@@ -27,15 +27,18 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -640,7 +643,7 @@ public final class OmeroRawTools {
         for (String col : ob.getAllNames()) {
             if (ob.isNumericMeasurement(col)) {
                 // feature name
-                columns.add(new TableDataColumn(col.replace("/","-").replace(GeneralTools.micrometerSymbol(),"um"), i++, Double.class)); // OMERO table does not support "/" and remove "mu" character
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, Double.class)); // OMERO table does not support "/" and remove "mu" character
 
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
@@ -652,7 +655,7 @@ public final class OmeroRawTools {
 
             if (ob.isStringMeasurement(col)) {
                 // feature name
-                columns.add(new TableDataColumn(col.replace("/","-").replace(GeneralTools.micrometerSymbol(),"um"), i++, String.class)); // OMERO table does not support "/" and remove "mu" character
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, String.class)); // OMERO table does not support "/" and remove "mu" character
 
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
@@ -925,7 +928,7 @@ public final class OmeroRawTools {
 
        try {
            // write the file
-           BufferedWriter buffer = new BufferedWriter(new FileWriter(file));
+           BufferedWriter buffer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8));
            buffer.write(tableString + "\n");
 
            // close the file
