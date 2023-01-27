@@ -3,6 +3,7 @@ plugins {
   // To create a shadow/fat jar, including dependencies
   id 'com.github.johnrengelman.shadow' version '7.0.0'
   // Reduce JavaCPP dependencies
+  id 'maven-publish'
 }
 
 ext.moduleName = 'qupath.extension.biop.omero'
