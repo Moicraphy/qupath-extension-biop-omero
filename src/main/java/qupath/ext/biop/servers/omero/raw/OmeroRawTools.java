@@ -28,7 +28,6 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -65,6 +64,7 @@ import omero.gateway.facility.MetadataFacility;
 import omero.gateway.facility.ROIFacility;
 import omero.gateway.facility.TablesFacility;
 
+import omero.gateway.facility.TransferFacility;
 import omero.gateway.model.AnnotationData;
 import omero.gateway.model.ChannelData;
 import omero.gateway.model.DatasetData;
@@ -398,6 +398,79 @@ public final class OmeroRawTools {
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Retrieve the parent dataset of an image
+     *
+     * @param client
+     * @param imageId
+     * @return List of datasets
+     */
+    public static Collection<DatasetData> getParentDataset(OmeroRawClient client, long imageId){
+        try {
+            //TODO create a generic method getParent(client, type, id) that automatically retrieves the right parents
+            List<IObject> datasetObjects = client.getGateway().getQueryService(client.getContext()).findAllByQuery("select link.parent from DatasetImageLink as link " +
+                    "where link.child=" + imageId, null);
+            List<Long> datasetIds = datasetObjects.stream().map(IObject::getId).map(RLong::getValue).distinct().collect(Collectors.toList());
+
+            return client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(),datasetIds);
+        } catch (DSOutOfServiceException | ExecutionException | ServerError e) {
+            Dialogs.showErrorMessage("Read parent dataset","Cannot retrieved parent dataset(s) from image "+imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        } catch (DSAccessException e) {
+            Dialogs.showErrorMessage("Read parent dataset", "You don't have the right to access to parent dataset(s) of image "+imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Retrieve the parent project of a dataset
+     *
+     * @param client
+     * @param datasetId
+     * @return List of projects
+     */
+    public static Collection<ProjectData> getDatasetParentProject(OmeroRawClient client, long datasetId){
+        try {
+            List<IObject> projectObjects = client.getGateway().getQueryService(client.getContext()).findAllByQuery("select link.parent from ProjectDatasetLink as link " +
+                    "where link.child=" + datasetId, null);
+            List<Long> projectIds = projectObjects.stream().map(IObject::getId).map(RLong::getValue).distinct().collect(Collectors.toList());
+
+            return client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),projectIds);
+        } catch (DSOutOfServiceException | ExecutionException | ServerError e) {
+            Dialogs.showErrorMessage("Read dataset parent project","Cannot retrieve parent project(s) from dataset  "+datasetId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        } catch (DSAccessException e) {
+            Dialogs.showErrorMessage("Read dataset parent project", "You don't have the right to access to parent project(s) of dataset "+datasetId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Retrieve the parent project of an image
+     *
+     * @param client
+     * @param imageId
+     * @return List of projects
+     */
+    public static Collection<ProjectData> getImageParentProject(OmeroRawClient client, long imageId){
+        Collection<DatasetData> datasets = getParentDataset(client, imageId);
+        Collection<ProjectData> projects = new ArrayList<>();
+
+        datasets.forEach(dataset->{
+            projects.addAll(getDatasetParentProject(client, dataset.getId()));
+        });
+
+        return projects;
     }
 
 
@@ -884,6 +957,37 @@ public final class OmeroRawTools {
         return wasAdded;
     }
 
+    /**
+     * Download an image from OMERO in the path given in argument.
+     *
+     * @param client
+     * @param imageId
+     * @param path
+     * @return Downloading status (True if downloaded ; false with error message otherwise)
+     */
+    public static boolean downloadImage(OmeroRawClient client, long imageId, String path){
+        boolean wasDownloaded = true;
+        try {
+            if(new File(path).exists())
+                client.getGateway().getFacility(TransferFacility.class).downloadImage(client.getContext(), path, imageId);
+            else {
+                Dialogs.showErrorNotification("Download object","The following path does not exists : "+path);
+                wasDownloaded = false;
+            }
+        } catch(DSOutOfServiceException | ExecutionException e){
+            Dialogs.showErrorNotification("Download object","Error during downloading image "+imageId+" from OMERO.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            wasDownloaded = false;
+        } catch(DSAccessException e){
+            Dialogs.showErrorNotification("Download object","You don't have the right to download image "+imageId+" from OMERO.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            wasDownloaded = false;
+        }
+
+        return wasDownloaded;
+    }
 
     /**
      * Convert a QuPath measurement table into a CSV file,
