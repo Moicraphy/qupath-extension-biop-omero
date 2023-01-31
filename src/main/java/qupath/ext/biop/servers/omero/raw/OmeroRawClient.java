@@ -222,7 +222,7 @@ public class OmeroRawClient {
         return this.gateway;
     }
 
-    Experimenter getLoggedInUser() {
+    public Experimenter getLoggedInUser() {
         return this.loggedInUser;
     }
 
