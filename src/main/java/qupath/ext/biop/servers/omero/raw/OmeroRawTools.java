@@ -67,6 +67,7 @@ import omero.gateway.facility.TablesFacility;
 import omero.gateway.facility.TransferFacility;
 import omero.gateway.model.AnnotationData;
 import omero.gateway.model.ChannelData;
+import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.EllipseData;
 import omero.gateway.model.ImageData;
@@ -84,7 +85,9 @@ import omero.gateway.model.ShapeData;
 import omero.gateway.model.TableData;
 import omero.gateway.model.TableDataColumn;
 import omero.gateway.model.TagAnnotationData;
+import omero.gateway.model.WellData;
 import omero.model.Dataset;
+import omero.model.DatasetImageLink;
 import omero.model.Ellipse;
 import omero.model.Experimenter;
 import omero.model.ExperimenterGroup;
@@ -101,6 +104,7 @@ import omero.model.Rectangle;
 import omero.model.RenderingDef;
 import omero.model.Roi;
 import omero.model.Shape;
+import omero.model.WellSample;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -401,78 +405,121 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Retrieve the parent dataset of an image
+     * Retrieve parents of OMERO containers (i.e. Image, Dataset, Well and Plate). For Project, Screen and other, it
+     * returns an empty list.
      *
      * @param client
-     * @param imageId
-     * @return List of datasets
+     * @param dataType
+     * @param id
+     * @return List of object's parent(s) or empty list
      */
-    public static Collection<DatasetData> getParentDataset(OmeroRawClient client, long imageId){
-        try {
-            //TODO create a generic method getParent(client, type, id) that automatically retrieves the right parents
-            List<IObject> datasetObjects = client.getGateway().getQueryService(client.getContext()).findAllByQuery("select link.parent from DatasetImageLink as link " +
-                    "where link.child=" + imageId, null);
-            List<Long> datasetIds = datasetObjects.stream().map(IObject::getId).map(RLong::getValue).distinct().collect(Collectors.toList());
+    public static Collection<? extends DataObject> getParent(OmeroRawClient client, String dataType, long id){
+        try{
+            switch(dataType) {
 
-            return client.getGateway().getFacility(BrowseFacility.class).getDatasets(client.getContext(),datasetIds);
-        } catch (DSOutOfServiceException | ExecutionException | ServerError e) {
-            Dialogs.showErrorMessage("Read parent dataset","Cannot retrieved parent dataset(s) from image "+imageId);
+                case "Image":
+                    // get the image
+                    Image image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), id).asImage();
+
+                    // try first to get the parent dataset
+                    try {
+                        List<Long> ids = image.copyDatasetLinks()
+                                .stream()
+                                .map(DatasetImageLink::getParent)
+                                .map(IObject::getId)
+                                .map(RLong::getValue)
+                                .collect(Collectors.toList());
+
+                        logger.info("The current image " + id + " has a dataset as parent");
+
+                        return client.getGateway()
+                                .getFacility(BrowseFacility.class)
+                                .getDatasets(client.getContext(), ids);
+                    } catch (Exception e) {
+                        logger.warn("The current image " + id + " has a well as parent");
+                    }
+
+                    // then try to get the parent well if there is no parent dataset
+                    try {
+                        List<Long> ids = image.copyWellSamples()
+                                .stream()
+                                .map(WellSample::getWell)
+                                .map(IObject::getId)
+                                .map(RLong::getValue)
+                                .collect(Collectors.toList());
+
+                        return client.getGateway()
+                                .getFacility(BrowseFacility.class)
+                                .getWells(client.getContext(), ids);
+                    } catch (Exception e) {
+                        Dialogs.showErrorNotification("Getting parent of image", "The current image " + id + " has no parent. Please check the id and the object type");
+                        logger.error("" + e);
+                        logger.error(getErrorStackTraceAsString(e));
+                        return Collections.emptyList();
+                    }
+
+                case "Dataset":
+                    // get the parent projects
+                    List<IObject> projectObjects = client.getGateway()
+                            .getQueryService(client.getContext())
+                            .findAllByQuery("select link.parent from ProjectDatasetLink as link " +
+                                    "where link.child=" + id, null);
+
+                    // get projects' id
+                    List<Long> projectIds = projectObjects
+                            .stream()
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .distinct()
+                            .collect(Collectors.toList());
+
+                    return client.getGateway()
+                            .getFacility(BrowseFacility.class)
+                            .getProjects(client.getContext(), projectIds);
+
+                case "Well":
+                    return Collections.singletonList(
+                            client.getGateway()
+                                    .getFacility(BrowseFacility.class)
+                                    .getWells(client.getContext(), Collections.singletonList(id))
+                                    .iterator()
+                                    .next()
+                                    .getPlate()
+                    );
+
+                case "Plate":
+                    // get parent plates
+                    List<IObject> plateObjects = client.getGateway()
+                            .getQueryService(client.getContext())
+                            .findAllByQuery("select link.parent from ScreenPlateLink as link " +
+                                    "where link.child=" + id, null);
+
+                    // get plates' id
+                    List<Long> plateIds = plateObjects
+                            .stream()
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .distinct()
+                            .collect(Collectors.toList());
+
+                    return client.getGateway()
+                            .getFacility(BrowseFacility.class)
+                            .getPlates(client.getContext(), plateIds);
+                default:
+                    return Collections.emptyList();
+            }
+        } catch (ServerError | DSOutOfServiceException | ExecutionException e) {
+            Dialogs.showErrorNotification("Getting parent","Cannot retrieved the parent of "+dataType+" id "+id);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
         } catch (DSAccessException e) {
-            Dialogs.showErrorMessage("Read parent dataset", "You don't have the right to access to parent dataset(s) of image "+imageId);
+            Dialogs.showErrorNotification("Getting parent","You do not have access to "+dataType+" id "+id);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
         }
     }
-
-    /**
-     * Retrieve the parent project of a dataset
-     *
-     * @param client
-     * @param datasetId
-     * @return List of projects
-     */
-    public static Collection<ProjectData> getDatasetParentProject(OmeroRawClient client, long datasetId){
-        try {
-            List<IObject> projectObjects = client.getGateway().getQueryService(client.getContext()).findAllByQuery("select link.parent from ProjectDatasetLink as link " +
-                    "where link.child=" + datasetId, null);
-            List<Long> projectIds = projectObjects.stream().map(IObject::getId).map(RLong::getValue).distinct().collect(Collectors.toList());
-
-            return client.getGateway().getFacility(BrowseFacility.class).getProjects(client.getContext(),projectIds);
-        } catch (DSOutOfServiceException | ExecutionException | ServerError e) {
-            Dialogs.showErrorMessage("Read dataset parent project","Cannot retrieve parent project(s) from dataset  "+datasetId);
-            logger.error("" + e);
-            logger.error(getErrorStackTraceAsString(e));
-            return Collections.emptyList();
-        } catch (DSAccessException e) {
-            Dialogs.showErrorMessage("Read dataset parent project", "You don't have the right to access to parent project(s) of dataset "+datasetId);
-            logger.error("" + e);
-            logger.error(getErrorStackTraceAsString(e));
-            return Collections.emptyList();
-        }
-    }
-
-    /**
-     * Retrieve the parent project of an image
-     *
-     * @param client
-     * @param imageId
-     * @return List of projects
-     */
-    public static Collection<ProjectData> getImageParentProject(OmeroRawClient client, long imageId){
-        Collection<DatasetData> datasets = getParentDataset(client, imageId);
-        Collection<ProjectData> projects = new ArrayList<>();
-
-        datasets.forEach(dataset->{
-            projects.addAll(getDatasetParentProject(client, dataset.getId()));
-        });
-
-        return projects;
-    }
-
 
 
     /**
