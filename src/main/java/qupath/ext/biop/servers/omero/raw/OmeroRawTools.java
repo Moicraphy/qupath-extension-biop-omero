@@ -423,11 +423,18 @@ public final class OmeroRawTools {
 
                     // try first to get the parent dataset
                     try {
-                        List<Long> ids = image.copyDatasetLinks()
+                        // get the parent datasets
+                        List<IObject> datasetObjects = client.getGateway()
+                                .getQueryService(client.getContext())
+                                .findAllByQuery("select link.parent from DatasetImageLink as link " +
+                                        "where link.child=" + id, null);
+
+                        // get projects' id
+                        List<Long> ids = datasetObjects
                                 .stream()
-                                .map(DatasetImageLink::getParent)
                                 .map(IObject::getId)
                                 .map(RLong::getValue)
+                                .distinct()
                                 .collect(Collectors.toList());
 
                         logger.info("The current image " + id + " has a dataset as parent");
