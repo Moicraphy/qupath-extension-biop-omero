@@ -253,7 +253,7 @@ public class OmeroRawClient {
      * @return serverUri
      * @see OmeroRawTools#getServerURI(URI)
      */
-    URI getServerURI() {
+    public URI getServerURI() {
         return serverURI;
     }
 
