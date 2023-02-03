@@ -47,10 +47,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import fr.igred.omero.exception.OMEROServerError;
+import loci.formats.in.DefaultMetadataOptions;
+import loci.formats.in.MetadataLevel;
+import ome.formats.OMEROMetadataStoreClient;
+import ome.formats.importer.ImportCandidates;
+import ome.formats.importer.ImportConfig;
+import ome.formats.importer.ImportContainer;
+import ome.formats.importer.ImportLibrary;
+import ome.formats.importer.OMEROWrapper;
+import ome.formats.importer.cli.ErrorHandler;
+import ome.formats.importer.cli.LoggingImportMonitor;
 import omero.RLong;
 import omero.ServerError;
 import omero.api.RenderingEnginePrx;
@@ -86,6 +99,7 @@ import omero.gateway.model.TableData;
 import omero.gateway.model.TableDataColumn;
 import omero.gateway.model.TagAnnotationData;
 import omero.gateway.model.WellData;
+import omero.gateway.util.PojoMapper;
 import omero.model.Dataset;
 import omero.model.DatasetImageLink;
 import omero.model.Ellipse;
@@ -97,6 +111,7 @@ import omero.model.Label;
 import omero.model.Line;
 import omero.model.Mask;
 import omero.model.NamedValue;
+import omero.model.Pixels;
 import omero.model.Point;
 import omero.model.Polygon;
 import omero.model.Polyline;
@@ -1041,6 +1056,83 @@ public final class OmeroRawTools {
         }
 
         return wasDownloaded;
+    }
+
+    /**
+     * Upload an image to a specific dataset on OMERO
+     *
+     * @param client
+     * @param datasetId
+     * @param path
+     * @return id of the newly uploaded image
+     */
+    public static List<Long> uploadImage(OmeroRawClient client, long datasetId, String path){
+        Collection<DatasetData> datasets = readOmeroDatasets(client, Collections.singletonList(datasetId));
+        if(!datasets.isEmpty())
+            return uploadImage(client, datasets.iterator().next(), path);
+        else {
+            Dialogs.showErrorNotification("Upload image", "The dataset "+datasetId+" does not exist");
+            return Collections.emptyList();
+        }
+    }
+
+
+    /**
+     * Upload an image to a specific dataset on OMERO
+     * Code taken from simple-omero-client project from Pierre Pouchin (GreD-Clermont)
+     *
+     * @param client
+     * @param dataset
+     * @param path
+     * @return id of the newly uploaded image
+     */
+    public static List<Long> uploadImage(OmeroRawClient client, DatasetData dataset, String path){
+        if(dataset == null){
+            Dialogs.showErrorNotification("Upload image", "The dataset you want to access does not exist");
+            return Collections.emptyList();
+        }
+
+        ImportConfig config = new ImportConfig();
+        config.target.set("Dataset:" + dataset.getId()); // can also import an image into a well or wellsample => to check
+        config.username.set(client.getUsername());
+        config.email.set(client.getLoggedInUser().getEmail().getValue());
+
+        Collection<Pixels> pixels = new ArrayList<>(1);
+        OMEROMetadataStoreClient store = null;
+        try (OMEROWrapper reader = new OMEROWrapper(config)) {
+            store = client.getGateway().getImportStore(client.getContext());
+            store.logVersionInfo(config.getIniVersionNumber());
+            reader.setMetadataOptions(new DefaultMetadataOptions(MetadataLevel.ALL));
+
+            ImportLibrary library = new ImportLibrary(store, reader);
+            library.addObserver(new LoggingImportMonitor());
+
+            ErrorHandler handler = new ErrorHandler(config);
+
+            ImportCandidates candidates = new ImportCandidates(reader, new String[]{path}, handler);
+            ExecutorService uploadThreadPool = Executors.newFixedThreadPool(config.parallelUpload.get());
+
+            List<ImportContainer> containers = candidates.getContainers();
+            if (containers != null) {
+                for (int i = 0; i < containers.size(); i++) {
+                    ImportContainer container = containers.get(i);
+                    container.setTarget(dataset.asIObject());
+                    List<Pixels> imported = library.importImage(container, uploadThreadPool, i);
+                    pixels.addAll(imported);
+                }
+            }
+            uploadThreadPool.shutdown();
+        } catch (Throwable e) {
+            Dialogs.showErrorNotification("Upload image","Error during uploading image "+path+" to OMERO.");
+            logger.error(""+e);
+        } finally {
+            if(store != null)
+                store.logout();
+        }
+
+        List<Long> ids = new ArrayList<>(pixels.size());
+        pixels.forEach(pix -> ids.add(pix.getImage().getId().getValue()));
+        return ids.stream().distinct().collect(Collectors.toList());
     }
 
     /**
