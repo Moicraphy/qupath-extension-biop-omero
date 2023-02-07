@@ -101,6 +101,7 @@ import omero.gateway.model.TagAnnotationData;
 import omero.gateway.model.WellData;
 import omero.gateway.util.PojoMapper;
 import omero.model.Dataset;
+import omero.model.DatasetI;
 import omero.model.DatasetImageLink;
 import omero.model.Ellipse;
 import omero.model.Experimenter;
@@ -115,6 +116,9 @@ import omero.model.Pixels;
 import omero.model.Point;
 import omero.model.Polygon;
 import omero.model.Polyline;
+import omero.model.ProjectDatasetLink;
+import omero.model.ProjectDatasetLinkI;
+import omero.model.ProjectI;
 import omero.model.Rectangle;
 import omero.model.RenderingDef;
 import omero.model.Roi;
@@ -634,6 +638,20 @@ public final class OmeroRawTools {
         }
     }
 
+    /**
+     * Get OMERO corresponding to the id
+     *
+     * @param client
+     * @param datasetId
+     * @return OMERO dataset or null object is ot doesn't exists
+     */
+    public static DatasetData readOmeroDataset(OmeroRawClient client, Long datasetId){
+        Collection<DatasetData> datasets = readOmeroDatasets(client, Collections.singletonList(datasetId));
+        if(datasets.isEmpty())
+            return null;
+        return datasets.iterator().next();
+
+    }
     /**
      * Get all OMERO datasets corresponding to the list of ids
      *
@@ -1555,6 +1573,97 @@ public final class OmeroRawTools {
                 .filter(MapAnnotationData.class::isInstance)
                 .map(MapAnnotationData.class::cast)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * create a new orphaned dataset on OMERO
+     *
+     * @param client
+     * @param datasetName
+     * @return OMERO dataset
+     */
+    public static DatasetData createNewDataset(OmeroRawClient client, String datasetName){
+        return createNewDataset(client, datasetName, "");
+    }
+
+    /**
+     * create a new dataset on OMERO and add a project as parent object
+     *
+     * @param client
+     * @param projectId
+     * @param datasetName
+     * @return OMERO dataset
+     */
+    public static DatasetData createNewDataset(OmeroRawClient client, long projectId, String datasetName){
+        return createNewDataset(client, projectId, datasetName, "");
+    }
+
+    /**
+     * create a new orphaned dataset on OMERO
+     *
+     * @param client
+     * @param datasetName
+     * @param datasetDescription
+     * @return OMERO dataset
+     */
+    public static DatasetData createNewDataset(OmeroRawClient client, String datasetName, String datasetDescription){
+        // create a new dataset
+        Dataset dataset = new DatasetI();
+        dataset.setName(omero.rtypes.rstring(datasetName));
+        dataset.setDescription(omero.rtypes.rstring(datasetDescription));
+
+        try {
+            // send the new dataset to OMERO
+            IObject r = client.getGateway().getFacility(DataManagerFacility.class).saveAndReturnObject(client.getContext(), dataset);
+            return readOmeroDataset(client,r.getId().getValue());
+        }catch(ExecutionException | DSOutOfServiceException  e) {
+            Dialogs.showErrorNotification("Create New dataset", "Cannot create dataset "+datasetName);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return null;
+        }catch(DSAccessException e) {
+            Dialogs.showErrorNotification("Create New dataset", "You don't have the right to create a dataset on OMERO");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return null;
+        }
+    }
+
+    /**
+     * create a new dataset on OMERO and add a project as parent object
+     *
+     * @param client
+     * @param projectId
+     * @param datasetName
+     * @param datasetDescription
+     * @return OMERO dataset
+     */
+    public static DatasetData createNewDataset(OmeroRawClient client, long projectId, String datasetName, String datasetDescription) {
+        // create a new dataset
+        Dataset dataset = new DatasetI();
+        dataset.setName(omero.rtypes.rstring(datasetName));
+        dataset.setDescription(omero.rtypes.rstring(datasetDescription));
+
+        // link the dataset to a project
+        ProjectDatasetLink link = new ProjectDatasetLinkI();
+        link.setChild(dataset);
+        link.setParent(new ProjectI(projectId, false));
+
+        try {
+            // send the new dataset to OMERO
+            IObject r = client.getGateway().getFacility(DataManagerFacility.class).saveAndReturnObject(client.getContext(), link);
+            return readOmeroDataset(client,r.getId().getValue());
+        }catch(ExecutionException | DSOutOfServiceException  e) {
+            Dialogs.showErrorNotification("Create New dataset", "Cannot create dataset "+datasetName+" in the project "+projectId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return null;
+        }catch(DSAccessException e) {
+            Dialogs.showErrorNotification("Create New dataset", "You don't have the right to create a dataset on OMERO in the project "+projectId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return null;
+        }
     }
 
     /**
