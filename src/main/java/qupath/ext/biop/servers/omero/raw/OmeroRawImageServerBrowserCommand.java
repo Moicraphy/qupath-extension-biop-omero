@@ -32,6 +32,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -57,6 +58,9 @@ import javafx.stage.Screen;
 import javafx.stage.Window;
 import omero.gateway.exception.DSAccessException;
 import omero.gateway.exception.DSOutOfServiceException;
+import omero.gateway.model.DataObject;
+import omero.gateway.model.DatasetData;
+import omero.gateway.model.ProjectData;
 import org.controlsfx.glyphfont.GlyphFontRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -375,10 +379,20 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 var selectedItem = tree.getSelectionModel().getSelectedItem();
                 if (selectedItem != null && selectedItem.getValue().getType() == OmeroRawObjects.OmeroRawObjectType.IMAGE && isSupported(selectedItem.getValue())) {
                     // TODO see what to do with the createObjectURI
+
                     if (qupath.getProject() == null)
                         qupath.openImage(createObjectURI(selectedItem.getValue()), true, true);
-                    else
+                    else {
+                        HashSet<ProjectImageEntry<BufferedImage>> beforeImport = new HashSet<>(qupath.getProject().getImageList());
                         promptToImportOmeroImages(createObjectURI(selectedItem.getValue()));
+                        HashSet<ProjectImageEntry<BufferedImage>> afterImport = new HashSet<>(qupath.getProject().getImageList());
+
+                        // filter newly imported images
+                        afterImport.removeAll(beforeImport);
+
+                        for(ProjectImageEntry<BufferedImage> entry : afterImport)
+                           OmeroRawBrowserTools.addContainersAsMetadataFields(client, entry);
+                    }
                 }
             }
         });
@@ -632,7 +646,15 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     Dialogs.showErrorMessage("Open OMERO images", "If you want to handle multiple images, you need to create a project first."); // Same as D&D for images
                 return;
             }
+            HashSet<ProjectImageEntry<BufferedImage>> beforeImport = new HashSet<>(qupath.getProject().getImageList());
             promptToImportOmeroImages(validUris);
+            HashSet<ProjectImageEntry<BufferedImage>> afterImport = new HashSet<>(qupath.getProject().getImageList());
+
+            // filter newly imported images
+            afterImport.removeAll(beforeImport);
+
+            for(ProjectImageEntry<BufferedImage> entry : afterImport)
+                OmeroRawBrowserTools.addContainersAsMetadataFields(client, entry);
         });
 
         PaneTools.addGridRow(browseLeftPane, 0, 0, "Filter by", comboGroup, comboOwner);
@@ -1710,8 +1732,17 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                             return null;
                         }).map(item -> item.toString())
                         .toArray(String[]::new);
-                if (URIs.length > 0)
+                if (URIs.length > 0) {
+                    HashSet<ProjectImageEntry<BufferedImage>> beforeImport = new HashSet<>(qupath.getProject().getImageList());
                     promptToImportOmeroImages(URIs);
+                    HashSet<ProjectImageEntry<BufferedImage>> afterImport = new HashSet<>(qupath.getProject().getImageList());
+
+                    // filter newly imported images
+                    afterImport.removeAll(beforeImport);
+
+                    for(ProjectImageEntry<BufferedImage> entry : afterImport)
+                        OmeroRawBrowserTools.addContainersAsMetadataFields(client, entry);
+                }
                 else
                     Dialogs.showErrorMessage("No image found", "No image found in OMERO object.");
             });
@@ -1828,8 +1859,17 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                         try {
                             List<URI> URIs = OmeroRawTools.getURIs(selectedItem.link.toURI(), client);
                             var uriStrings = URIs.parallelStream().map(uriTemp -> uriTemp.toString()).toArray(String[]::new);
-                            if (URIs.size() > 0)
+                            if (URIs.size() > 0) {
+                                HashSet<ProjectImageEntry<BufferedImage>> beforeImport = new HashSet<>(qupath.getProject().getImageList());
                                 promptToImportOmeroImages(uriStrings);
+                                HashSet<ProjectImageEntry<BufferedImage>> afterImport = new HashSet<>(qupath.getProject().getImageList());
+
+                                // filter newly imported images
+                                afterImport.removeAll(beforeImport);
+
+                                for(ProjectImageEntry<BufferedImage> entry : afterImport)
+                                    OmeroRawBrowserTools.addContainersAsMetadataFields(client, entry);
+                            }
                             else
                                 Dialogs.showErrorMessage("No image found", "No image found in OMERO object.");
                         } catch (IOException | URISyntaxException ex) {

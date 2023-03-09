@@ -1,6 +1,7 @@
 package qupath.ext.biop.servers.omero.raw;
 
 import omero.RLong;
+import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.ProjectData;
@@ -9,10 +10,16 @@ import omero.model.ExperimenterGroup;
 import omero.model.ProjectDatasetLink;
 import omero.model.DatasetImageLink;
 import omero.model.IObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import qupath.lib.projects.ProjectImageEntry;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -23,6 +30,7 @@ import java.util.stream.Collectors;
 public class OmeroRawBrowserTools {
 
 
+    final private static Logger logger = LoggerFactory.getLogger(OmeroRawBrowserTools.class);
 
     /**
      * Get all the OMERO objects (inside the parent Id) present in the OMERO server with the specified
@@ -248,6 +256,28 @@ public class OmeroRawBrowserTools {
      */
     public static OmeroRawAnnotations readAnnotationsItems(OmeroRawClient client, OmeroRawObjects.OmeroRawObject obj, OmeroRawAnnotations.OmeroRawAnnotationType category) {
         return OmeroRawAnnotations.getOmeroAnnotations(client, category, OmeroRawTools.readOmeroAnnotations(client, obj.getId()));
+    }
+
+    public static void addContainersAsMetadataFields(OmeroRawClient client, ProjectImageEntry<BufferedImage> entry){
+        try {
+            long imageId = ((OmeroRawImageServer) (entry.readImageData().getServer())).getId();
+            Collection<? extends DataObject> datasets = OmeroRawTools.getParent(client, "Image", imageId);
+
+            if (!datasets.isEmpty()) {
+                entry.putMetadataValue("Dataset", ((DatasetData) (datasets.iterator().next())).getName());
+                long datasetId = datasets.iterator().next().getId();
+                Collection<? extends DataObject> projects = OmeroRawTools.getParent(client, "Dataset", datasetId);
+
+                if (!projects.isEmpty()) {
+                    entry.putMetadataValue("Project", ((ProjectData) (projects.iterator().next())).getName());
+                } else entry.putMetadataValue("Project", "None");
+            } else {
+                entry.putMetadataValue("Dataset", "None");
+                entry.putMetadataValue("Project", "None");
+            }
+        }catch(IOException error){
+            logger.error("Cannot add default OMERO container as metadata to QuPath for image "+ entry.getImageName());
+        }
     }
 
 }
