@@ -87,6 +87,7 @@ import omero.gateway.model.ImageData;
 import omero.gateway.model.LineData;
 import omero.gateway.model.MapAnnotationData;
 import omero.gateway.model.PixelsData;
+import omero.gateway.model.PlateData;
 import omero.gateway.model.PointData;
 import omero.gateway.model.PolygonData;
 import omero.gateway.model.PolylineData;
@@ -94,6 +95,7 @@ import omero.gateway.model.ProjectData;
 import omero.gateway.model.ROIData;
 import omero.gateway.model.ROIResult;
 import omero.gateway.model.RectangleData;
+import omero.gateway.model.ScreenData;
 import omero.gateway.model.ShapeData;
 import omero.gateway.model.TableData;
 import omero.gateway.model.TableDataColumn;
@@ -639,6 +641,29 @@ public final class OmeroRawTools {
     }
 
     /**
+     * Get all OMERO screens linked to the specified user.
+     *
+     * @param client
+     * @param userId
+     * @return User's list of OMERO project objects
+     */
+    public static Collection<ScreenData> readOmeroScreensByUser(OmeroRawClient client, long userId){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getScreens(client.getContext(), userId);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Reading projects by user","An error occurs when reading OMERO projects for the user "+userId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }catch (DSAccessException | NoSuchElementException e){
+            Dialogs.showErrorNotification("Reading projects by user","You don't have the right to access OMERO projects for the user "+userId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+    }
+
+    /**
      * Get OMERO corresponding to the id
      *
      * @param client
@@ -652,6 +677,7 @@ public final class OmeroRawTools {
         return datasets.iterator().next();
 
     }
+
     /**
      * Get all OMERO datasets corresponding to the list of ids
      *
@@ -669,6 +695,29 @@ public final class OmeroRawTools {
             return Collections.emptyList();
         }catch (DSAccessException | NoSuchElementException e){
             Dialogs.showErrorNotification("Reading datasets","You don't have the right to access OMERO datasets "+datasetIds);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Get all OMERO datasets corresponding to the list of ids
+     *
+     * @param client
+     * @param plateIds
+     * @return List of OMERO dataset objects
+     */
+    public static Collection<PlateData> readOmeroPlates(OmeroRawClient client, List<Long> plateIds){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getPlates(client.getContext(), plateIds);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Reading datasets","An error occurs when reading OMERO datasets "+plateIds);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }catch (DSAccessException | NoSuchElementException e){
+            Dialogs.showErrorNotification("Reading datasets","You don't have the right to access OMERO datasets "+plateIds);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();

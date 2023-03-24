@@ -29,11 +29,15 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import omero.gateway.model.DatasetData;
+import omero.gateway.model.PlateAcquisitionData;
+import omero.gateway.model.PlateData;
 import omero.gateway.model.ProjectData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.PixelsData;
 import omero.gateway.model.DataObject;
 import omero.gateway.model.PermissionData;
+import omero.gateway.model.ScreenData;
+import omero.gateway.model.WellData;
 import omero.model.ExperimenterGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,9 +65,10 @@ final class OmeroRawObjects {
         PROJECT("http://www.openmicroscopy.org/Schemas/OME/2016-06#Project", "Project"),
         DATASET("http://www.openmicroscopy.org/Schemas/OME/2016-06#Dataset", "Dataset"),
         IMAGE("http://www.openmicroscopy.org/Schemas/OME/2016-06#Image", "Image"),
-        PLATE("TODO", "Plate"),
-        WELL("TODO", "Well"),
-        SCREEN("TODO", "Screen"),
+        PLATE("https://www.openmicroscopy.org/Schemas/OME/2016-06/#Plate", "Plate"),
+        WELL("https://www.openmicroscopy.org/Schemas/OME/2016-06/#Well", "Well"),
+        SCREEN("https://www.openmicroscopy.org/Schemas/OME/2016-06/#Screen", "Screen"),
+        PLATE_ACQUISITION("https://www.openmicroscopy.org/Schemas/OME/2016-06/#Plate-Aqcuisiton", "Plate acquisition"),
 
         // Object for OmeroRawBrowser's 'Orphaned folder' item (not for deserialization)
         ORPHANED_FOLDER("#OrphanedFolder", "Orphaned Folder"),
@@ -438,6 +443,140 @@ final class OmeroRawObjects {
                     user.getOmeName()==null ? "" : user.getOmeName().getValue()));
 
             super.setGroup(new Group(datasetData.getGroupId(), group.getName().getValue()));
+        }
+    }
+
+
+    static class Screen extends OmeroRawObject {
+
+        private final String url;
+        private final String description;
+        private final int childCount;
+
+        @Override
+        String getAPIURLString() {
+            return url;
+        }
+
+        @Override
+        int getNChildren() {
+            return childCount;
+        }
+
+        String getDescription() {
+            return description;
+        }
+
+
+        public Screen(String url, ScreenData screenData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
+            this.url = url;
+            this.description = screenData.getDescription();
+            this.childCount = screenData.asScreen().sizeOfPlateLinks();
+            super.data = screenData;
+            super.setId(id);
+            super.setName(screenData.getName());
+            super.setType(type.toString());
+            super.setParent(parent);
+
+            super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                    user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                    user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                    user.getLastName()==null ? "" : user.getLastName().getValue(),
+                    user.getEmail()==null ? "" : user.getEmail().getValue(),
+                    user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                    user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+
+            super.setGroup(new Group(screenData.getGroupId(), group.getName().getValue()));
+        }
+    }
+
+
+    static class Plate extends OmeroRawObject {
+
+        private final String url;
+        private final String description;
+        private final int plateAquisitionCount;
+        private final int childCount;
+
+        @Override
+        String getAPIURLString() {
+            return url;
+        }
+
+        @Override
+        int getNChildren() {
+            return childCount;
+        }
+
+        String getDescription() {
+            return description;
+        }
+
+
+        public Plate(String url, PlateData plateData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
+            this.url = url;
+            this.description = plateData.getDescription();
+            this.plateAquisitionCount = plateData.asPlate().sizeOfPlateAcquisitions();
+            this.childCount = plateData.asPlate().sizeOfWells();
+            super.data = plateData;
+            super.setId(id);
+            super.setName(plateData.getName());
+            super.setType(type.toString());
+            super.setParent(parent);
+
+            super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                    user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                    user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                    user.getLastName()==null ? "" : user.getLastName().getValue(),
+                    user.getEmail()==null ? "" : user.getEmail().getValue(),
+                    user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                    user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+
+            super.setGroup(new Group(plateData.getGroupId(), group.getName().getValue()));
+        }
+    }
+
+
+    static class Well extends OmeroRawObject {
+
+        private final String url;
+        private final String description;
+        private final int childCount;
+
+        @Override
+        String getAPIURLString() {
+            return url;
+        }
+
+        @Override
+        int getNChildren() {
+            return childCount;
+        }
+
+        String getDescription() {
+            return description;
+        }
+
+
+        public Well(String url, WellData wellData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
+            this.url = url;
+            this.description = "";
+            this.childCount = wellData.asWell().sizeOfWellSamples();
+            super.data = wellData;
+            super.setId(id);
+            super.setName("" + (char)(wellData.getRow() +65) + wellData.getColumn());
+            super.setType(type.toString());
+            super.setParent(parent);
+
+            super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                    user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                    user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                    user.getLastName()==null ? "" : user.getLastName().getValue(),
+                    user.getEmail()==null ? "" : user.getEmail().getValue(),
+                    user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                    user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+
+            super.setGroup(new Group(wellData.getGroupId(), group.getName().getValue()));
         }
     }
 

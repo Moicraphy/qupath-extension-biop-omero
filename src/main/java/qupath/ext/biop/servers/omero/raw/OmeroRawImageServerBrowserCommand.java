@@ -185,6 +185,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
     private ObservableList<OmeroRawObjects.OmeroRawObject> orphanedImageList;
     private Map<OmeroRawObjects.Group, List<OmeroRawObjects.Owner>> groupMap;
     private Map<OmeroRawObjects.OmeroRawObject, List<OmeroRawObjects.OmeroRawObject>> projectMap;
+    private Map<OmeroRawObjects.OmeroRawObject, List<OmeroRawObjects.OmeroRawObject>> screenMap;
     private Map<OmeroRawObjects.OmeroRawObject, List<OmeroRawObjects.OmeroRawObject>> datasetMap;
     private Map<Long, BufferedImage> thumbnailBank;
     private IntegerProperty currentOrphanedCount;
@@ -247,6 +248,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         currentOrphanedCount = orphanedFolder.getCurrentCountProperty();
         thumbnailBank = new ConcurrentHashMap<>();
         projectMap = new ConcurrentHashMap<>();
+        screenMap = new ConcurrentHashMap<>();
         datasetMap = new ConcurrentHashMap<>();
         executorTable = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("children-loader", true));
         executorThumbnails = Executors.newFixedThreadPool(PathPrefs.numCommandThreadsProperty().get(), ThreadTools.createThreadFactory("thumbnail-loader", true));
@@ -741,6 +743,8 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             return orphanedImageList;
         else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT && projectMap.containsKey(parentObj))
             return projectMap.get(parentObj);
+        else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SCREEN && screenMap.containsKey(parentObj))
+            return screenMap.get(parentObj);
         else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET && datasetMap.containsKey(parentObj))
             return datasetMap.get(parentObj);
         else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.IMAGE)
@@ -758,6 +762,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
         // Read children and populate maps
         children = OmeroRawBrowserTools.readOmeroObjectsItems(parentObj, this.client, group, owner);
+        System.out.println(children);
         children.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
         // If parentObj is a Server, add all the orphaned datasets (orphaned images are in 'Orphaned images' folder)
@@ -779,10 +784,12 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                 groupOwnersChildrenMap.put(group, ownerMap);
             }
 
-        } else if (parentObj .getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
+        } else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
             projectMap.put(parentObj, children);
         } else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
             datasetMap.put(parentObj, children);
+        }else if (parentObj.getType() == OmeroRawObjects.OmeroRawObjectType.SCREEN) {
+           screenMap.put(parentObj, children);
         }
 
         return children;
@@ -800,6 +807,12 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
             // Load image icon
             map.put(OmeroRawObjects.OmeroRawObjectType.IMAGE, ImageIO.read(getClass().getClassLoader().getResource("images/image16.png")));
+
+            // Load screen icon
+            map.put(OmeroRawObjects.OmeroRawObjectType.SCREEN, ImageIO.read(getClass().getClassLoader().getResource("images/folder_screen16.png")));
+
+            // Load plate icon
+            map.put(OmeroRawObjects.OmeroRawObjectType.PLATE, ImageIO.read(getClass().getClassLoader().getResource("images/folder_plate16.png")));
 
             // Load orphaned folder icon
             map.put(OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER, ImageIO.read(getClass().getClassLoader().getResource("images/folder_yellow16.png")));
@@ -906,7 +919,21 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             outString = new String[] {name, id, description, owner, group, nChildren};
 
         } else if (omeroObject.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET) {
-            String description = ((OmeroRawObjects.Dataset)omeroObject).getDescription();
+            String description = ((OmeroRawObjects.Dataset) omeroObject).getDescription();
+            if (description == null || description.isEmpty())
+                description = "-";
+            String nChildren = omeroObject.getNChildren() + "";
+            outString = new String[]{name, id, description, owner, group, nChildren};}
+
+        else if (omeroObject.getType() == OmeroRawObjects.OmeroRawObjectType.SCREEN) {
+            String description = ((OmeroRawObjects.Screen)omeroObject).getDescription();
+            if (description == null || description.isEmpty())
+                description = "-";
+            String nChildren = omeroObject.getNChildren() + "";
+            outString = new String[] {name, id, description, owner, group, nChildren};}
+
+        else if (omeroObject.getType() == OmeroRawObjects.OmeroRawObjectType.PLATE) {
+            String description = ((OmeroRawObjects.Plate)omeroObject).getDescription();
             if (description == null || description.isEmpty())
                 description = "-";
             String nChildren = omeroObject.getNChildren() + "";
@@ -1110,7 +1137,10 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             BufferedImage icon = omeroIcons.get(item.getType());
             if (item.getType() == OmeroRawObjects.OmeroRawObjectType.SERVER)
                 name = serverURI.getHost();
-            else if (item.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT || item.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET)
+            else if (item.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT ||
+                    item.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET ||
+                    item.getType() == OmeroRawObjects.OmeroRawObjectType.PLATE ||
+                    item.getType() == OmeroRawObjects.OmeroRawObjectType.SCREEN)
                 name = item.getName() + " (" + item.getNChildren() + ")";
             else if (item.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER) {
                 // No need for 'text', as we're using the graphic component of the cell for orphaned folder
