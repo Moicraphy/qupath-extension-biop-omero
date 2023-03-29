@@ -692,7 +692,6 @@ public class OmeroRawScripting {
             return OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
     }
 
-
     /**
      * Send pathObjects' measurements to OMERO as an OMERO.table  with a default table name referring to annotations
      *
@@ -705,7 +704,6 @@ public class OmeroRawScripting {
         return sendMeasurementTableToOmero(annotationObjects, imageServer, imageData, tableName, false);
     }
 
-
     /**
      * Send all annotations measurements to OMERO as an OMERO.table
      *
@@ -716,7 +714,6 @@ public class OmeroRawScripting {
     public static boolean sendAnnotationMeasurementTable(OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         return sendAnnotationMeasurementTable(QP.getAnnotationObjects(), imageServer, imageData);
     }
-
 
     /**
      * Send pathObjects' measurements to OMERO as an OMERO.table  with a default table name referring to annotations
@@ -1199,4 +1196,25 @@ public class OmeroRawScripting {
 
         return updateImageDisplay && updateThumbnail;
     }
+
+    /**
+     * Set the name the image on OMERO, based on QuPath settings.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return Sending status (true if the image name on OMERO has been updated ; false if there were troubles during the sending process)
+     */
+    public static boolean sendImageNameToOmero(OmeroRawImageServer imageServer){
+        // get the image
+        omero.gateway.model.ImageData image = OmeroRawTools.readOmeroImage(imageServer.getClient(), imageServer.getId());
+        if(image != null) {
+            image.setName(QPEx.getCurrentImageName());
+
+            // update the image on OMERO first
+            return OmeroRawTools.updateObjectOnOmero(imageServer.getClient(), image.asIObject());
+        }
+
+        return false;
+    }
+
+
 }
