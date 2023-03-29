@@ -53,7 +53,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import fr.igred.omero.exception.OMEROServerError;
 import loci.formats.in.DefaultMetadataOptions;
 import loci.formats.in.MetadataLevel;
 import ome.formats.OMEROMetadataStoreClient;
@@ -98,11 +97,8 @@ import omero.gateway.model.ShapeData;
 import omero.gateway.model.TableData;
 import omero.gateway.model.TableDataColumn;
 import omero.gateway.model.TagAnnotationData;
-import omero.gateway.model.WellData;
-import omero.gateway.util.PojoMapper;
 import omero.model.Dataset;
 import omero.model.DatasetI;
-import omero.model.DatasetImageLink;
 import omero.model.Ellipse;
 import omero.model.Experimenter;
 import omero.model.ExperimenterGroup;
@@ -1211,20 +1207,42 @@ public final class OmeroRawTools {
        return file;
     }
 
+
+    public static Collection<ROIData> getImageOmeroRois(OmeroRawClient client, long imageId){
+        try {
+            // get existing OMERO ROIs
+            List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
+
+            // extract ROIData
+            Collection<ROIData> roiData = new ArrayList<>();
+            roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs()));
+
+            return roiData;
+
+        } catch (DSOutOfServiceException |  ExecutionException e){
+            Dialogs.showErrorNotification("Retrieve ROIs from OMERO","Cannot retrieve ROIs from image "+imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }  catch (DSAccessException e) {
+            Dialogs.showErrorNotification("Retrieve ROIs from OMERO", "You don't have the right to access those ROIs on image "+imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return  Collections.emptyList();
+    }
+
+
+
     /**
      * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
      *
      * @param client
      * @param imageId
      */
-    public static void deleteOmeroROIs(OmeroRawClient client, long imageId) {
+    public static void deleteAllOmeroROIs(OmeroRawClient client, long imageId) {
         try {
-            // get existing OMERO ROIs
-            List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
-
             // extract ROIData
-            List<IObject> roiData = new ArrayList<>();
-            roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
+            List<IObject> roiData = getImageOmeroRois(client, imageId).stream().map(ROIData::asIObject).collect(Collectors.toList());
 
             // delete ROis
             if(client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData) == null)
@@ -1236,6 +1254,31 @@ public final class OmeroRawTools {
             logger.error(getErrorStackTraceAsString(e));
         } catch (DSAccessException e) {
             Dialogs.showErrorNotification("ROI deletion", "You don't have the right to delete ROIs on OMERO on the image  " + imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+    }
+
+    /**
+     * Delete the specified ROIs on OMERO that are linked to an image, specified by its id.
+     *
+     * @param client
+     */
+    public static void deleteOmeroROIs(OmeroRawClient client, Collection<ROIData> roisToDelete) {
+        try {
+            // Convert to IObject
+            List<IObject> roiData = roisToDelete.stream().map(ROIData::asIObject).collect(Collectors.toList());
+
+            // delete ROis
+            if(client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData) == null)
+                Dialogs.showInfoNotification("ROI deletion","No ROIs to delete");
+
+        } catch (DSOutOfServiceException |  ExecutionException e){
+            Dialogs.showErrorNotification("ROI deletion","Could not delete existing ROIs on OMERO.");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e) {
+            Dialogs.showErrorNotification("ROI deletion", "You don't have the right to delete those ROIs on OMERO");
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
         }

@@ -221,12 +221,15 @@ public class OmeroRawScripting {
         OmeroRawClient client = imageServer.getClient();
         long imageId = imageServer.getId();
 
+        Collection<ROIData> existingROIs = OmeroRawTools.getImageOmeroRois(client, imageId);
+        boolean hasBeenWritten = OmeroRawTools.writeOmeroROIs(client, imageId, omeroROIs);
+
         // delete ROIs
         if (deleteROIsOnOMERO)
-            OmeroRawTools.deleteOmeroROIs(client, imageId);
+            OmeroRawTools.deleteOmeroROIs(client, existingROIs);
 
         // send to OMERO
-        return OmeroRawTools.writeOmeroROIs(client, imageId, omeroROIs);
+        return hasBeenWritten;
     }
 
 
