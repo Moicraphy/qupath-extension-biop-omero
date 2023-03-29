@@ -22,9 +22,13 @@
 package qupath.ext.biop.servers.omero.raw;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import javafx.scene.control.CheckBox;
+import omero.gateway.model.FileAnnotationData;
+import omero.gateway.model.ROIData;
 import org.apache.commons.lang3.StringUtils;
 
 import javafx.scene.control.Label;
@@ -72,7 +76,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         CheckBox cbDetectionsMap = new CheckBox("Detection measurements");
         cbDetectionsMap.setSelected(false);
 
-        CheckBox cbDeleteRois = new CheckBox("Delete existing annotations on OMERO");
+        CheckBox cbDeleteRois = new CheckBox("Delete existing tables & annotations on OMERO");
         cbDeleteRois.setSelected(false);
 
         int row = 0;
@@ -89,7 +93,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         // get user choice
         boolean annotationMap = cbAnnotationsMap.isSelected();
-        boolean deleteRois = cbDeleteRois.isSelected();
+        boolean deletePreviousExperiments = cbDeleteRois.isSelected();
         boolean detectionMap = cbDetectionsMap.isSelected();
 
         Collection<PathObject> objs = viewer.getHierarchy().getAnnotationObjects();
@@ -111,8 +115,15 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         if (!confirm)
             return;
 
+        List<ROIData> tmpRoiList = new ArrayList<>();
+        List<FileAnnotationData> tmpFileList = new ArrayList<>();
+        if(deletePreviousExperiments){
+            tmpFileList = OmeroRawTools.readAttachments(omeroServer.getClient(), omeroServer.getId());
+            tmpRoiList = OmeroRawTools.readOmeroROIs(omeroServer.getClient(), omeroServer.getId());
+        }
+
         // send annotations to OMERO
-        boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
+        boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs);
         if(hasBeenSaved)
             Dialogs.showInfoNotification(StringUtils.capitalize(objectString) + " written successfully", String.format("%d %s %s successfully written to OMERO server",
                     objs.size(),
@@ -131,6 +142,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             // send the corresponding csv file
             if(OmeroRawScripting.sendAnnotationMeasurementTableAsCSV(objs, omeroServer, qupath.getImageData())) nWrittenTables++;
         }
+
         if(detectionMap){
             // get detection objects
             Collection<PathObject> detections = viewer.getHierarchy().getDetectionObjects();
@@ -143,7 +155,14 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                 // send the corresponding csv file
                 if(OmeroRawScripting.sendDetectionMeasurementTableAsCSV(detections, omeroServer, qupath.getImageData())) nWrittenTables++;
             }
-            else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
+            else
+                Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
+        }
+
+        if(deletePreviousExperiments) {
+            OmeroRawScripting.deletePreviousAnnotationFiles(omeroServer.getClient(), tmpFileList);
+            OmeroRawScripting.deletePreviousDetectionFiles(omeroServer.getClient(), tmpFileList);
+            OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), tmpRoiList);
         }
 
         if(detectionMap || annotationMap)
@@ -157,6 +176,5 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
             }
             else
                 Dialogs.showErrorNotification(StringUtils.capitalize(objectString) + " writing failure", String.format("No measurement tables were sent to OMERO"));
-
     }
 }

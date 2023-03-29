@@ -38,6 +38,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -82,6 +85,7 @@ import omero.gateway.model.ChannelData;
 import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.EllipseData;
+import omero.gateway.model.FileAnnotationData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.LineData;
 import omero.gateway.model.MapAnnotationData;
@@ -918,7 +922,6 @@ public final class OmeroRawTools {
         return wasAdded;
     }
 
-
     /**
      * Update a list of OMERO objects
      *
@@ -1208,31 +1211,6 @@ public final class OmeroRawTools {
     }
 
 
-    public static Collection<ROIData> getImageOmeroRois(OmeroRawClient client, long imageId){
-        try {
-            // get existing OMERO ROIs
-            List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
-
-            // extract ROIData
-            Collection<ROIData> roiData = new ArrayList<>();
-            roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs()));
-
-            return roiData;
-
-        } catch (DSOutOfServiceException |  ExecutionException e){
-            Dialogs.showErrorNotification("Retrieve ROIs from OMERO","Cannot retrieve ROIs from image "+imageId);
-            logger.error("" + e);
-            logger.error(getErrorStackTraceAsString(e));
-        }  catch (DSAccessException e) {
-            Dialogs.showErrorNotification("Retrieve ROIs from OMERO", "You don't have the right to access those ROIs on image "+imageId);
-            logger.error("" + e);
-            logger.error(getErrorStackTraceAsString(e));
-        }
-        return  Collections.emptyList();
-    }
-
-
-
     /**
      * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
      *
@@ -1242,7 +1220,7 @@ public final class OmeroRawTools {
     public static void deleteAllOmeroROIs(OmeroRawClient client, long imageId) {
         try {
             // extract ROIData
-            List<IObject> roiData = getImageOmeroRois(client, imageId).stream().map(ROIData::asIObject).collect(Collectors.toList());
+            List<IObject> roiData = readOmeroROIs(client, imageId).stream().map(ROIData::asIObject).collect(Collectors.toList());
 
             // delete ROis
             if(client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData) == null)
@@ -1617,6 +1595,99 @@ public final class OmeroRawTools {
                 .map(MapAnnotationData.class::cast)
                 .collect(Collectors.toList());
     }
+
+
+    /**
+     * Get attachments from OMERO server attached to the specified image.
+     *
+     * @param client
+     * @param imageId
+     * @return Sending status (True if retrieved ; false with error message otherwise)
+     */
+    public static List<FileAnnotationData> readAttachments(OmeroRawClient client, long imageId) {
+        List<AnnotationData> annotations;
+        try{
+            // read image
+            ImageData image = readOmeroImage(client, imageId);
+
+            // get annotations
+            List<Class<? extends AnnotationData>> types = Collections.singletonList(FileAnnotationData.class);
+            annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), image, types, null);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Attachment reading","Cannot read attachment from image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Attachment reading","You don't have the right to read attachments on OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+
+        // filter attachments
+        return annotations.stream()
+                .filter(FileAnnotationData.class::isInstance)
+                .map(FileAnnotationData.class::cast)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get tables from OMERO server attached to the specified image.
+     *
+     * @param client
+     * @param imageId
+     * @return Sending status (True if retrieved ; false with error message otherwise)
+     */
+    public static Collection<FileAnnotationData> readTables(OmeroRawClient client, long imageId) {
+        try{
+            // read image
+            ImageData image = readOmeroImage(client, imageId);
+
+            // get annotations
+            return client.getGateway().getFacility(TablesFacility.class).getAvailableTables(client.getContext(), image);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Attachment reading","Cannot read attachment from image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Attachment reading","You don't have the right to read attachments on OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
+     *
+     * @param client
+     * @param data
+     */
+    public static boolean deleteFiles(OmeroRawClient client, List<FileAnnotationData> data){
+        boolean hasBeenDeleted = false;
+
+        try{
+            List<IObject> IObjectData = data.stream().map(FileAnnotationData::asIObject).collect(Collectors.toList());
+            client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), IObjectData);
+            hasBeenDeleted = true;
+        } catch (DSOutOfServiceException |  ExecutionException e){
+            Dialogs.showErrorNotification("File deletion","Could not delete files on OMERO.");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e) {
+            Dialogs.showErrorNotification("File deletion", "You don't have the right to delete those files on OMERO");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return hasBeenDeleted;
+    }
+
+
+
+
 
     /**
      * create a new orphaned dataset on OMERO
@@ -2282,5 +2353,21 @@ public final class OmeroRawTools {
 
     public static String getErrorStackTraceAsString(Exception e){
         return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a, b)->a + "     at "+b+"\n");
+    }
+
+    /**
+     * @return formatted date
+     */
+    public static String getCurrentDateAndHour(){
+        LocalDateTime localDateTime = LocalDateTime.now();
+        LocalTime localTime = localDateTime.toLocalTime();
+        LocalDate localDate = localDateTime.toLocalDate();
+        return ""+localDate.getYear()+
+                (localDate.getMonthValue() < 10 ? "0"+localDate.getMonthValue():localDate.getMonthValue()) +
+                (localDate.getDayOfMonth() < 10 ? "0"+localDate.getDayOfMonth():localDate.getDayOfMonth())+"-"+
+                (localTime.getHour() < 10 ? "0"+localTime.getHour():localTime.getHour())+"h"+
+                (localTime.getMinute() < 10 ? "0"+localTime.getMinute():localTime.getMinute())+"m"+
+                (localTime.getSecond() < 10 ? "0"+localTime.getSecond():localTime.getSecond());
+
     }
 }
