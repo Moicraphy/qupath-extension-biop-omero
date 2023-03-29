@@ -668,6 +668,7 @@ public class OmeroRawScripting {
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param imageData QuPath image
      * @param tableName Name of the OMERO.table
+     * @param deletePreviousTable Delete of not all previous OMERO measurement tables
      * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     private static boolean sendMeasurementTableToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName, boolean deletePreviousTable){
@@ -684,7 +685,7 @@ public class OmeroRawScripting {
         if(deletePreviousTable){
             Collection<FileAnnotationData> tables = OmeroRawTools.readTables(client, imageId);
             boolean hasBeenSent = OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
-            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")));
+            deletePreviousFileVersions(imageServer, tables, tableName.substring(0, tableName.lastIndexOf("_")));
 
             return hasBeenSent;
         } else
@@ -698,6 +699,7 @@ public class OmeroRawScripting {
      * @param annotationObjects QuPath annotations objects
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param imageData QuPath image
+     * @param tableName Name of the table to upload
      * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMeasurementTableToOmero(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName){
@@ -815,6 +817,7 @@ public class OmeroRawScripting {
      * @param pathObjects QuPath detection objects
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param imageData QuPath image
+     * @param filename Name of the file to upload
      * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename){
@@ -828,6 +831,7 @@ public class OmeroRawScripting {
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param imageData QuPath image
      * @param filename Name of the CSV file
+     * @param deletePreviousTable Delete or not all previous versions of csv measurements tables
      * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename, boolean deletePreviousTable){
@@ -849,7 +853,7 @@ public class OmeroRawScripting {
             if (deletePreviousTable) {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, imageId);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(file, client, imageId);
-                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
+                deletePreviousFileVersions(imageServer, attachments, filename.substring(0,filename.lastIndexOf("_")));
 
             } else
                 // add the csv file to OMERO
@@ -861,22 +865,44 @@ public class OmeroRawScripting {
         return hasBeenSent;
     }
 
-    public static void deletePreviousAnnotationFiles(OmeroRawClient client, Collection<FileAnnotationData> files){
-        deletePreviousFileVersions(client, files, annotationFileBaseName);
+    /**
+     * Delete all previous version of annotation tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the given table name in the list of files.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param files List of files to browse
+     */
+    public static void deletePreviousAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
+        deletePreviousFileVersions(imageServer, files, annotationFileBaseName);
     }
 
-    public static void deletePreviousDetectionFiles(OmeroRawClient client, Collection<FileAnnotationData> files){
-        deletePreviousFileVersions(client, files, detectionFileBaseName);
+    /**
+     * Delete all previous version of detection tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the given table name in the list of files.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param files List of files to browse
+     */
+    public static void deletePreviousDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
+        deletePreviousFileVersions(imageServer, files, detectionFileBaseName);
     }
 
-    public static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name){
+    /**
+     * Delete all previous version of tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the given table name in the list of files.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param files List of files to browse
+     * @param name Table name that files name must contain to be deleted (i.e. filtering item)
+     */
+    public static void deletePreviousFileVersions(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files, String name){
         if(!files.isEmpty()) {
             List<FileAnnotationData> previousTables = files.stream()
                     .filter(e -> e.getFileName().contains(name))
                     .collect(Collectors.toList());
 
             if (!previousTables.isEmpty())
-                OmeroRawTools.deleteFiles(client, previousTables);
+                OmeroRawTools.deleteFiles(imageServer.getClient(), previousTables);
             else logger.warn("Sending tables : No previous table attached to the image");
         }
     }

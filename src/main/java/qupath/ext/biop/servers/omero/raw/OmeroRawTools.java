@@ -1661,7 +1661,7 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
+     * Delete given files on OMERO
      *
      * @param client
      * @param data
@@ -1684,10 +1684,6 @@ public final class OmeroRawTools {
         }
         return hasBeenDeleted;
     }
-
-
-
-
 
     /**
      * create a new orphaned dataset on OMERO

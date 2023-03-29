@@ -115,6 +115,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         if (!confirm)
             return;
 
+        // get the current ROIs and tables
         List<ROIData> tmpRoiList = new ArrayList<>();
         List<FileAnnotationData> tmpFileList = new ArrayList<>();
         if(deletePreviousExperiments){
@@ -155,13 +156,13 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
                 // send the corresponding csv file
                 if(OmeroRawScripting.sendDetectionMeasurementTableAsCSV(detections, omeroServer, qupath.getImageData())) nWrittenTables++;
             }
-            else
-                Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
+            else Dialogs.showErrorMessage(title, "No detection objects , cannot send detection map!");
         }
 
+        // delete all previous ROIs and related tables (detection and annotations)
         if(deletePreviousExperiments) {
-            OmeroRawScripting.deletePreviousAnnotationFiles(omeroServer.getClient(), tmpFileList);
-            OmeroRawScripting.deletePreviousDetectionFiles(omeroServer.getClient(), tmpFileList);
+            OmeroRawScripting.deletePreviousAnnotationFiles(omeroServer, tmpFileList);
+            OmeroRawScripting.deletePreviousDetectionFiles(omeroServer, tmpFileList);
             OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), tmpRoiList);
         }
 
