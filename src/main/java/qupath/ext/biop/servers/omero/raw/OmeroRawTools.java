@@ -437,7 +437,6 @@ public final class OmeroRawTools {
     public static Collection<? extends DataObject> getParent(OmeroRawClient client, String dataType, long id){
         try{
             switch(dataType) {
-
                 case "Image":
                     // get the image
                     Image image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), id).asImage();

@@ -33,6 +33,7 @@ import java.text.SimpleDateFormat;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -650,21 +651,9 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
         importBtn.setOnMouseClicked(e -> {
             var selected = tree.getSelectionModel().getSelectedItems();
             var validUris = selected.parallelStream()
-                    .flatMap(item -> {
-                        OmeroRawObjects.OmeroRawObject uri = item.getValue();
-                        if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-                            var temp = getChildren(uri,comboGroup.getSelectionModel().getSelectedItem(), comboOwner.getSelectionModel().getSelectedItem());
-                            List<OmeroRawObjects.OmeroRawObject> out = new ArrayList<>();
-                            for (var subTemp: temp) {
-                                out.addAll(getChildren(subTemp,comboGroup.getSelectionModel().getSelectedItem(),comboOwner.getSelectionModel().getSelectedItem()));
-                            }
-                            return out.parallelStream();
-                        } else if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET)
-                            return getChildren(uri, comboGroup.getSelectionModel().getSelectedItem(),comboOwner.getSelectionModel().getSelectedItem()).parallelStream();
-                        else if (uri.getType() == OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER)
-                            return getChildren(uri, comboGroup.getSelectionModel().getSelectedItem(),comboOwner.getSelectionModel().getSelectedItem()).parallelStream();
-                        return Stream.of(uri);
-                    })
+                    .flatMap(item -> listAllImagesToImport(item.getValue(),
+                            comboGroup.getSelectionModel().getSelectedItem(),
+                            comboOwner.getSelectionModel().getSelectedItem()).parallelStream())
                     .filter(obj -> isSupported(obj))
                     .map(obj -> createObjectURI(obj))
                     .toArray(String[]::new);
@@ -679,6 +668,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     Dialogs.showErrorMessage("Open OMERO images", "If you want to handle multiple images, you need to create a project first."); // Same as D&D for images
                 return;
             }
+            //TODO wait new qupath version to remove before and after import images because prompt to import images should return the list of newly images
             HashSet<ProjectImageEntry<BufferedImage>> beforeImport = new HashSet<>(qupath.getProject().getImageList());
             promptToImportOmeroImages(validUris);
             HashSet<ProjectImageEntry<BufferedImage>> afterImport = new HashSet<>(qupath.getProject().getImageList());
@@ -754,6 +744,27 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             OmeroRawExtension.getOpenedRawBrowsers().remove(client);
         });
         dialog.showAndWait();
+    }
+
+
+    private List<OmeroRawObjects.OmeroRawObject> listAllImagesToImport(OmeroRawObjects.OmeroRawObject uri, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner){
+        switch (uri.getType()){
+            case PROJECT:
+            case SCREEN:
+            case PLATE:
+                var temp = getChildren(uri, group, owner);
+                List<OmeroRawObjects.OmeroRawObject> out = new ArrayList<>();
+                for (var subTemp: temp) {
+                    out.addAll(listAllImagesToImport(subTemp, group, owner));
+                }
+                return out;
+            case DATASET:
+            case WELL:
+            case ORPHANED_FOLDER:
+                return getChildren(uri, group, owner);
+            default:
+                return Collections.singletonList(uri);
+        }
     }
 
     /**
