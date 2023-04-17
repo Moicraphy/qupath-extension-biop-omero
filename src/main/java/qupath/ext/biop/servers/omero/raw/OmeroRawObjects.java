@@ -516,8 +516,8 @@ final class OmeroRawObjects {
         public Plate(String url, PlateData plateData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
             this.url = url;
             this.description = plateData.getDescription();
-            this.plateAquisitionCount = plateData.asPlate().sizeOfPlateAcquisitions();
-            this.childCount = plateData.asPlate().sizeOfWells();
+            this.plateAquisitionCount = plateData.asPlate().sizeOfPlateAcquisitions(); // TODO see that also
+            this.childCount = plateData.asPlate().sizeOfWells(); // TODO seem to does not work
             super.data = plateData;
             super.setId(id);
             super.setName(plateData.getName());
@@ -537,11 +537,57 @@ final class OmeroRawObjects {
     }
 
 
+    // TODo see how to deal with that => not really understandable
+    static class PlateAcquisition extends OmeroRawObject {
+
+        private final String url;
+        private final String description;
+        private final int timePoint;
+
+        @Override
+        String getAPIURLString() {
+            return url;
+        }
+
+        @Override
+        int getNChildren() {
+            return 0;
+        }
+
+        String getDescription() {
+            return description;
+        }
+
+
+        public PlateAcquisition(String url, PlateAcquisitionData plateAcquisitionData, long id, int timePoint, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
+            this.url = url;
+            this.description = plateAcquisitionData.getDescription();
+            this.timePoint = timePoint;
+            super.data = plateAcquisitionData;
+            super.setId(id);
+            super.setName(plateAcquisitionData.getName());
+            super.setType(type.toString());
+            super.setParent(parent);
+
+            super.setOwner(new Owner(user.getId()==null ? 0 : user.getId().getValue(),
+                    user.getFirstName()==null ? "" : user.getFirstName().getValue(),
+                    user.getMiddleName()==null ? "" : user.getMiddleName().getValue(),
+                    user.getLastName()==null ? "" : user.getLastName().getValue(),
+                    user.getEmail()==null ? "" : user.getEmail().getValue(),
+                    user.getInstitution()==null ? "" : user.getInstitution().getValue(),
+                    user.getOmeName()==null ? "" : user.getOmeName().getValue()));
+
+            super.setGroup(new Group(plateAcquisitionData.getGroupId(), group.getName().getValue()));
+        }
+    }
+
+
     static class Well extends OmeroRawObject {
 
         private final String url;
         private final String description;
         private final int childCount;
+        private final int timePoint;
 
         @Override
         String getAPIURLString() {
@@ -557,14 +603,19 @@ final class OmeroRawObjects {
             return description;
         }
 
+        int getTimePoint() {
+            return timePoint;
+        }
 
-        public Well(String url, WellData wellData, long id, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
+
+        public Well(String url, WellData wellData, long id, int timePoint, OmeroRawObjectType type, OmeroRawObject parent, omero.model.Experimenter user, ExperimenterGroup group) {
             this.url = url;
             this.description = "";
             this.childCount = wellData.asWell().sizeOfWellSamples();
+            this.timePoint = timePoint;
             super.data = wellData;
             super.setId(id);
-            super.setName("" + (char)(wellData.getRow() +65) + wellData.getColumn());
+            super.setName("" + (char)(wellData.getRow() + 65) + wellData.getColumn());
             super.setType(type.toString());
             super.setParent(parent);
 

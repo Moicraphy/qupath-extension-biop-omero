@@ -702,22 +702,22 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Get all OMERO datasets corresponding to the list of ids
+     * Get all OMERO wells corresponding to the plate id
      *
      * @param client
-     * @param plateIds
+     * @param plateId
      * @return List of OMERO dataset objects
      */
-    public static Collection<PlateData> readOmeroPlates(OmeroRawClient client, List<Long> plateIds){
+    public static Collection<WellData> readOmeroWells(OmeroRawClient client, long plateId){
         try {
-            return client.getGateway().getFacility(BrowseFacility.class).getPlates(client.getContext(), plateIds);
+            return client.getGateway().getFacility(BrowseFacility.class).getWells(client.getContext(), plateId);
         }catch(ExecutionException | DSOutOfServiceException e){
-            Dialogs.showErrorNotification("Reading datasets","An error occurs when reading OMERO datasets "+plateIds);
+            Dialogs.showErrorNotification("Reading datasets","An error occurs when reading wells in plate "+plateId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
         }catch (DSAccessException | NoSuchElementException e){
-            Dialogs.showErrorNotification("Reading datasets","You don't have the right to access OMERO datasets "+plateIds);
+            Dialogs.showErrorNotification("Reading wells","You don't have the right to access wells in plate "+plateId);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
