@@ -15,6 +15,7 @@ import omero.model.ExperimenterGroup;
 import omero.model.ProjectDatasetLink;
 import omero.model.DatasetImageLink;
 import omero.model.IObject;
+import omero.model.ScreenPlateLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.projects.ProjectImageEntry;
@@ -52,21 +53,6 @@ public class OmeroRawBrowserTools {
         if (parent == null)
             return new ArrayList<>();
 
-        // get the child type
-       /* OmeroRawObjects.OmeroRawObjectType type = OmeroRawObjects.OmeroRawObjectType.PROJECT;
-        if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.PROJECT)
-            type = OmeroRawObjects.OmeroRawObjectType.DATASET;
-        else if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.DATASET)
-            type = OmeroRawObjects.OmeroRawObjectType.IMAGE;
-        else if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.SCREEN)
-            type = OmeroRawObjects.OmeroRawObjectType.PLATE;
-        else if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.PLATE)
-            type = OmeroRawObjects.OmeroRawObjectType.PLATE_ACQUISITION;
-        else if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.PLATE_ACQUISITION)
-            type = OmeroRawObjects.OmeroRawObjectType.WELL;
-        else if (parent.getType() == OmeroRawObjects.OmeroRawObjectType.WELL)
-            type = OmeroRawObjects.OmeroRawObjectType.IMAGE;*/
-
         // get OMERO owner and group
         Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
         ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
@@ -91,52 +77,63 @@ public class OmeroRawBrowserTools {
 
                 // if the current project has some datasets
                 if(projectData.asProject().sizeOfDatasetLinks() > 0){
-                    List<DatasetData> datasets = new ArrayList<>();
+                    // get dataset ids
                     List<ProjectDatasetLink> links = projectData.asProject().copyDatasetLinks();
+                    List<Long> linksId = links.stream()
+                            .map(ProjectDatasetLink::getChild)
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .collect(Collectors.toList());
 
-                    // get child images
-                    for (ProjectDatasetLink link : links) {
-                        datasets.add(new DatasetData(link.getChild()));
-                    }
                     // get child datasets
-                    for(DatasetData dataset : datasets) {
-                        System.out.println(dataset);
-                        System.out.println(dataset.asDataset().sizeOfImageLinks());
-                        System.out.println(dataset.getImages());
+                    List<DatasetData> datasets = new ArrayList<>(OmeroRawTools.readOmeroDatasets(client,linksId));
+
+                    // build dataset object
+                    for(DatasetData dataset : datasets)
                         list.add(new OmeroRawObjects.Dataset("", dataset, dataset.getId(), OmeroRawObjects.OmeroRawObjectType.DATASET, parent, user, userGroup));
-                    }
                 }
                 break;
 
             case DATASET:
-                // get the current project to have access to the child datasets
+                // get the current dataset to have access to the child images
                 DatasetData datasetData = (DatasetData)parent.getData();
 
-                // if the current project has some datasets
+                // if the current dataset has some images
                 if(datasetData.asDataset().sizeOfImageLinks() > 0){
                     List<ImageData> images = new ArrayList<>();
                     List<DatasetImageLink> links = datasetData.asDataset().copyImageLinks();
 
                     // get child images
-                    for (DatasetImageLink link : links) {
+                    for (DatasetImageLink link : links)
                         images.add(new ImageData(link.getChild()));
-                    }
 
-                    // create OmeroRawObjects from child images
+                    // build image object
                     for(ImageData image : images)
                         list.add(new OmeroRawObjects.Image("",image ,image.getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, parent, user, userGroup));
                 }
                 break;
 
             case SCREEN:
-                // get the current project to have access to the child datasets
+                // get the current screen to have access to the child plates
                 ScreenData screenData = (ScreenData)parent.getData();
 
-                // if the current project has some datasets
+                // if the current screen has some plates
                 if(parent.getNChildren() > 0){
-                    // create OmeroRawObjects from child datasets
-                    for(PlateData plate : screenData.getPlates())
-                        list.add(new OmeroRawObjects.Plate("",plate ,plate.getId(), OmeroRawObjects.OmeroRawObjectType.PLATE, parent, user, userGroup));
+                    List<ScreenPlateLink> links = screenData.asScreen().copyPlateLinks();
+
+                    List<Long> linksId = links.stream()
+                            .map(ScreenPlateLink::getChild)
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .collect(Collectors.toList());
+
+                    // get child plates
+                    List<PlateData> plates = new ArrayList<>(OmeroRawTools.readOmeroPlates(client,linksId));
+
+                    // build plate object
+                    for(PlateData plate : plates) {
+                        list.add(new OmeroRawObjects.Plate("", plate, plate.getId(), OmeroRawObjects.OmeroRawObjectType.PLATE, parent, user, userGroup));
+                    }
                 }
                 break;
             case PLATE:
@@ -146,10 +143,13 @@ public class OmeroRawBrowserTools {
                 Collection<WellData> wellDataList = OmeroRawTools.readOmeroWells(client, plateData.getId());
                 System.out.println("Plate wells : "+wellDataList);
                 System.out.println("parent.getNChildren() : "+parent.getNChildren());
-                if(parent.getNChildren() > 0) {
-                    for(WellData well : wellDataList)
-                        list.add(new OmeroRawObjects.Well("", well, well.getId(), 0,OmeroRawObjects.OmeroRawObjectType.WELL, parent, user, userGroup));
+                if(wellDataList.size() > 0/*parent.getNChildren() > 0*/) {
+                    for(WellData well : wellDataList) {
+                        System.out.println(well);
+                        list.add(new OmeroRawObjects.Well("", well, well.getId(), 0, OmeroRawObjects.OmeroRawObjectType.WELL, parent, user, userGroup));
+                    }
                 }
+                break;
 
 
             case WELL:
@@ -157,52 +157,14 @@ public class OmeroRawBrowserTools {
                 WellData wellData = (WellData)parent.getData();
 
                 // if the current project has some datasets
-                if(wellData.asWell().sizeOfWellSamples() > 0){
+                if(wellData.asWell().sizeOfWellSamples() > 0) {
                     // get child datasets
-                    for(WellSampleData wSample : wellData.getWellSamples())
-                        list.add(new OmeroRawObjects.Image("",wSample.getImage() ,wSample.getImage().getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, parent, user, userGroup));
+                    for (WellSampleData wSample : wellData.getWellSamples())
+                        list.add(new OmeroRawObjects.Image("", wSample.getImage(), wSample.getImage().getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, parent, user, userGroup));
                 }
                 break;
 
         }
-
-
-/*
-        if (type == OmeroRawObjects.OmeroRawObjectType.PROJECT) {
-
-        }
-        else if (type == OmeroRawObjects.OmeroRawObjectType.DATASET) {
-
-        }
-        else if (type == OmeroRawObjects.OmeroRawObjectType.PLATE) {
-
-        } else if (type == OmeroRawObjects.OmeroRawObjectType.PLATE_ACQUISITION) {
-
-
-        } else if (type == OmeroRawObjects.OmeroRawObjectType.WELL) {
-            // get the current project to have access to the child datasets
-            PlateData plateData = (PlateData)parent.getData();
-
-            Set<PlateAcquisitionData> plateAcquisitionSet = plateData.getPlateAcquisitions();
-
-        }else if (type == OmeroRawObjects.OmeroRawObjectType.IMAGE) {
-               /// get the current dataset to have access to the child images
-                DatasetData datasetColl = OmeroRawTools.readOmeroDatasets(client, Collections.singletonList(parent.getId())).iterator().next();
-
-                if(datasetColl.asDataset().sizeOfImageLinks() > 0){
-                    List<ImageData> images = new ArrayList<>();
-                    List<DatasetImageLink> links = datasetColl.asDataset().copyImageLinks();
-
-                    // get child images
-                    for (DatasetImageLink link : links) {
-                        images.add(new ImageData(link.getChild()));
-                    }
-
-                    // create OmeroRawObjects from child images
-                    for(ImageData image : images)
-                        list.add(new OmeroRawObjects.Image("",image ,image.getId(), type, parent, user, userGroup));
-                }
-            }*/
 
         return list;
     }

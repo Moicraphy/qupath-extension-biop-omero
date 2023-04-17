@@ -615,7 +615,7 @@ final class OmeroRawObjects {
             this.timePoint = timePoint;
             super.data = wellData;
             super.setId(id);
-            super.setName("" + (char)(wellData.getRow() + 65) + wellData.getColumn());
+            super.setName("" + (char)(wellData.getRow() + 65) + (wellData.getColumn() + 1));
             super.setType(type.toString());
             super.setParent(parent);
 

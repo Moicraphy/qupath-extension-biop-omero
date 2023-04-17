@@ -702,6 +702,29 @@ public final class OmeroRawTools {
     }
 
     /**
+     * Get all OMERO datasets corresponding to the list of ids
+     *
+     * @param client
+     * @param plateIds
+     * @return List of OMERO dataset objects
+     */
+    public static Collection<PlateData> readOmeroPlates(OmeroRawClient client, List<Long> plateIds){
+        try {
+            return client.getGateway().getFacility(BrowseFacility.class).getPlates(client.getContext(), plateIds);
+        }catch(ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Reading plates","An error occurs when reading OMERO plates "+plateIds);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }catch (DSAccessException | NoSuchElementException e){
+            Dialogs.showErrorNotification("Reading plates","You don't have the right to access OMERO plates "+plateIds);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+    }
+
+    /**
      * Get all OMERO wells corresponding to the plate id
      *
      * @param client

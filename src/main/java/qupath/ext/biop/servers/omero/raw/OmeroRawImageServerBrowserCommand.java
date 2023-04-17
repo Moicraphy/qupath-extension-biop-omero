@@ -208,6 +208,27 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             "Group",
             "Num. images"};
 
+    private final String[] screenAttributes = new String[] {"Name",
+            "Id",
+            "Description",
+            "Owner",
+            "Group",
+            "Num. plates"};
+
+    private final String[] plateAttributes = new String[] {"Name",
+            "Id",
+            "Description",
+            "Owner",
+            "Group",
+            "Num. wells"};
+
+    private final String[] wellAttributes = new String[] {"Name",
+            "Id",
+            "Description",
+            "Owner",
+            "Group",
+            "Num. images"};
+
     private final String[] imageAttributes = new String[] {"Name",
             "Id",
             "Owner",
@@ -515,6 +536,12 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
                     return new ReadOnlyObjectWrapper<>(projectAttributes[cellData.getValue()]);
                 else if (type == OmeroRawObjects.OmeroRawObjectType.DATASET)
                     return new ReadOnlyObjectWrapper<>(datasetAttributes[cellData.getValue()]);
+                else if (type == OmeroRawObjects.OmeroRawObjectType.SCREEN)
+                    return new ReadOnlyObjectWrapper<>(screenAttributes[cellData.getValue()]);
+                else if (type == OmeroRawObjects.OmeroRawObjectType.PLATE)
+                    return new ReadOnlyObjectWrapper<>(plateAttributes[cellData.getValue()]);
+                else if (type == OmeroRawObjects.OmeroRawObjectType.WELL)
+                    return new ReadOnlyObjectWrapper<>(wellAttributes[cellData.getValue()]);
                 else if (type == OmeroRawObjects.OmeroRawObjectType.IMAGE)
                     return new ReadOnlyObjectWrapper<>(imageAttributes[cellData.getValue()]);
             }
@@ -995,6 +1022,21 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             } else if (selectedItems.get(0).getValue().getType().equals(OmeroRawObjects.OmeroRawObjectType.DATASET)) {
                 Integer[] datasetIndices = new Integer[datasetAttributes.length];
                 for (int index = 0; index < datasetAttributes.length; index++) datasetIndices[index] = index;
+                indexList = FXCollections.observableArrayList(datasetIndices);
+
+            } else if (selectedItems.get(0).getValue().getType().equals(OmeroRawObjects.OmeroRawObjectType.SCREEN)) {
+                Integer[] datasetIndices = new Integer[screenAttributes.length];
+                for (int index = 0; index < screenAttributes.length; index++) datasetIndices[index] = index;
+                indexList = FXCollections.observableArrayList(datasetIndices);
+
+            } else if (selectedItems.get(0).getValue().getType().equals(OmeroRawObjects.OmeroRawObjectType.PLATE)) {
+                Integer[] datasetIndices = new Integer[plateAttributes.length];
+                for (int index = 0; index < plateAttributes.length; index++) datasetIndices[index] = index;
+                indexList = FXCollections.observableArrayList(datasetIndices);
+
+            } else if (selectedItems.get(0).getValue().getType().equals(OmeroRawObjects.OmeroRawObjectType.WELL)) {
+                Integer[] datasetIndices = new Integer[wellAttributes.length];
+                for (int index = 0; index < wellAttributes.length; index++) datasetIndices[index] = index;
                 indexList = FXCollections.observableArrayList(datasetIndices);
 
             } else if (selectedItems.get(0).getValue().getType().equals(OmeroRawObjects.OmeroRawObjectType.IMAGE)) {
