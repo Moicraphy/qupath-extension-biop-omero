@@ -800,24 +800,21 @@ public final class OmeroRawTools {
      * Get annotations (i.e. tag, key-value, comment...) attached to an image on OMERO, specified by its id.
      *
      * @param client
-     * @param imageId
+     * @param obj
      * @return List of annotation objects
      */
-    public static List<AnnotationData> readOmeroAnnotations(OmeroRawClient client, long imageId){
+    public static List<AnnotationData> readOmeroAnnotations(OmeroRawClient client, DataObject obj){
         try {
-            // get current image from OMERO
-            ImageData imageData = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId);
-
-            // read annotations linked to the image
-            return client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), imageData);
+             // read annotations linked to the image
+            return client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), obj);
 
         } catch(ExecutionException | DSOutOfServiceException e) {
-            Dialogs.showErrorNotification("Reading OMERO annotations", "Cannot get annotations from OMERO for the image "+imageId);
+            Dialogs.showErrorNotification("Reading OMERO annotations", "Cannot get annotations from OMERO for the object "+obj);
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
         } catch (DSAccessException e){
-            Dialogs.showErrorNotification("Reading OMERO annotations","You don't have the read annotations on OMERO for the image "+imageId);
+            Dialogs.showErrorNotification("Reading OMERO annotations","You don't have the right to read annotations on OMERO for the object "+obj);
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();

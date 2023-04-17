@@ -313,7 +313,7 @@ public class OmeroRawBrowserTools {
      * @return omeroRawAnnotations object
      */
     public static OmeroRawAnnotations readAnnotationsItems(OmeroRawClient client, OmeroRawObjects.OmeroRawObject obj, OmeroRawAnnotations.OmeroRawAnnotationType category) {
-        return OmeroRawAnnotations.getOmeroAnnotations(client, category, OmeroRawTools.readOmeroAnnotations(client, obj.getId()));
+        return OmeroRawAnnotations.getOmeroAnnotations(client, category, OmeroRawTools.readOmeroAnnotations(client, obj.getData()));
     }
 
     public static void addContainersAsMetadataFields(OmeroRawClient client, ProjectImageEntry<BufferedImage> entry){
