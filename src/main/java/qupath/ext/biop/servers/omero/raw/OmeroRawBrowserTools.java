@@ -86,7 +86,7 @@ public class OmeroRawBrowserTools {
                 list.addAll(ophDatasetsList);
                 list.addAll(screensList);
 
-                break;
+                return list;
 
             case PROJECT:
                 // get the current project to have access to the child datasets
@@ -166,6 +166,7 @@ public class OmeroRawBrowserTools {
                 }
                 break;
         }
+        list.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
         return list;
     }
 
