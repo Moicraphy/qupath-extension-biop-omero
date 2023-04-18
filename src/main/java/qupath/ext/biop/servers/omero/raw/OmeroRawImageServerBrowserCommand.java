@@ -881,7 +881,7 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
             map.put(OmeroRawObjects.OmeroRawObjectType.ORPHANED_FOLDER, ImageIO.read(getClass().getClassLoader().getResource("images/folder_yellow16.png")));
 
             // Load image icon
-            map.put(OmeroRawObjects.OmeroRawObjectType.WELL, ImageIO.read(getClass().getClassLoader().getResource("images/image16.png")));
+            map.put(OmeroRawObjects.OmeroRawObjectType.WELL, ImageIO.read(getClass().getClassLoader().getResource("images/folder_well16.png")));
 
         } catch (IOException e) {
             logger.warn("Could not load OMERO icons: {}", e.getLocalizedMessage());
