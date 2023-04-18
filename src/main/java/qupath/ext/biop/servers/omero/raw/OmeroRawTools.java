@@ -434,57 +434,49 @@ public final class OmeroRawTools {
      */
     public static Collection<? extends DataObject> getParent(OmeroRawClient client, String dataType, long id){
         try{
-            switch(dataType) {
-
-                case "Image":
+            switch(dataType.toLowerCase()) {
+                case "image":
                     // get the image
                     Image image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), id).asImage();
 
-                    // try first to get the parent dataset
-                    try {
-                        // get the parent datasets
-                        List<IObject> datasetObjects = client.getGateway()
-                                .getQueryService(client.getContext())
-                                .findAllByQuery("select link.parent from DatasetImageLink as link " +
-                                        "where link.child=" + id, null);
+                    // get the parent datasets
+                    List<IObject> datasetObjects = client.getGateway()
+                            .getQueryService(client.getContext())
+                            .findAllByQuery("select link.parent from DatasetImageLink as link " +
+                                    "where link.child=" + id, null);
 
+                    if(!datasetObjects.isEmpty()) {
+                        logger.info("The current image " + id + " has a dataset as parent");
                         // get projects' id
-                        List<Long> ids = datasetObjects
-                                .stream()
+                        List<Long> ids = datasetObjects.stream()
                                 .map(IObject::getId)
                                 .map(RLong::getValue)
                                 .distinct()
                                 .collect(Collectors.toList());
 
-                        logger.info("The current image " + id + " has a dataset as parent");
-
                         return client.getGateway()
                                 .getFacility(BrowseFacility.class)
                                 .getDatasets(client.getContext(), ids);
-                    } catch (Exception e) {
-                        logger.warn("The current image " + id + " has a well as parent");
-                    }
+                    }else{
+                        logger.info("The current image " + id + " has a well as parent");
 
-                    // then try to get the parent well if there is no parent dataset
-                    try {
-                        List<Long> ids = image.copyWellSamples()
-                                .stream()
+                        List<Long> ids = image.copyWellSamples().stream()
                                 .map(WellSample::getWell)
                                 .map(IObject::getId)
                                 .map(RLong::getValue)
                                 .collect(Collectors.toList());
 
-                        return client.getGateway()
-                                .getFacility(BrowseFacility.class)
-                                .getWells(client.getContext(), ids);
-                    } catch (Exception e) {
-                        Dialogs.showErrorNotification("Getting parent of image", "The current image " + id + " has no parent. Please check the id and the object type");
-                        logger.error("" + e);
-                        logger.error(getErrorStackTraceAsString(e));
-                        return Collections.emptyList();
+                        if(!ids.isEmpty())
+                            return client.getGateway()
+                                    .getFacility(BrowseFacility.class)
+                                    .getWells(client.getContext(), ids);
+                        else {
+                            Dialogs.showErrorNotification("Getting parent of image", "The current image " + id + " has no parent.");
+                            break;
+                        }
                     }
 
-                case "Dataset":
+                case "dataset":
                     // get the parent projects
                     List<IObject> projectObjects = client.getGateway()
                             .getQueryService(client.getContext())
@@ -492,8 +484,7 @@ public final class OmeroRawTools {
                                     "where link.child=" + id, null);
 
                     // get projects' id
-                    List<Long> projectIds = projectObjects
-                            .stream()
+                    List<Long> projectIds = projectObjects.stream()
                             .map(IObject::getId)
                             .map(RLong::getValue)
                             .distinct()
@@ -503,26 +494,23 @@ public final class OmeroRawTools {
                             .getFacility(BrowseFacility.class)
                             .getProjects(client.getContext(), projectIds);
 
-                case "Well":
-                    return Collections.singletonList(
-                            client.getGateway()
+                case "well":
+                    return Collections.singletonList(client.getGateway()
                                     .getFacility(BrowseFacility.class)
                                     .getWells(client.getContext(), Collections.singletonList(id))
                                     .iterator()
                                     .next()
-                                    .getPlate()
-                    );
+                                    .getPlate());
 
-                case "Plate":
-                    // get parent plates
-                    List<IObject> plateObjects = client.getGateway()
+                case "plate":
+                    // get parent screen
+                    List<IObject> screenObjects = client.getGateway()
                             .getQueryService(client.getContext())
                             .findAllByQuery("select link.parent from ScreenPlateLink as link " +
                                     "where link.child=" + id, null);
 
-                    // get plates' id
-                    List<Long> plateIds = plateObjects
-                            .stream()
+                    // get screens' id
+                    List<Long> screenIds = screenObjects.stream()
                             .map(IObject::getId)
                             .map(RLong::getValue)
                             .distinct()
@@ -530,21 +518,26 @@ public final class OmeroRawTools {
 
                     return client.getGateway()
                             .getFacility(BrowseFacility.class)
-                            .getPlates(client.getContext(), plateIds);
+                            .getScreens(client.getContext(), screenIds);
+
+                case "project":
+                case "screen":
+                    Dialogs.showWarningNotification("Getting parent","No parent for "+dataType+" id "+id);
+                    break;
                 default:
-                    return Collections.emptyList();
+                    Dialogs.showWarningNotification("Getting parent","Unsupported object : "+dataType+" id "+id);
             }
         } catch (ServerError | DSOutOfServiceException | ExecutionException e) {
             Dialogs.showErrorNotification("Getting parent","Cannot retrieved the parent of "+dataType+" id "+id);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
-            return Collections.emptyList();
         } catch (DSAccessException e) {
             Dialogs.showErrorNotification("Getting parent","You do not have access to "+dataType+" id "+id);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
-            return Collections.emptyList();
         }
+
+        return Collections.emptyList();
     }
 
 
