@@ -56,7 +56,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import fr.igred.omero.exception.OMEROServerError;
 import loci.formats.in.DefaultMetadataOptions;
 import loci.formats.in.MetadataLevel;
 import ome.formats.OMEROMetadataStoreClient;
@@ -106,10 +105,8 @@ import omero.gateway.model.TableData;
 import omero.gateway.model.TableDataColumn;
 import omero.gateway.model.TagAnnotationData;
 import omero.gateway.model.WellData;
-import omero.gateway.util.PojoMapper;
 import omero.model.Dataset;
 import omero.model.DatasetI;
-import omero.model.DatasetImageLink;
 import omero.model.Ellipse;
 import omero.model.Experimenter;
 import omero.model.ExperimenterGroup;

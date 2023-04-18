@@ -1,11 +1,7 @@
 package qupath.ext.biop.servers.omero.raw;
 
-import omero.RLong;
-import omero.gateway.facility.BrowseFacility;
-import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
-import omero.gateway.model.PlateAcquisitionData;
 import omero.gateway.model.PlateData;
 import omero.gateway.model.ProjectData;
 import omero.gateway.model.ScreenData;
@@ -13,24 +9,18 @@ import omero.gateway.model.WellData;
 import omero.gateway.model.WellSampleData;
 import omero.model.Experimenter;
 import omero.model.ExperimenterGroup;
-import omero.model.ProjectDatasetLink;
 import omero.model.DatasetImageLink;
-import omero.model.IObject;
-import omero.model.ScreenPlateLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.projects.ProjectImageEntry;
 
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Comparator;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
