@@ -59,18 +59,33 @@ public class OmeroRawBrowserTools {
         ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
         List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
 
-        
         switch (parent.getType()){
             case SERVER:
                 // get all projects for the current user
+                List<OmeroRawObjects.OmeroRawObject> projectsList = new ArrayList<>();
                 Collection<ProjectData> projects = new ArrayList<>(OmeroRawTools.readOmeroProjectsByUser(client, owner.getId()));
                 for(ProjectData project : projects)
-                    list.add(new OmeroRawObjects.Project("",project, project.getId(), OmeroRawObjects.OmeroRawObjectType.PROJECT, parent, user, userGroup));
+                    projectsList.add(new OmeroRawObjects.Project("",project, project.getId(), OmeroRawObjects.OmeroRawObjectType.PROJECT, parent, user, userGroup));
+                projectsList.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
 
                 // get all screens for the current user
+                List<OmeroRawObjects.OmeroRawObject> screensList = new ArrayList<>();
                 Collection<ScreenData> screens = new ArrayList<>(OmeroRawTools.readOmeroScreensByUser(client, owner.getId()));
                 for(ScreenData screen : screens)
-                    list.add(new OmeroRawObjects.Screen("",screen, screen.getId(), OmeroRawObjects.OmeroRawObjectType.SCREEN, parent, user, userGroup));
+                    screensList.add(new OmeroRawObjects.Screen("",screen, screen.getId(), OmeroRawObjects.OmeroRawObjectType.SCREEN, parent, user, userGroup));
+                screensList.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
+
+                // read orphaned dataset
+                List<OmeroRawObjects.OmeroRawObject> ophDatasetsList = new ArrayList<>();
+                Collection<DatasetData> orphanedDatasets = OmeroRawTools.readOmeroOrphanedDatasetsPerOwner(client, owner.getId());
+                for(DatasetData ophDataset : orphanedDatasets)
+                    ophDatasetsList.add(new OmeroRawObjects.Dataset("", ophDataset, ophDataset.getId(), OmeroRawObjects.OmeroRawObjectType.DATASET, parent, user, userGroup));
+                ophDatasetsList.sort(Comparator.comparing(OmeroRawObjects.OmeroRawObject::getName));
+
+                list.addAll(projectsList);
+                list.addAll(ophDatasetsList);
+                list.addAll(screensList);
+
                 break;
 
             case PROJECT:
@@ -151,7 +166,6 @@ public class OmeroRawBrowserTools {
                 }
                 break;
         }
-
         return list;
     }
 
@@ -236,32 +250,6 @@ public class OmeroRawBrowserTools {
 
 
     /**
-     * get all the orphaned dataset from the server for a certain user as list of {@link OmeroRawObjects.OmeroRawObject}
-     *
-     * @param client the client {@code OmeroRawClient} object
-     * @return list of orphaned datasets
-     */
-    public static List<OmeroRawObjects.OmeroRawObject> readOrphanedDatasetsItem(OmeroRawClient client, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner) {
-        List<OmeroRawObjects.OmeroRawObject> list = new ArrayList<>();
-
-        // get orphaned datasets
-        Collection<DatasetData> orphanedDatasets = OmeroRawTools.readOmeroOrphanedDatasetsPerOwner(client, owner.getId());
-
-        // get OMERO user and group
-        Experimenter user = OmeroRawTools.getOmeroUser(client, owner.getId(), owner.getName());
-        ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
-
-        // convert dataset to OmeroRawObject
-        orphanedDatasets.forEach( e -> {
-            OmeroRawObjects.OmeroRawObject omeroObj = new OmeroRawObjects.Dataset("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.DATASET, new OmeroRawObjects.Server(client.getServerURI()), user, userGroup);
-            list.add(omeroObj);
-        });
-
-        return list;
-    }
-
-
-    /**
      * get all the orphaned images from the server for a certain user as list of {@link OmeroRawObjects.OmeroRawObject}
      *
      * @param client
@@ -280,10 +268,9 @@ public class OmeroRawBrowserTools {
         ExperimenterGroup userGroup = OmeroRawTools.getOmeroGroup(client, group.getId(), group.getName());
 
         // convert dataset to OmeroRawObject
-        orphanedImages.forEach( e -> {
-            OmeroRawObjects.OmeroRawObject omeroObj = new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, new OmeroRawObjects.Server(client.getServerURI()),user, userGroup);
-            list.add(omeroObj);
-        });
+        orphanedImages.forEach( e ->
+            list.add(new OmeroRawObjects.Image("", e, e.getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, new OmeroRawObjects.Server(client.getServerURI()),user, userGroup))
+        );
 
         return list;
     }
