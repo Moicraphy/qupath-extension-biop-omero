@@ -38,6 +38,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -84,6 +87,7 @@ import omero.gateway.model.ChannelData;
 import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.EllipseData;
+import omero.gateway.model.FileAnnotationData;
 import omero.gateway.model.ImageData;
 import omero.gateway.model.LineData;
 import omero.gateway.model.MapAnnotationData;
@@ -426,6 +430,123 @@ public final class OmeroRawTools {
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Retrieve parents of OMERO containers (i.e. Image, Dataset, Well and Plate). For Project, Screen and other, it
+     * returns an empty list.
+     *
+     * @param client
+     * @param dataType
+     * @param id
+     * @return List of object's parent(s) or empty list
+     */
+    public static Collection<? extends DataObject> getParent(OmeroRawClient client, String dataType, long id){
+        try{
+            switch(dataType.toLowerCase()) {
+                case "image":
+                    // get the image
+                    Image image = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), id).asImage();
+
+                    // get the parent datasets
+                    List<IObject> datasetObjects = client.getGateway()
+                            .getQueryService(client.getContext())
+                            .findAllByQuery("select link.parent from DatasetImageLink as link " +
+                                    "where link.child=" + id, null);
+
+                    if(!datasetObjects.isEmpty()) {
+                        logger.info("The current image " + id + " has a dataset as parent");
+                        // get projects' id
+                        List<Long> ids = datasetObjects.stream()
+                                .map(IObject::getId)
+                                .map(RLong::getValue)
+                                .distinct()
+                                .collect(Collectors.toList());
+
+                        return client.getGateway()
+                                .getFacility(BrowseFacility.class)
+                                .getDatasets(client.getContext(), ids);
+                    }else{
+                        logger.info("The current image " + id + " has a well as parent");
+
+                        List<Long> ids = image.copyWellSamples().stream()
+                                .map(WellSample::getWell)
+                                .map(IObject::getId)
+                                .map(RLong::getValue)
+                                .collect(Collectors.toList());
+
+                        if(!ids.isEmpty())
+                            return client.getGateway()
+                                    .getFacility(BrowseFacility.class)
+                                    .getWells(client.getContext(), ids);
+                        else {
+                            Dialogs.showErrorNotification("Getting parent of image", "The current image " + id + " has no parent.");
+                            break;
+                        }
+                    }
+
+                case "dataset":
+                    // get the parent projects
+                    List<IObject> projectObjects = client.getGateway()
+                            .getQueryService(client.getContext())
+                            .findAllByQuery("select link.parent from ProjectDatasetLink as link " +
+                                    "where link.child=" + id, null);
+
+                    // get projects' id
+                    List<Long> projectIds = projectObjects.stream()
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .distinct()
+                            .collect(Collectors.toList());
+
+                    return client.getGateway()
+                            .getFacility(BrowseFacility.class)
+                            .getProjects(client.getContext(), projectIds);
+
+                case "well":
+                    return Collections.singletonList(client.getGateway()
+                                    .getFacility(BrowseFacility.class)
+                                    .getWells(client.getContext(), Collections.singletonList(id))
+                                    .iterator()
+                                    .next()
+                                    .getPlate());
+
+                case "plate":
+                    // get parent screen
+                    List<IObject> screenObjects = client.getGateway()
+                            .getQueryService(client.getContext())
+                            .findAllByQuery("select link.parent from ScreenPlateLink as link " +
+                                    "where link.child=" + id, null);
+
+                    // get screens' id
+                    List<Long> screenIds = screenObjects.stream()
+                            .map(IObject::getId)
+                            .map(RLong::getValue)
+                            .distinct()
+                            .collect(Collectors.toList());
+
+                    return client.getGateway()
+                            .getFacility(BrowseFacility.class)
+                            .getScreens(client.getContext(), screenIds);
+
+                case "project":
+                case "screen":
+                    Dialogs.showWarningNotification("Getting parent","No parent for "+dataType+" id "+id);
+                    break;
+                default:
+                    Dialogs.showWarningNotification("Getting parent","Unsupported object : "+dataType+" id "+id);
+            }
+        } catch (ServerError | DSOutOfServiceException | ExecutionException e) {
+            Dialogs.showErrorNotification("Getting parent","Cannot retrieved the parent of "+dataType+" id "+id);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e) {
+            Dialogs.showErrorNotification("Getting parent","You do not have access to "+dataType+" id "+id);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+
+        return Collections.emptyList();
     }
 
 
@@ -1172,20 +1293,17 @@ public final class OmeroRawTools {
        return file;
     }
 
+
     /**
      * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
      *
      * @param client
      * @param imageId
      */
-    public static void deleteOmeroROIs(OmeroRawClient client, long imageId) {
+    public static void deleteAllOmeroROIs(OmeroRawClient client, long imageId) {
         try {
-            // get existing OMERO ROIs
-            List<ROIResult> roiList = client.getGateway().getFacility(ROIFacility.class).loadROIs(client.getContext(), imageId);
-
             // extract ROIData
-            List<IObject> roiData = new ArrayList<>();
-            roiList.forEach(roiResult -> roiData.addAll(roiResult.getROIs().stream().map(ROIData::asIObject).collect(Collectors.toList())));
+            List<IObject> roiData = readOmeroROIs(client, imageId).stream().map(ROIData::asIObject).collect(Collectors.toList());
 
             // delete ROis
             if(client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData) == null)
@@ -1197,6 +1315,31 @@ public final class OmeroRawTools {
             logger.error(getErrorStackTraceAsString(e));
         } catch (DSAccessException e) {
             Dialogs.showErrorNotification("ROI deletion", "You don't have the right to delete ROIs on OMERO on the image  " + imageId);
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+    }
+
+    /**
+     * Delete the specified ROIs on OMERO that are linked to an image, specified by its id.
+     *
+     * @param client
+     */
+    public static void deleteOmeroROIs(OmeroRawClient client, Collection<ROIData> roisToDelete) {
+        try {
+            // Convert to IObject
+            List<IObject> roiData = roisToDelete.stream().map(ROIData::asIObject).collect(Collectors.toList());
+
+            // delete ROis
+            if(client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), roiData) == null)
+                Dialogs.showInfoNotification("ROI deletion","No ROIs to delete");
+
+        } catch (DSOutOfServiceException |  ExecutionException e){
+            Dialogs.showErrorNotification("ROI deletion","Could not delete existing ROIs on OMERO.");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e) {
+            Dialogs.showErrorNotification("ROI deletion", "You don't have the right to delete those ROIs on OMERO");
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
         }
@@ -1534,6 +1677,95 @@ public final class OmeroRawTools {
                 .filter(MapAnnotationData.class::isInstance)
                 .map(MapAnnotationData.class::cast)
                 .collect(Collectors.toList());
+    }
+
+
+    /**
+     * Get attachments from OMERO server attached to the specified image.
+     *
+     * @param client
+     * @param imageId
+     * @return Sending status (True if retrieved ; false with error message otherwise)
+     */
+    public static List<FileAnnotationData> readAttachments(OmeroRawClient client, long imageId) {
+        List<AnnotationData> annotations;
+        try{
+            // read image
+            ImageData image = readOmeroImage(client, imageId);
+
+            // get annotations
+            List<Class<? extends AnnotationData>> types = Collections.singletonList(FileAnnotationData.class);
+            annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), image, types, null);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Attachment reading","Cannot read attachment from image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Attachment reading","You don't have the right to read attachments on OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+
+        // filter attachments
+        return annotations.stream()
+                .filter(FileAnnotationData.class::isInstance)
+                .map(FileAnnotationData.class::cast)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get tables from OMERO server attached to the specified image.
+     *
+     * @param client
+     * @param imageId
+     * @return Sending status (True if retrieved ; false with error message otherwise)
+     */
+    public static Collection<FileAnnotationData> readTables(OmeroRawClient client, long imageId) {
+        try{
+            // read image
+            ImageData image = readOmeroImage(client, imageId);
+
+            // get annotations
+            return client.getGateway().getFacility(TablesFacility.class).getAvailableTables(client.getContext(), image);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Attachment reading","Cannot read attachment from image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Attachment reading","You don't have the right to read attachments on OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Delete given files on OMERO
+     *
+     * @param client
+     * @param data
+     */
+    public static boolean deleteFiles(OmeroRawClient client, List<FileAnnotationData> data){
+        boolean hasBeenDeleted = false;
+
+        try{
+            List<IObject> IObjectData = data.stream().map(FileAnnotationData::asIObject).collect(Collectors.toList());
+            client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), IObjectData);
+            hasBeenDeleted = true;
+        } catch (DSOutOfServiceException |  ExecutionException e){
+            Dialogs.showErrorNotification("File deletion","Could not delete files on OMERO.");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e) {
+            Dialogs.showErrorNotification("File deletion", "You don't have the right to delete those files on OMERO");
+            logger.error("" + e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return hasBeenDeleted;
     }
 
     /**
@@ -2206,5 +2438,21 @@ public final class OmeroRawTools {
 
     public static String getErrorStackTraceAsString(Exception e){
         return Arrays.stream(e.getStackTrace()).map(StackTraceElement::toString).reduce("",(a, b)->a + "     at "+b+"\n");
+    }
+
+    /**
+     * @return formatted date
+     */
+    public static String getCurrentDateAndHour(){
+        LocalDateTime localDateTime = LocalDateTime.now();
+        LocalTime localTime = localDateTime.toLocalTime();
+        LocalDate localDate = localDateTime.toLocalDate();
+        return ""+localDate.getYear()+
+                (localDate.getMonthValue() < 10 ? "0"+localDate.getMonthValue():localDate.getMonthValue()) +
+                (localDate.getDayOfMonth() < 10 ? "0"+localDate.getDayOfMonth():localDate.getDayOfMonth())+"-"+
+                (localTime.getHour() < 10 ? "0"+localTime.getHour():localTime.getHour())+"h"+
+                (localTime.getMinute() < 10 ? "0"+localTime.getMinute():localTime.getMinute())+"m"+
+                (localTime.getSecond() < 10 ? "0"+localTime.getSecond():localTime.getSecond());
+
     }
 }
