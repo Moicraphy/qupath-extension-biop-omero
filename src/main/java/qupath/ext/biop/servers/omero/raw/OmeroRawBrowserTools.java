@@ -1,6 +1,7 @@
 package qupath.ext.biop.servers.omero.raw;
 
 import omero.RLong;
+import omero.gateway.facility.BrowseFacility;
 import omero.gateway.model.DataObject;
 import omero.gateway.model.DatasetData;
 import omero.gateway.model.ImageData;
@@ -316,25 +317,29 @@ public class OmeroRawBrowserTools {
         return OmeroRawAnnotations.getOmeroAnnotations(client, category, OmeroRawTools.readOmeroAnnotations(client, obj.getData()));
     }
 
-    public static void addContainersAsMetadataFields(OmeroRawClient client, ProjectImageEntry<BufferedImage> entry){
-        try {
-            long imageId = ((OmeroRawImageServer) (entry.readImageData().getServer())).getId();
-            Collection<? extends DataObject> datasets = OmeroRawTools.getParent(client, "Image", imageId);
+    public static void addContainersAsMetadataFields(ProjectImageEntry<BufferedImage> entry, OmeroRawObjects.OmeroRawObject obj){
 
-            if (!datasets.isEmpty()) {
-                entry.putMetadataValue("Dataset", ((DatasetData) (datasets.iterator().next())).getName());
-                long datasetId = datasets.iterator().next().getId();
-                Collection<? extends DataObject> projects = OmeroRawTools.getParent(client, "Dataset", datasetId);
-
-                if (!projects.isEmpty()) {
-                    entry.putMetadataValue("Project", ((ProjectData) (projects.iterator().next())).getName());
-                } else entry.putMetadataValue("Project", "None");
-            } else {
-                entry.putMetadataValue("Dataset", "None");
-                entry.putMetadataValue("Project", "None");
-            }
-        }catch(IOException error){
-            logger.error("Cannot add default OMERO container as metadata to QuPath for image "+ entry.getImageName());
+        switch(obj.getType()){
+            case SCREEN:
+                entry.putMetadataValue("Screen",obj.getName());
+                break;
+            case PROJECT:
+                entry.putMetadataValue("Project",obj.getName());
+                break;
+            case DATASET:
+                entry.putMetadataValue("Dataset",obj.getName());
+                addContainersAsMetadataFields(entry, obj.getParent());
+                break;
+            case PLATE:
+                entry.putMetadataValue("Plate",obj.getName());
+                addContainersAsMetadataFields(entry, obj.getParent());
+                break;
+            case WELL:
+                entry.putMetadataValue("Well",obj.getName());
+                addContainersAsMetadataFields(entry, obj.getParent());
+                break;
+            case IMAGE:
+                addContainersAsMetadataFields(entry, obj.getParent());
         }
     }
 
