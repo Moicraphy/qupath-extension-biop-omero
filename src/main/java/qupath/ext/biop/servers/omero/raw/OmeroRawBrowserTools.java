@@ -72,6 +72,7 @@ public class OmeroRawBrowserTools {
                 for(ScreenData screen : screens)
                     list.add(new OmeroRawObjects.Screen("",screen, screen.getId(), OmeroRawObjects.OmeroRawObjectType.SCREEN, parent, user, userGroup));
                 break;
+
             case PROJECT:
                 // get the current project to have access to the child datasets
                 ProjectData projectData = (ProjectData)parent.getData();
@@ -79,12 +80,7 @@ public class OmeroRawBrowserTools {
                 // if the current project has some datasets
                 if(projectData.asProject().sizeOfDatasetLinks() > 0){
                     // get dataset ids
-                    List<ProjectDatasetLink> links = projectData.asProject().copyDatasetLinks();
-                    List<Long> linksId = links.stream()
-                            .map(ProjectDatasetLink::getChild)
-                            .map(IObject::getId)
-                            .map(RLong::getValue)
-                            .collect(Collectors.toList());
+                    List<Long> linksId = projectData.getDatasets().stream().map(DatasetData::getId).collect(Collectors.toList());
 
                     // get child datasets
                     List<DatasetData> datasets = new ArrayList<>(OmeroRawTools.readOmeroDatasets(client,linksId));
@@ -100,7 +96,7 @@ public class OmeroRawBrowserTools {
                 DatasetData datasetData = (DatasetData)parent.getData();
 
                 // if the current dataset has some images
-                if(datasetData.asDataset().sizeOfImageLinks() > 0){
+                if(parent.getNChildren() > 0){
                     List<ImageData> images = new ArrayList<>();
                     List<DatasetImageLink> links = datasetData.asDataset().copyImageLinks();
 
@@ -120,51 +116,40 @@ public class OmeroRawBrowserTools {
 
                 // if the current screen has some plates
                 if(parent.getNChildren() > 0){
-                    List<ScreenPlateLink> links = screenData.asScreen().copyPlateLinks();
+                    List<Long> plateIds = screenData.getPlates().stream().map(PlateData::getId).collect(Collectors.toList());
 
-                    List<Long> linksId = links.stream()
-                            .map(ScreenPlateLink::getChild)
-                            .map(IObject::getId)
-                            .map(RLong::getValue)
-                            .collect(Collectors.toList());
-
-                    // get child plates
-                    List<PlateData> plates = new ArrayList<>(OmeroRawTools.readOmeroPlates(client,linksId));
-
+                    Collection<PlateData> plates = OmeroRawTools.readOmeroPlates(client, plateIds);
                     // build plate object
-                    for(PlateData plate : plates) {
+                    for(PlateData plate : plates)
                         list.add(new OmeroRawObjects.Plate("", plate, plate.getId(), OmeroRawObjects.OmeroRawObjectType.PLATE, parent, user, userGroup));
-                    }
                 }
                 break;
+
             case PLATE:
                 // get the current project to have access to the child datasets
                 PlateData plateData = (PlateData)parent.getData();
                 // get well for the current plate
                 Collection<WellData> wellDataList = OmeroRawTools.readOmeroWells(client, plateData.getId());
-                System.out.println("Plate wells : "+wellDataList);
-                System.out.println("parent.getNChildren() : "+parent.getNChildren());
-                if(wellDataList.size() > 0/*parent.getNChildren() > 0*/) {
-                    for(WellData well : wellDataList) {
-                        System.out.println(well);
+
+                if(parent.getNChildren() > 0) {
+                    for(WellData well : wellDataList)
                         list.add(new OmeroRawObjects.Well("", well, well.getId(), 0, OmeroRawObjects.OmeroRawObjectType.WELL, parent, user, userGroup));
-                    }
                 }
                 break;
-
 
             case WELL:
                 // get the current project to have access to the child datasets
                 WellData wellData = (WellData)parent.getData();
 
-                // if the current project has some datasets
-                if(wellData.asWell().sizeOfWellSamples() > 0) {
-                    // get child datasets
-                    for (WellSampleData wSample : wellData.getWellSamples())
-                        list.add(new OmeroRawObjects.Image("", wSample.getImage(), wSample.getImage().getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, parent, user, userGroup));
+                // if the current well has some images
+                if(parent.getNChildren() > 0) {
+                    // get child images
+                    for (WellSampleData wSample : wellData.getWellSamples()) {
+                        ImageData image = wSample.getImage();
+                        list.add(new OmeroRawObjects.Image("", image, image.getId(), OmeroRawObjects.OmeroRawObjectType.IMAGE, parent, user, userGroup));
+                    }
                 }
                 break;
-
         }
 
         return list;

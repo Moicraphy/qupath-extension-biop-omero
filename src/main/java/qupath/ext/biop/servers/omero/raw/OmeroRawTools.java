@@ -66,6 +66,7 @@ import ome.formats.importer.cli.ErrorHandler;
 import ome.formats.importer.cli.LoggingImportMonitor;
 import omero.RLong;
 import omero.ServerError;
+import omero.api.IQueryPrx;
 import omero.api.RenderingEnginePrx;
 import omero.api.ThumbnailStorePrx;
 import omero.gateway.exception.DSAccessException;
@@ -115,6 +116,7 @@ import omero.model.Line;
 import omero.model.Mask;
 import omero.model.NamedValue;
 import omero.model.Pixels;
+import omero.model.PlateI;
 import omero.model.Point;
 import omero.model.Polygon;
 import omero.model.Polyline;
@@ -126,6 +128,7 @@ import omero.model.RenderingDef;
 import omero.model.Roi;
 import omero.model.Shape;
 import omero.model.WellSample;
+import omero.sys.ParametersI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -585,14 +588,27 @@ public final class OmeroRawTools {
      * @return List of OMERO dataset objects
      */
     public static Collection<PlateData> readOmeroPlates(OmeroRawClient client, List<Long> plateIds){
+
+        String GET_PLATE_QUERY = "select p from Plate as p " +
+                "left join fetch p.wells as w " +
+                "left join fetch p.plateAcquisitions as pa " +
+                "where p.id in (:ids)";
         try {
-            return client.getGateway().getFacility(BrowseFacility.class).getPlates(client.getContext(), plateIds);
-        }catch(ExecutionException | DSOutOfServiceException e){
+            IQueryPrx qs = client.getGateway().getQueryService(client.getContext());
+            ParametersI param = new ParametersI();
+
+            param.addIds(plateIds);
+            return qs.findAllByQuery(GET_PLATE_QUERY, param).stream()
+                    .map(PlateI.class::cast)
+                    .map(PlateData::new)
+                    .collect(Collectors.toList());
+
+        }catch(DSOutOfServiceException | ServerError e){
             Dialogs.showErrorNotification("Reading plates","An error occurs when reading OMERO plates "+plateIds);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();
-        }catch (DSAccessException | NoSuchElementException e){
+        }catch (NoSuchElementException e){
             Dialogs.showErrorNotification("Reading plates","You don't have the right to access OMERO plates "+plateIds);
             logger.error("" + e);
             logger.error(getErrorStackTraceAsString(e));
