@@ -1832,7 +1832,9 @@ public final class OmeroRawTools {
         try {
             pixel = client.getGateway().getFacility(BrowseFacility.class).getImage(client.getContext(), imageId).getDefaultPixels();
         }catch(ExecutionException | DSOutOfServiceException | DSAccessException | NullPointerException e){
-            Dialogs.showErrorNotification( "Error retrieving image and pixels for thumbnail :","" +e);
+            Dialogs.showErrorNotification( "Thumbnail reading","The thumbnail of image "+imageId+" cannot be read.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
             return readLocalImage(noImageThumbnail);
         }
 
@@ -1863,7 +1865,9 @@ public final class OmeroRawTools {
             array = store.getThumbnail(rint(width), rint(height));
             store.close();
         } catch (DSOutOfServiceException | ServerError | NullPointerException e) {
-            Dialogs.showErrorNotification( "Error retrieving thumbnail :","" +e);
+            Dialogs.showErrorNotification( "Thumbnail reading","The thumbnail of image "+imageId+" cannot be read.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
             return readLocalImage(noImageThumbnail);
         }
 
@@ -1876,7 +1880,9 @@ public final class OmeroRawTools {
                     return readLocalImage(noImageThumbnail);
                 else return thumbnail;
             }catch(IOException e){
-                Dialogs.showErrorNotification( "Error converting thumbnail to bufferedImage :","" +e);
+                Dialogs.showErrorNotification( "Thumbnail reading","The thumbnail of image "+imageId+" cannot be converted to buffered image.");
+                logger.error(""+e);
+                logger.error(getErrorStackTraceAsString(e));
                 return readLocalImage(noImageThumbnail);
             }
         }
@@ -1894,7 +1900,7 @@ public final class OmeroRawTools {
         try {
             return ImageIO.read(OmeroRawTools.class.getClassLoader().getResource("images/"+imageName));
         }catch(IOException e){
-            return null;
+            return new BufferedImage(256,256, BufferedImage.TYPE_BYTE_GRAY);
         }
     }
 
