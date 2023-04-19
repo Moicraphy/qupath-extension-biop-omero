@@ -161,8 +161,8 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         // delete all previous ROIs and related tables (detection and annotations)
         if(deletePreviousExperiments) {
-            OmeroRawScripting.deletePreviousAnnotationFiles(omeroServer, tmpFileList);
-            OmeroRawScripting.deletePreviousDetectionFiles(omeroServer, tmpFileList);
+            OmeroRawScripting.deleteAnnotationFiles(omeroServer, tmpFileList);
+            OmeroRawScripting.deleteDetectionFiles(omeroServer, tmpFileList);
             OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), tmpRoiList);
         }
 

@@ -873,26 +873,65 @@ public class OmeroRawScripting {
         return hasBeenSent;
     }
 
+
+    /**
+     * Return the files as FileAnnotationData attached to the current image from OMERO.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return
+     */
+    public static List<FileAnnotationData> readFilesAttachedToCurrentImageOnOmero(OmeroRawImageServer imageServer){
+        return OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
+    }
+
     /**
      * Delete all previous version of annotation tables (OMERO and csv files) related to the current QuPath project.
-     * Files to delete are filtered according to the given table name in the list of files.
+     * Files to delete are retrieved from the corresponding image on OMERO and filtered according to the current
+     * QuPath project
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     */
+    public static void deleteAnnotationFiles(OmeroRawImageServer imageServer){
+        List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
+        String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
+        deletePreviousFileVersions(imageServer, files, name);
+    }
+
+
+    /**
+     * Delete all previous version of annotation tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the current QuPath project.
      *
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param files List of files to browse
      */
-    public static void deletePreviousAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
+    public static void deleteAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
+        deletePreviousFileVersions(imageServer, files, name);
+    }
+
+
+    /**
+     * Delete all previous version of detection tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are retrieved from the corresponding image on OMERO and filtered according to the current
+     * QuPath project
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     */
+    public static void deleteDetectionFiles(OmeroRawImageServer imageServer){
+        List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
+        String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
         deletePreviousFileVersions(imageServer, files, name);
     }
 
     /**
      * Delete all previous version of detection tables (OMERO and csv files) related to the current QuPath project.
-     * Files to delete are filtered according to the given table name in the list of files.
+     * Files to delete are filtered according to the current QuPath project.
      *
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param files List of files to browse
      */
-    public static void deletePreviousDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
+    public static void deleteDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
         deletePreviousFileVersions(imageServer, files, name);
     }
@@ -905,7 +944,7 @@ public class OmeroRawScripting {
      * @param files List of files to browse
      * @param name Table name that files name must contain to be deleted (i.e. filtering item)
      */
-    public static void deletePreviousFileVersions(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files, String name){
+    private static void deletePreviousFileVersions(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files, String name){
         if(!files.isEmpty()) {
             List<FileAnnotationData> previousTables = files.stream()
                     .filter(e -> e.getFileName().contains(name))
