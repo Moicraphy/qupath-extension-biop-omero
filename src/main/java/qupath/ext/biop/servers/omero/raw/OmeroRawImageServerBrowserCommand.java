@@ -754,6 +754,14 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
     }
 
 
+    /**
+     * If something else than an image is selected in the browser, then it lists all images contained the selected container.
+     *
+     * @param uri
+     * @param group
+     * @param owner
+     * @return List of available images in the selected container
+     */
     private List<OmeroRawObjects.OmeroRawObject> listAllImagesToImport(OmeroRawObjects.OmeroRawObject uri, OmeroRawObjects.Group group, OmeroRawObjects.Owner owner){
         switch (uri.getType()){
             case PROJECT:

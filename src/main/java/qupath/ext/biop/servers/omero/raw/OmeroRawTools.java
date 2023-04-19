@@ -238,6 +238,7 @@ public final class OmeroRawTools {
      *
      * @param client
      * @param groupId
+     * @param groupName
      * @return The specified OMERO group
      */
     public static ExperimenterGroup getOmeroGroup(OmeroRawClient client, long groupId, String groupName){
@@ -255,6 +256,8 @@ public final class OmeroRawTools {
     /**
      * get all the groups where the current user is member of
      *
+     * @param client
+     * @param userId
      * @return The list of user's OMERO groups
      */
     public static List<ExperimenterGroup> getUserOmeroGroups(OmeroRawClient client, long userId) {
@@ -273,6 +276,7 @@ public final class OmeroRawTools {
      * get all the groups on OMERO server. This functionality is reserved to Admin people. In case you are not
      * Admin, {@link #getUserOmeroGroups(OmeroRawClient client, long userId)} method is called instead.
      *
+     * @param client
      * @return The list of all groups on OMERO server
      */
     public static List<ExperimenterGroup> getAllOmeroGroups(OmeroRawClient client) {
@@ -296,6 +300,7 @@ public final class OmeroRawTools {
      * Get the default OMERO group of the specified user
      *
      * @param client
+     * @param userId
      * @return User's OMERO default group
      */
     public static ExperimenterGroup getDefaultOmeroGroup(OmeroRawClient client, long userId) {
@@ -337,6 +342,7 @@ public final class OmeroRawTools {
      * Get user's orphaned datasets from the OMERO server
      *
      * @param client the client {@link OmeroRawClient} object
+     * @param userId
      * @return List orphaned of datasets
      */
     public static Collection<DatasetData> readOmeroOrphanedDatasetsPerOwner(OmeroRawClient client, long userId) {
@@ -416,6 +422,7 @@ public final class OmeroRawTools {
      * Get user's orphaned images from the OMERO server
      *
      * @param client
+     * @param userId
      * @return List of orphaned images
      */
     public static Collection<ImageData> readOmeroOrphanedImagesPerUser(OmeroRawClient client, long userId) {
@@ -434,8 +441,8 @@ public final class OmeroRawTools {
      * returns an empty list.
      *
      * @param client
-     * @param dataType
-     * @param id
+     * @param dataType image or container denomination (no case sensitive)
+     * @param id image or container id
      * @return List of object's parent(s) or empty list
      */
     public static Collection<? extends DataObject> getParent(OmeroRawClient client, String dataType, long id){
@@ -861,6 +868,8 @@ public final class OmeroRawTools {
      *
      * @param pathObjects
      * @param ob
+     * @param client
+     * @param imageId
      * @return The corresponding OMERO.Table
      */
     public static TableData convertMeasurementTableToOmeroTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, OmeroRawClient client, long imageId) {
@@ -1321,6 +1330,7 @@ public final class OmeroRawTools {
      * Delete the specified ROIs on OMERO that are linked to an image, specified by its id.
      *
      * @param client
+     * @param roisToDelete
      */
     public static void deleteOmeroROIs(OmeroRawClient client, Collection<ROIData> roisToDelete) {
         try {
@@ -2233,6 +2243,7 @@ public final class OmeroRawTools {
      * "{@code /host/webclient/?show=image=4}" and "{@code /host/webclient/?show=image=5}".
      *
      * @param uri
+     * @param client
      * @return list
      * @throws IOException
      */

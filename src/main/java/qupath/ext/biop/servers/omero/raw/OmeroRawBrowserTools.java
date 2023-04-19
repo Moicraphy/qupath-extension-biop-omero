@@ -30,13 +30,12 @@ public class OmeroRawBrowserTools {
     final private static Logger logger = LoggerFactory.getLogger(OmeroRawBrowserTools.class);
 
     /**
-     * Get all the OMERO objects (inside the parent Id) present in the OMERO server with the specified
-     * URI.
-     * <p>
-     * No orphaned {@code OmeroRawObject} will be fetched.
+     * Get all the child OMERO objects present in the OMERO server with the specified parent.
      *
      * @param client
      * @param parent
+     * @param group
+     * @param owner
      * @return list of OmeroRawObjects
      */
     public static List<OmeroRawObjects.OmeroRawObject> readOmeroObjectsItems(OmeroRawObjects.OmeroRawObject parent, OmeroRawClient client,
@@ -162,7 +161,7 @@ public class OmeroRawBrowserTools {
 
 
     /**
-     * build an {@link OmeroRawObjects.Owner} object based on the OMERO {@link Experimenter} user
+     * Build an {@link OmeroRawObjects.Owner} object based on the OMERO {@link Experimenter} user
      *
      * @param user
      * @return
@@ -178,7 +177,7 @@ public class OmeroRawBrowserTools {
     }
 
     /**
-     * return the {@link OmeroRawObjects.Owner} object corresponding to the logged-in user on the current OMERO session
+     * Return the {@link OmeroRawObjects.Owner} object corresponding to the logged-in user on the current OMERO session
      *
      * @param client
      * @return
@@ -189,7 +188,7 @@ public class OmeroRawBrowserTools {
 
 
     /**
-     * return the group object corresponding to the default group attributed to the logged in user
+     * Return the group object corresponding to the default group attributed to the logged in user
      * @param client
      * @return
      */
@@ -199,10 +198,10 @@ public class OmeroRawBrowserTools {
     }
 
     /**
-     * return a map of available groups with its attached users.
+     * Return a map of available groups with its attached users.
      *
      * @param client
-     * @return
+     * @return available groups for the current user
      */
     public static Map<OmeroRawObjects.Group,List<OmeroRawObjects.Owner>> getGroupUsersMapAvailableForCurrentUser(OmeroRawClient client) {
         // final map
@@ -241,7 +240,7 @@ public class OmeroRawBrowserTools {
 
 
     /**
-     * get all the orphaned images from the server for a certain user as list of {@link OmeroRawObjects.OmeroRawObject}
+     * Get all the orphaned images from the server for a certain user as list of {@link OmeroRawObjects.OmeroRawObject}
      *
      * @param client
      * @param group
@@ -280,6 +279,12 @@ public class OmeroRawBrowserTools {
         return OmeroRawAnnotations.getOmeroAnnotations(client, category, OmeroRawTools.readOmeroAnnotations(client, obj.getData()));
     }
 
+    /**
+     * Adds the OMERO object hierarchy as QuPath metadata fields
+     *
+     * @param entry current QuPath entry
+     * @param obj OMERO object to read the hierarchy from
+     */
     public static void addContainersAsMetadataFields(ProjectImageEntry<BufferedImage> entry, OmeroRawObjects.OmeroRawObject obj){
 
         switch(obj.getType()){
