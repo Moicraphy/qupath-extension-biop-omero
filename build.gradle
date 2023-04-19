@@ -11,7 +11,7 @@ archivesBaseName = 'qupath-extension-biop-omero'
 description = "QuPath extension to support image reading using OMERO's Java API."
 
 group = "ch.epfl.biop"
-version = "0.4.0"
+version = "0.4.1-SNAPSHOT"
 
 repositories {
 //  mavenLocal()
