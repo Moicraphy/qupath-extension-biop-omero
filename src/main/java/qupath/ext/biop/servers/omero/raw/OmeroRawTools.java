@@ -473,7 +473,12 @@ public final class OmeroRawTools {
                     }else{
                         logger.info("The current image " + id + " has a well as parent");
 
-                        List<Long> ids = image.copyWellSamples().stream()
+                        List<IObject> wellSamplesObjects = client.getGateway()
+                                .getQueryService(client.getContext())
+                                .findAllByQuery("select ws from WellSample ws where image=" + id, null);
+
+                        List<Long> ids = wellSamplesObjects.stream()
+                                .map(WellSample.class::cast)
                                 .map(WellSample::getWell)
                                 .map(IObject::getId)
                                 .map(RLong::getValue)
