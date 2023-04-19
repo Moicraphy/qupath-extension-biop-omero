@@ -40,8 +40,8 @@ import java.util.stream.Collectors;
 
 public class OmeroRawScripting {
 
-    private static final String detectionFileBaseName = "QP detection table_"+QPEx.getQuPath().getProject().getName().split("/")[0];
-    private static final String annotationFileBaseName = "QP annotation table_"+QPEx.getQuPath().getProject().getName().split("/")[0];
+    private static final String detectionFileBaseName = "QP detection table";
+    private static final String annotationFileBaseName = "QP annotation table";
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawScripting.class);
 
 
@@ -727,7 +727,9 @@ public class OmeroRawScripting {
      */
     public static boolean sendAnnotationMeasurementTable(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the table name
-        String name = annotationFileBaseName + "_" + OmeroRawTools.getCurrentDateAndHour();
+        String name = annotationFileBaseName + "_" +
+                QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
+                OmeroRawTools.getCurrentDateAndHour();
         return sendMeasurementTableToOmero(annotationObjects, imageServer, imageData, name);
     }
 
@@ -753,7 +755,9 @@ public class OmeroRawScripting {
      */
     public static boolean sendDetectionMeasurementTable(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the table name
-        String name = detectionFileBaseName + "_" + OmeroRawTools.getCurrentDateAndHour();
+        String name = detectionFileBaseName + "_" +
+                QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
+                OmeroRawTools.getCurrentDateAndHour();
         return sendMeasurementTableToOmero(detectionObjects, imageServer, imageData, name);
     }
 
@@ -780,7 +784,9 @@ public class OmeroRawScripting {
      */
     public static boolean sendAnnotationMeasurementTableAsCSV(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the file name
-        String name = annotationFileBaseName + "_" + OmeroRawTools.getCurrentDateAndHour();
+        String name = annotationFileBaseName + "_" +
+                QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
+                OmeroRawTools.getCurrentDateAndHour();
         return sendMeasurementTableAsCSVToOmero(annotationObjects, imageServer, imageData, name);
     }
 
@@ -807,7 +813,9 @@ public class OmeroRawScripting {
      */
     public static boolean sendDetectionMeasurementTableAsCSV(Collection<PathObject> detectionObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData){
         // set the file name
-        String name = detectionFileBaseName + "_" + OmeroRawTools.getCurrentDateAndHour();
+        String name = detectionFileBaseName + "_" +
+                QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
+                OmeroRawTools.getCurrentDateAndHour();
         return sendMeasurementTableAsCSVToOmero(detectionObjects, imageServer, imageData, name);
     }
 
@@ -873,7 +881,8 @@ public class OmeroRawScripting {
      * @param files List of files to browse
      */
     public static void deletePreviousAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
-        deletePreviousFileVersions(imageServer, files, annotationFileBaseName);
+        String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
+        deletePreviousFileVersions(imageServer, files, name);
     }
 
     /**
@@ -884,7 +893,8 @@ public class OmeroRawScripting {
      * @param files List of files to browse
      */
     public static void deletePreviousDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
-        deletePreviousFileVersions(imageServer, files, detectionFileBaseName);
+        String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
+        deletePreviousFileVersions(imageServer, files, name);
     }
 
     /**
