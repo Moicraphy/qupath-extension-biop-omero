@@ -1,5 +1,6 @@
 package qupath.ext.biop.servers.omero.raw;
 
+import javafx.geometry.Pos;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
@@ -9,11 +10,10 @@ import qupath.lib.images.servers.ImageServer;
 
 import java.awt.image.BufferedImage;
 
-public class OmeroRawImportViewSettingsCommand implements Runnable{
-
-    private final String title = "Import view settings from OMERO";
+public class OmeroRawWriteChannelSettingsCommand implements Runnable {
+    private final String title = "Sending image & channels settings";
     private final QuPathGUI qupath;
-    public OmeroRawImportViewSettingsCommand(QuPathGUI qupath)  {
+    public OmeroRawWriteChannelSettingsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }
 
@@ -29,8 +29,11 @@ public class OmeroRawImportViewSettingsCommand implements Runnable{
             return;
         }
 
-        // build the GUI for view settings options
+        // build the GUI for import options
         GridPane pane = new GridPane();
+
+        CheckBox cbImageName = new CheckBox("Image name");
+        cbImageName.setSelected(false);
 
         CheckBox cbChannelNames = new CheckBox("Channel names");
         cbChannelNames.setSelected(false);
@@ -42,31 +45,39 @@ public class OmeroRawImportViewSettingsCommand implements Runnable{
         cbChannelColor.setSelected(false);
 
         int row = 0;
-        pane.add(new Label("Select view settings options"), 0, row++, 2, 1);
+        pane.add(cbImageName, 0, row++);
+        Label label = new Label("------ Only for fluorescence images ------");
+        label.setAlignment(Pos.CENTER);
+        pane.add(label, 0, row++, 2, 1);
         pane.add(cbChannelNames, 0, row++);
         pane.add(cbChannelDisplayRange, 0, row++);
         pane.add(cbChannelColor, 0, row);
 
         pane.setHgap(5);
-        pane.setVgap(5);
+        pane.setVgap(10);
 
         if (!Dialogs.showConfirmDialog(title, pane))
             return;
 
         // get user choice
+        boolean imageName = cbImageName.isSelected();
         boolean channelNames = cbChannelNames.isSelected();
         boolean channelDisplayRange = cbChannelDisplayRange.isSelected();
         boolean channelColor = cbChannelColor.isSelected();
 
-        // set OMERO display settings on QuPath image
+        boolean wasSaved = true;
+
+        // send display settings to OMERO
+        if(imageName)
+            wasSaved = OmeroRawScripting.sendImageNameToOmero((OmeroRawImageServer)imageServer);
         if(channelDisplayRange)
-            OmeroRawScripting.setChannelsDisplayRangeFromOmeroChannel((OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendChannelsDisplayRangeToOmero((OmeroRawImageServer)imageServer);
         if(channelColor)
-            OmeroRawScripting.setChannelsColorFromOmeroChannel((OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendChannelsColorToOmero((OmeroRawImageServer)imageServer);
         if(channelNames)
-            OmeroRawScripting.setChannelsNameFromOmeroChannel((OmeroRawImageServer)imageServer);
+            wasSaved = OmeroRawScripting.sendChannelsNameToOmero((OmeroRawImageServer)imageServer);
 
-        Dialogs.showInfoNotification("View settings import","View settings successfully set the current image");
+        if(wasSaved)
+            Dialogs.showInfoNotification(" Image update successfully", "Image & channels settings have been successfully updated");
     }
-
 }
