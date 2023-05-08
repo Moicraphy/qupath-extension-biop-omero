@@ -1,12 +1,15 @@
-# QuPath OMERO extension
+# QuPath BIOP-OMERO extension
 
-Welcome to the OMERO extension for [QuPath](http://qupath.github.io)!
+Welcome to the BIOP-OMERO extension for [QuPath](http://qupath.github.io)!
 
 This adds support for accessing images hosted on an [OMERO](https://www.openmicroscopy.org/omero/) 
 server through OMERO-ICE API.
 
 The extension is intended for QuPath v0.4 (at the time of writing).
 It is not compatible with earlier QuPath versions. However, the 0.2.0 version of this extension is the last compatible one with QuPath 0.3.2.
+
+## Documentation
+You can find all the documentation on how to use this extension on our [wiki page](https://wiki-biop.epfl.ch/en/Image_Storage/OMERO/OmeroQuPath).
 
 ## Installing
 
@@ -34,6 +37,3 @@ gradlew clean build
 
 The output will be under `build/libs`.
 You can drag the jar file on top of QuPath to install the extension.
-
-## Documentation
-You can find all the documentation on how to use this extension on our [wiki page](https://wiki-biop.epfl.ch/en/Image_Storage/OMERO/OmeroQuPath).
