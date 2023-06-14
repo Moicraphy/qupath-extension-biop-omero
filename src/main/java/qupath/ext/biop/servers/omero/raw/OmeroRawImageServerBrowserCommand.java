@@ -672,18 +672,15 @@ public class OmeroRawImageServerBrowserCommand implements Runnable {
 
             // filter newly imported images
             afterImport.removeAll(beforeImport);
-
             for(ProjectImageEntry<BufferedImage> entry : afterImport) {
-                    Optional<OmeroRawObjects.OmeroRawObject> optObj = validObjs.stream()
-                            .filter(obj -> {
-                                try {
-                                    return obj.getId() == ((OmeroRawImageServer) entry.readImageData().getServer()).getId();
-                                }catch(IOException ex){
-                                    return false;
-                                }
-                            })
+
+                String[] query = entry.getServerBuilder().getURIs().iterator().next().getQuery().split("-");
+                long id = Long.parseLong(query[query.length-1]);
+
+                Optional<OmeroRawObjects.OmeroRawObject> optObj = validObjs.stream()
+                            .filter(obj -> obj.getId() == id)
                             .findFirst();
-                    optObj.ifPresent(omeroRawObject -> OmeroRawBrowserTools.addContainersAsMetadataFields(entry, omeroRawObject));
+                optObj.ifPresent(omeroRawObject -> OmeroRawBrowserTools.addContainersAsMetadataFields(entry, omeroRawObject));
             }
         });
 

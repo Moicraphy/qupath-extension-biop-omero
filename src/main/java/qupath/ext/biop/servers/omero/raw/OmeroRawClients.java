@@ -150,8 +150,9 @@ public class OmeroRawClients {
 	public static OmeroRawClient createClientAndLogin(URI serverURI) throws IOException, URISyntaxException {
 		OmeroRawClient client = OmeroRawClient.create(serverURI);
 		boolean loggedIn = true;
-		if (!client.checkIfLoggedIn())
+		if (!client.checkIfLoggedIn()) {
 			loggedIn = client.logIn();
+		}
 		
 		if (!loggedIn)
 			return null;

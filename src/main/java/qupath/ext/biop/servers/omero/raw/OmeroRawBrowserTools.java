@@ -286,7 +286,6 @@ public class OmeroRawBrowserTools {
      * @param obj OMERO object to read the hierarchy from
      */
     public static void addContainersAsMetadataFields(ProjectImageEntry<BufferedImage> entry, OmeroRawObjects.OmeroRawObject obj){
-
         switch(obj.getType()){
             case SCREEN:
                 entry.putMetadataValue("Screen",obj.getName());
@@ -308,6 +307,8 @@ public class OmeroRawBrowserTools {
                 break;
             case IMAGE:
                 addContainersAsMetadataFields(entry, obj.getParent());
+            default:
+                    break;
         }
     }
 
