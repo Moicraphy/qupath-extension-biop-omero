@@ -62,6 +62,7 @@ import qupath.lib.images.servers.PixelType;
 import qupath.lib.images.servers.TileRequest;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectReader;
+import qupath.lib.regions.RegionRequest;
 
 import java.awt.image.BandedSampleModel;
 import java.awt.image.BufferedImage;
@@ -725,7 +726,35 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				uri,
 				args);
 	}
-	
+
+	/**
+	 * Overridden method to generate a thumbnail even if it cannot be read from OMERO
+	 * Code adapted from {@link qupath.lib.images.servers.AbstractImageServer}
+	 *
+	 * @param z
+	 * @param t
+	 * @return
+	 * @throws IOException
+	 */
+	@Override
+	public BufferedImage getDefaultThumbnail(int z, int t) throws IOException {
+		int ind = nResolutions() - 1;
+		double targetDownsample = Math.sqrt(getWidth() / 1024.0 * getHeight() / 1024.0);
+		double[] downsamples = getPreferredDownsamples();
+		while (ind > 0 && downsamples[ind-1] >= targetDownsample)
+			ind--;
+		double downsample = downsamples[ind];
+		RegionRequest request = RegionRequest.createInstance(getPath(), downsample, 0, 0, getWidth(), getHeight(), z, t);
+
+		//TODO Find a way to read correctly the thumbnail from OMERO (for RGB considered images in QP => seems to be the issue)
+		BufferedImage bf = readRegion(request);
+		if(isRGB() && bf.getType() == BufferedImage.TYPE_CUSTOM){
+			logger.info("Cannot read thumbnail of OMERO image ; generate default black thumbnail instead");
+			return new BufferedImage(256,256, BufferedImage.TYPE_BYTE_GRAY);
+		}
+		return bf;
+	}
+
 	/**
 	 * Return the preferred tile width of this {@code ImageServer}.
 	 * @return preferredTileWidth
@@ -952,9 +981,12 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 */
 			synchronized LocalReaderWrapper getPrimaryReaderWrapper(final Long pixelsID, OmeroRawClient client) throws ServerError, DSOutOfServiceException, URISyntaxException, IOException {
 				/*for (LocalReaderWrapper wrapper : primaryReaders) {
-					if (pixelsID.equals(wrapper.getReader().getPixelsId()))
+					if (pixelsID.equals(wrapper.getReader().getPixelsId())) {
+						System.out.println("Get reader "+pixelsID);
 						return wrapper;
+					}
 				}*/
+				logger.info("Create new OMERO reader for pixel ID : "+pixelsID);
 				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client);
 				primaryReaders.add(reader);
 				return reader;
