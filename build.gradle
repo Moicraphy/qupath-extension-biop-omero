@@ -75,7 +75,7 @@ dependencies {
         simple-omero-client-x.x.x.jar
      and copy these file the folder : File:\qupath\maven\repo\fr\igred\simple-omero-client\x.x.x\
     */
-    implementation "fr.igred:simple-omero-client:5.12.3"
+    implementation "fr.igred:simple-omero-client:5.14.0"
 }
 
 processResources {

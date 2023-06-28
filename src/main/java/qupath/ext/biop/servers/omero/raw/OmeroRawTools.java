@@ -2102,17 +2102,25 @@ public final class OmeroRawTools {
 
         // get thumbnail
         byte[] array;
+        ThumbnailStorePrx store = null;
         try {
-            ThumbnailStorePrx store = client.getGateway().getThumbnailService(client.getContext());
+            store = client.getGateway().getThumbnailService(client.getContext());
             store.setPixelsId(pixel.getId());
             store.setRenderingDefId(renderingSettings.getId().getValue());
             array = store.getThumbnail(rint(width), rint(height));
-            store.close();
         } catch (DSOutOfServiceException | ServerError | NullPointerException e) {
             Dialogs.showErrorNotification( "Thumbnail reading","The thumbnail of image "+imageId+" cannot be read.");
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
             return readLocalImage(noImageThumbnail);
+        } finally {
+            if(store != null){
+                try{
+                    store.close();
+                } catch (ServerError s) {
+
+                }
+            }
         }
 
         // convert thumbnail into BufferedImage

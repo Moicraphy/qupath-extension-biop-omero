@@ -746,13 +746,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		double downsample = downsamples[ind];
 		RegionRequest request = RegionRequest.createInstance(getPath(), downsample, 0, 0, getWidth(), getHeight(), z, t);
 
-		//TODO Find a way to read correctly the thumbnail from OMERO (for RGB considered images in QP => seems to be the issue)
 		BufferedImage bf = readRegion(request);
 		if(isRGB() && bf.getType() == BufferedImage.TYPE_CUSTOM){
-			logger.info("Cannot read thumbnail of OMERO image ; generate default black thumbnail instead");
-			return new BufferedImage(256,256, BufferedImage.TYPE_BYTE_GRAY);
+			logger.info("Cannot create default thumbnail ; try to get it from OMERO");
+			return OmeroRawTools.getThumbnail(getClient(), getId(), 256);
 		}
 		return bf;
+
 	}
 
 	/**
@@ -829,6 +829,13 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				client.getUsername().equals(((OmeroRawImageServer)obj).getClient().getUsername());
 	}
 
+	@Override
+	public void close() throws Exception {
+		super.close();
+		System.out.println("Close reader for "+this.getId());
+		readerWrapper.getReader().close();
+	}
+
 	/**
 	 * Retrieve any ROIs stored with this image as annotation objects.
 	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
@@ -896,7 +903,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			/**
 			 * A set of primary readers, to avoid needing to regenerate these for all servers.
 			 */
-			private static final Set<LocalReaderWrapper> primaryReaders = Collections.newSetFromMap(new WeakHashMap<>());
+			//private static final Set<LocalReaderWrapper> primaryReaders = Collections.newSetFromMap(new WeakHashMap<>());
 
 			/**
 			 * Set of created temp memo files
@@ -988,7 +995,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 				}*/
 				logger.info("Create new OMERO reader for pixel ID : "+pixelsID);
 				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client);
-				primaryReaders.add(reader);
+				//primaryReaders.add(reader);
 				return reader;
 			}
 
