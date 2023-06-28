@@ -832,8 +832,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	@Override
 	public void close() throws Exception {
 		super.close();
-		System.out.println("Close reader for "+this.getId());
 		readerWrapper.getReader().close();
+		logger.info("Close OMERO reader for image ID : "+this.getId());
 	}
 
 	/**
@@ -993,7 +993,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 						return wrapper;
 					}
 				}*/
-				logger.info("Create new OMERO reader for pixel ID : "+pixelsID);
+
 				LocalReaderWrapper reader = createPrimaryReader( pixelsID, null, client);
 				//primaryReaders.add(reader);
 				return reader;
@@ -1009,6 +1009,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 			 * @throws IOException
 			 */
 			private synchronized LocalReaderWrapper createReader(final Long imageID, final MetadataStore store, OmeroRawClient client) throws DSOutOfServiceException, URISyntaxException, MalformedURLException, ServerError {
+				logger.info("Create new OMERO reader for image ID : "+imageID);
 				OmeroRawClient currentClient = client;
 
 				// read the image with the current client, connected to the current group
