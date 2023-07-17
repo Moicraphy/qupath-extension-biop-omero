@@ -937,6 +937,18 @@ public class OmeroRawScripting {
     }
 
     /**
+     * Delete all previous version of a file, identified by the name given in parameters. This name may or may not be the
+     * full name of the files to delete.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param name contained in the table/file name to delete (i.e. filtering item). It may be a part of the full table/file name
+     */
+    public static void deleteFilesOnOmero(OmeroRawImageServer imageServer, String name){
+        List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
+        deletePreviousFileVersions(imageServer, files, name);
+    }
+
+    /**
      * Delete all previous version of tables (OMERO and csv files) related to the current QuPath project.
      * Files to delete are filtered according to the given table name in the list of files.
      *

@@ -56,10 +56,10 @@ dependencies {
 
     implementation "com.zeroc:glacier2:3.6.5"
     implementation "com.zeroc:ice:3.6.5"
-    implementation "org.openmicroscopy:ome-xml:6.1.0"
-    implementation "org.openmicroscopy:omero-blitz:5.5.8"
-    implementation "org.openmicroscopy:omero-gateway:5.6.5"
-    implementation "org.openmicroscopy:omero-model:5.6.0"
+    implementation "org.openmicroscopy:ome-xml:6.3.3" //6.3.3//6.1.0
+    implementation "org.openmicroscopy:omero-blitz:5.6.2" //5.6.2 //5.5.8
+    implementation "org.openmicroscopy:omero-gateway:5.8.0" //5.8.0 //5.6.5
+    implementation "org.openmicroscopy:omero-model:5.6.10" //5.6.10 //5.6.0
     implementation "info.picocli:picocli:4.3.2"
 
     /*
