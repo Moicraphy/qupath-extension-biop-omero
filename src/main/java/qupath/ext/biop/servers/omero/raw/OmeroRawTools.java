@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -56,6 +57,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import javafx.scene.effect.Bloom;
 import loci.formats.in.DefaultMetadataOptions;
 import loci.formats.in.MetadataLevel;
 import ome.formats.OMEROMetadataStoreClient;
@@ -148,8 +150,10 @@ import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.io.GsonTools;
 import qupath.lib.objects.PathObject;
 import qupath.lib.roi.interfaces.ROI;
+import qupath.lib.scripting.QP;
 
 import javax.imageio.ImageIO;
+import javax.xml.crypto.Data;
 
 import static omero.rtypes.rint;
 
@@ -957,6 +961,35 @@ public final class OmeroRawTools {
     }
 
     /**
+     * Send an OMERO.table to OMERO server and attach it to the image specified by its ID.
+     *
+     * @param table OMERO.table
+     * @param name table name
+     * @param client
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
+     */
+    public static boolean addTableToOmero(TableData table, String name, OmeroRawClient client, DataObject container) {
+        boolean wasAdded = true;
+        try{
+            // attach the omero.table to the image
+            client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(), container, name, table);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Table Saving","Error during saving table on OMERO.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            wasAdded = false;
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Table Saving","You don't have the right to add a table on OMERO for "
+                    + container.getClass().getName()+" id " +container.getId());
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            wasAdded = false;
+        }
+        return wasAdded;
+    }
+
+    /**
      * Send an attachment to OMERO server and attached it to an image specified by its ID.
      *
      * @param file
@@ -1015,6 +1048,61 @@ public final class OmeroRawTools {
         }
         return wasAdded;
     }
+
+
+
+    /**
+     * Send an attachment to OMERO server and attached it to an image specified by its ID.
+     *
+     * @param file
+     * @param client
+     * @param obj
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
+     */
+    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj) {
+        return addAttachmentToOmero(file, client, obj, null,"");
+    }
+
+    /**
+     *  Send an attachment to OMERO server and attached it to an image specified by its ID.
+     *  You can specify the mimetype of the file.
+     *
+     * @param file
+     * @param client
+     * @param obj
+     * @param miemtype
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
+     */
+    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj, String miemtype) {
+        return addAttachmentToOmero(file, client, obj, miemtype,"");
+    }
+
+    /**
+     * Send an attachment to OMERO server and attached it to an image specified by its ID, specifying the mimetype and
+     * a description of what the file is and how it works.
+     *
+     * @param file
+     * @param client
+     * @param obj
+     * @param miemtype
+     * @param description
+     * @return Sending status (True if sent and attached ; false with error message otherwise)
+     */
+    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj, String miemtype, String description) {
+        boolean wasAdded = true;
+        try{
+            // attach the omero.table to the image
+            client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, miemtype, description, file.getName(), obj).get();
+
+        } catch (ExecutionException | InterruptedException e){
+            Dialogs.showErrorNotification("File Saving","Error during saving file on OMERO.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            wasAdded = false;
+        }
+        return wasAdded;
+    }
+
 
 
     /**
@@ -1284,27 +1372,101 @@ public final class OmeroRawTools {
             tableString.delete(tableString.lastIndexOf(","),tableString.lastIndexOf(","));
             tableString.append("\n");
         }
-
-        // create the file locally
-        File file = new File(path + File.separator + name + ".csv");
-
-       try {
-           // write the file
-           BufferedWriter buffer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8));
-           buffer.write(tableString + "\n");
-
-           // close the file
-           buffer.close();
-
-       } catch (IOException e) {
-           Dialogs.showErrorNotification("Write CSV file", "An error has occurred when trying to save the csv file");
-           logger.error("" + e);
-           logger.error(getErrorStackTraceAsString(e));
-       }
-
-       return file;
+        String filename = QP.buildFilePath(QP.PROJECT_BASE_DIR, name + ".csv");
+        return UtilityTools.createAndSaveFile(filename, tableString.toString());
     }
 
+
+    public static File buildCSVFileFromListsOfStrings(LinkedHashMap<String, List<String>> parentTable, String name){
+        StringBuilder csvContent = new StringBuilder();
+        List<String> headers = new ArrayList<>(parentTable.keySet());
+        if(!headers.isEmpty()) {
+            int nRows = parentTable.get(headers.get(0)).size();
+
+            // add the headers
+            headers.forEach(item -> csvContent.append(item.replace(GeneralTools.micrometerSymbol(), "um").replace(UtilityTools.numericValueIdentifier, "")).append(","));
+            csvContent.delete(csvContent.lastIndexOf(","), csvContent.lastIndexOf(","));
+            csvContent.append("\n");
+
+            // add the table
+            for (int i = 0; i < nRows; i++) {
+                for (String header : parentTable.keySet()) {
+                    String item = parentTable.get(header).get(i);
+                    csvContent.append(item.replace(UtilityTools.numericValueIdentifier, "")).append(",");
+                }
+                csvContent.delete(csvContent.lastIndexOf(","), csvContent.lastIndexOf(","));
+                csvContent.append("\n");
+            }
+
+        } else {
+            logger.warn("Build CSV file from list of string -- There is no measurement to add. Write an empty file");
+        }
+
+        String path = QP.buildFilePath(QP.PROJECT_BASE_DIR, name + ".csv");
+        return UtilityTools.createAndSaveFile(path, csvContent.toString());
+    }
+
+    public static TableData buildOmeroTableFromListsOfStrings(LinkedHashMap<String, List<String>> parentTable, OmeroRawClient client){
+        List<TableDataColumn> columns = new ArrayList<>();
+        List<List<Object>> measurements = new ArrayList<>();
+
+        List<String> headers = new ArrayList<>(parentTable.keySet());
+        if(headers.isEmpty()) {
+            new TableData(columns, measurements);
+        }
+
+        int nRows = parentTable.get(headers.get(0)).size();
+        int c = 0;
+
+        // feature name ; here, the ImageData object is treated differently
+        columns.add(new TableDataColumn("Image", c++, ImageData.class));
+
+        // add all ImageData in the first column (read image from OMERO only once)
+        Map<String, ImageData> mapImages = new HashMap<>();
+        List<Object> imageDataField = new ArrayList<>();
+        for (String item : parentTable.get(UtilityTools.imageIDHeaderSummaryTable)) {
+            if(mapImages.containsKey(item)){
+                imageDataField.add(mapImages.get(item));
+            }else {
+                ImageData imageData = OmeroRawTools.readOmeroImage(client, Long.parseLong(item.replace(UtilityTools.numericValueIdentifier, "")));
+                imageDataField.add(imageData);
+                mapImages.put(item, imageData);
+            }
+        }
+        measurements.add(imageDataField);
+
+        // get the table
+        for (String header : parentTable.keySet()) {
+            if(header.equals(UtilityTools.imageIDHeaderSummaryTable))
+                continue;
+
+            List<String> col = parentTable.get(header);
+            // for OMERO.Table compatibility
+            header = header.replace("Image", "Label");
+            if (header.contains(UtilityTools.numericValueIdentifier)) {
+                // feature name
+                columns.add(new TableDataColumn(header.replace(GeneralTools.micrometerSymbol(),"um")
+                        .replace(UtilityTools.numericValueIdentifier,"")
+                        .replace("/","-"), c++, Double.class)); // OMERO table does not support "/" and remove "mu" character
+
+                //feature value => fill the entire column
+                List<Object> feature = new ArrayList<>();
+                for (String item : col) {
+                    feature.add(Double.parseDouble(item.replace(UtilityTools.numericValueIdentifier,"")));
+                }
+                measurements.add(feature);
+            } else {
+                // feature name
+                columns.add(new TableDataColumn(header.replace(GeneralTools.micrometerSymbol(),"um")
+                        .replace("/","-"), c++, String.class)); // OMERO table does not support "/" and remove "mu" character
+
+                //feature value => fill the entire column
+                List<Object> feature = new ArrayList<>(col);
+                measurements.add(feature);
+            }
+        }
+        return new TableData(columns, measurements);
+    }
 
     /**
      * Delete all existing ROIs on OMERO that are linked to an image, specified by its id.
@@ -1717,6 +1879,41 @@ public final class OmeroRawTools {
             return Collections.emptyList();
         } catch (DSAccessException e){
             Dialogs.showErrorNotification("Attachment reading","You don't have the right to read attachments on OMERO for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+
+        // filter attachments
+        return annotations.stream()
+                .filter(FileAnnotationData.class::isInstance)
+                .map(FileAnnotationData.class::cast)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get attachments from OMERO server attached to the specified image.
+     *
+     * @param client
+     * @param parent
+     * @return Sending status (True if retrieved ; false with error message otherwise)
+     */
+    public static List<FileAnnotationData> readAttachments(OmeroRawClient client, DataObject parent) {
+        List<AnnotationData> annotations;
+        try{
+            // get annotations
+            List<Class<? extends AnnotationData>> types = Collections.singletonList(FileAnnotationData.class);
+            annotations = client.getGateway().getFacility(MetadataFacility.class).getAnnotations(client.getContext(), parent, types, null);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Attachment reading",
+                    "Cannot read attachment from "+parent.getClass().getName()+" id "+parent.getId());
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Attachment reading",
+                    "You don't have the right to read attachments on OMERO for "+parent.getClass().getName()+" id "+parent.getId());
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
             return Collections.emptyList();

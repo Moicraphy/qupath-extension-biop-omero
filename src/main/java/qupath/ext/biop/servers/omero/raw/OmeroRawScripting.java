@@ -5,6 +5,7 @@ import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
 
 import omero.gateway.model.ChannelData;
+import omero.gateway.model.DataObject;
 import omero.gateway.model.FileAnnotationData;
 import omero.gateway.model.MapAnnotationData;
 import omero.gateway.model.ROIData;
@@ -34,6 +35,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,6 +44,7 @@ public class OmeroRawScripting {
 
     private static final String detectionFileBaseName = "QP detection table";
     private static final String annotationFileBaseName = "QP annotation table";
+    private static final String summaryFileBaseName = "QP summary table";
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawScripting.class);
 
 
@@ -674,7 +677,7 @@ public class OmeroRawScripting {
         if(deletePreviousTable){
             Collection<FileAnnotationData> tables = OmeroRawTools.readTables(client, imageId);
             boolean hasBeenSent = OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
-            deletePreviousFileVersions(imageServer, tables, tableName.substring(0, tableName.lastIndexOf("_")));
+            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")));
 
             return hasBeenSent;
         } else
@@ -831,7 +834,8 @@ public class OmeroRawScripting {
      * @param deletePreviousTable Delete or not all previous versions of csv measurements tables
      * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
-    private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename, boolean deletePreviousTable){
+    private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
+                                                            ImageData<BufferedImage> imageData, String filename, boolean deletePreviousTable){
         // get the measurement table
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
         ob.setImageData(imageData, pathObjects);
@@ -850,7 +854,7 @@ public class OmeroRawScripting {
             if (deletePreviousTable) {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, imageId);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(file, client, imageId);
-                deletePreviousFileVersions(imageServer, attachments, filename.substring(0,filename.lastIndexOf("_")));
+                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
 
             } else
                 // add the csv file to OMERO
@@ -859,6 +863,113 @@ public class OmeroRawScripting {
             // delete the temporary file
             file.delete();
         }
+        return hasBeenSent;
+    }
+
+
+    public static void addMeasurementsToParentTable(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
+                                             ImageData<BufferedImage> imageData, LinkedHashMap<String, List<String>> parentTable){
+        // get the measurement table
+        ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
+        ob.setImageData(imageData, pathObjects);
+
+        int headersSize = parentTable.keySet().size();
+        if(headersSize == 0){
+            // building the first measurement
+            parentTable.put(UtilityTools.imageIDHeaderSummaryTable, new ArrayList<>());
+
+            for(String header : ob.getAllNames()){
+                if(ob.isNumericMeasurement(header))
+                    parentTable.put(UtilityTools.numericValueIdentifier + header, new ArrayList<>());
+                else
+                    parentTable.put(header, new ArrayList<>());
+            }
+        } else if(headersSize != (ob.getAllNames().size() + 1)){
+            Dialogs.showWarningNotification("Parent Table - Compatibility issue","Size of headers ("+ob.getAllNames().size()+
+                    ") is different from existing table size ("+headersSize+"). Parent table is not populated");
+            return;
+        }
+
+        long imageId = imageServer.getId();
+
+        // for all annotations = rows
+        for (PathObject pathObject : pathObjects) {
+            // add image id
+            parentTable.get(UtilityTools.imageIDHeaderSummaryTable).add(UtilityTools.numericValueIdentifier + imageId);
+            // get table headers
+            List<String> tableHeaders = new ArrayList<>(parentTable.keySet());
+            // for each column
+            for (int i = 1; i < tableHeaders.size(); i++) {
+                String col = tableHeaders.get(i);
+                List<String> listedValues = parentTable.get(col);
+
+                if(listedValues == null){
+                    Dialogs.showErrorNotification("Parent Table - Compatibility issue","There is no columns named "+col);
+                    throw new RuntimeException();
+                }
+
+                if (col.contains(UtilityTools.numericValueIdentifier)){
+                    parentTable.get(col).add(UtilityTools.numericValueIdentifier +
+                            ob.getNumericValue(pathObject, col.replace(UtilityTools.numericValueIdentifier,"")));
+                } else {
+                    parentTable.get(col).add(""+ob.getStringValue(pathObject, col)); // need to keep the empty space because of null values
+                }
+            }
+        }
+    }
+
+    public static boolean sendParentMeasurementTableAsCSV(LinkedHashMap<String, List<String>> parentTable,
+                                                          OmeroRawClient client, DataObject parent,
+                                                          boolean deletePreviousTable){
+
+        // set the file name
+        String filename = summaryFileBaseName + "_" +
+                QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
+                OmeroRawTools.getCurrentDateAndHour();
+
+        File parentCSVFile = OmeroRawTools.buildCSVFileFromListsOfStrings(parentTable, filename);
+
+        boolean hasBeenSent = false;
+        if (parentCSVFile.exists()) {
+
+            if (deletePreviousTable) {
+                Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
+                hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
+                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
+
+            } else
+                // add the csv file to OMERO
+                hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
+
+            // delete the temporary file
+            parentCSVFile.delete();
+        }
+        return hasBeenSent;
+    }
+
+
+
+    public static boolean sendParentMeasurementTableAsOmeroTable(LinkedHashMap<String, List<String>> parentTable,
+                                                                 OmeroRawClient client, DataObject parent,
+                                                                 boolean deletePreviousTable){
+        // set the file name
+        String filename = summaryFileBaseName + "_" +
+                QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
+                OmeroRawTools.getCurrentDateAndHour();
+
+        TableData omeroTable = OmeroRawTools.buildOmeroTableFromListsOfStrings(parentTable, client);
+
+        boolean hasBeenSent;
+
+        if (deletePreviousTable) {
+            Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
+            hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
+            deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
+
+        } else
+            // add the csv file to OMERO
+            hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
+
         return hasBeenSent;
     }
 
@@ -883,7 +994,7 @@ public class OmeroRawScripting {
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer, files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name);
     }
 
 
@@ -896,7 +1007,7 @@ public class OmeroRawScripting {
      */
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer, files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name);
     }
 
 
@@ -910,7 +1021,7 @@ public class OmeroRawScripting {
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer, files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name);
     }
 
     /**
@@ -922,7 +1033,7 @@ public class OmeroRawScripting {
      */
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer, files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name);
     }
 
     /**
@@ -934,25 +1045,25 @@ public class OmeroRawScripting {
      */
     public static void deleteFilesOnOmero(OmeroRawImageServer imageServer, String name){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
-        deletePreviousFileVersions(imageServer, files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name);
     }
 
     /**
      * Delete all previous version of tables (OMERO and csv files) related to the current QuPath project.
      * Files to delete are filtered according to the given table name in the list of files.
      *
-     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param client Omero client
      * @param files List of files to browse
      * @param name Table name that files name must contain to be deleted (i.e. filtering item)
      */
-    private static void deletePreviousFileVersions(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files, String name){
+    private static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name){
         if(!files.isEmpty()) {
             List<FileAnnotationData> previousTables = files.stream()
                     .filter(e -> e.getFileName().contains(name))
                     .collect(Collectors.toList());
 
             if (!previousTables.isEmpty())
-                OmeroRawTools.deleteFiles(imageServer.getClient(), previousTables);
+                OmeroRawTools.deleteFiles(client, previousTables);
             else logger.warn("Sending tables : No previous table attached to the image");
         }
     }
