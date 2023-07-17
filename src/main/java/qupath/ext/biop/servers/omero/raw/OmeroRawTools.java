@@ -128,6 +128,7 @@ import omero.model.Rectangle;
 import omero.model.RenderingDef;
 import omero.model.Roi;
 import omero.model.Shape;
+import omero.model.TagAnnotation;
 import omero.model.WellSample;
 import omero.sys.ParametersI;
 import org.slf4j.Logger;
@@ -2026,6 +2027,33 @@ public final class OmeroRawTools {
                 .collect(Collectors.toList());
     }
 
+
+    /**
+     * Read all tags available for the logged-in user
+     *
+     * @param client
+     * @return List of available tag objects
+     */
+    public static List<TagAnnotationData> readUserTags(OmeroRawClient client) {
+        List<IObject> objects;
+
+        try {
+            // get current image from OMERO
+            objects = client.getGateway().getQueryService(client.getContext()).findAll(TagAnnotation.class.getSimpleName(),null);
+            
+        } catch (ServerError | DSOutOfServiceException e) {
+            Dialogs.showErrorNotification("Reading OMERO tags", "Error getting all available tags");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return Collections.emptyList();
+        }
+
+        // filter tags
+        return objects.stream()
+                .map(TagAnnotation.class::cast)
+                .map(TagAnnotationData::new)
+                .collect(Collectors.toList());
+    }
 
     /**
      *  Send a new tag on OMERO server and attach it to the specified image.

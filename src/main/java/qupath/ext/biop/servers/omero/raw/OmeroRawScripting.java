@@ -624,40 +624,29 @@ public class OmeroRawScripting {
         }
 
         boolean wasAdded = true;
-        for(String tag:tags) {
-            // create new omero-compatible tag
-            TagAnnotationData newOmeroTagAnnotation = new TagAnnotationData(tag);
+        List<TagAnnotationData> tagsToAdd = new ArrayList<>();
+        List<TagAnnotationData> groupTags = OmeroRawTools.readUserTags(imageServer.getClient());
 
+        for(String tag:tags) {
+            if(tagsToAdd.stream().noneMatch(e-> e.getTagValue().equalsIgnoreCase(tag))){
+                TagAnnotationData newOmeroTagAnnotation;
+                List<TagAnnotationData> matchedTags = groupTags.stream().filter(e -> e.getTagValue().equalsIgnoreCase(tag)).collect(Collectors.toList());
+                if(matchedTags.isEmpty()){
+                    newOmeroTagAnnotation = new TagAnnotationData(tag);
+                } else {
+                    newOmeroTagAnnotation = matchedTags.get(0);
+                }
+                // find if the requested tag already exists
+                tagsToAdd.add(newOmeroTagAnnotation);
+            }
+        }
+
+        for(TagAnnotationData tag:tagsToAdd) {
             // send tag to OMERO
-            wasAdded = wasAdded && OmeroRawTools.addTagsOnOmero(newOmeroTagAnnotation, imageServer.getClient(), imageServer.getId());
+            wasAdded = wasAdded && OmeroRawTools.addTagsOnOmero(tag, imageServer.getClient(), imageServer.getId());
         }
 
         return wasAdded;
-    }
-
-
-    /**
-     * Send a tag to OMERO. If the tag is already attached to the image, it is not sent.
-     *
-     * @param tag The tag to add to the image
-     * @param imageServer ImageServer of an image loaded from OMERO
-     * @return Sending status (true if tag has been sent ; false if there were troubles during the sending process)
-     */
-    public static boolean sendTagToOmero(String tag, OmeroRawImageServer imageServer){
-        // get current OMERO tags
-        List<String> currentTags = importOmeroTags(imageServer);
-
-        // check if the tag exists
-        if(currentTags.contains(tag)) {
-            Dialogs.showInfoNotification("Sending tags", "The tag "+tag+"  already exists.");
-            return false;
-        }
-
-        // create new omero-compatible tag
-        TagAnnotationData newOmeroTagAnnotation = new TagAnnotationData(tag);
-
-        // send tag to OMERO
-        return OmeroRawTools.addTagsOnOmero(newOmeroTagAnnotation, imageServer.getClient(), imageServer.getId());
     }
 
 
