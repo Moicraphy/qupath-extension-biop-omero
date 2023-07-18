@@ -873,61 +873,21 @@ public class OmeroRawScripting {
 
     /**
      * Populate a map < header, list_of_values > with new measurements coming from a measurement table of new pathObjects.
-     * 
+     *
+     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
      * @param pathObjects QuPath annotations or detections objects
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param imageData QuPath image
-     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
      */
-    public static void addMeasurementsToParentTable(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
-                                             ImageData<BufferedImage> imageData, LinkedHashMap<String, List<String>> parentTable){
+    public static void addMeasurementsToParentTable(LinkedHashMap<String, List<String>> parentTable,
+                                                    Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
+                                                    ImageData<BufferedImage> imageData){
         // get the measurement table
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
         ob.setImageData(imageData, pathObjects);
 
-        int headersSize = parentTable.keySet().size();
-        if(headersSize == 0){
-            // building the first measurement
-            parentTable.put(UtilityTools.IMAGE_ID_HEADER, new ArrayList<>());
-
-            for(String header : ob.getAllNames()){
-                if(ob.isNumericMeasurement(header))
-                    parentTable.put(UtilityTools.NUMERIC_FIELD_ID + header, new ArrayList<>());
-                else
-                    parentTable.put(header, new ArrayList<>());
-            }
-        } else if(headersSize != (ob.getAllNames().size() + 1)){
-            Dialogs.showWarningNotification("Parent Table - Compatibility issue","Size of headers ("+ob.getAllNames().size()+
-                    ") is different from existing table size ("+headersSize+"). Parent table is not populated");
-            return;
-        }
-
-        long imageId = imageServer.getId();
-
-        // for all annotations = rows
-        for (PathObject pathObject : pathObjects) {
-            // add image id
-            parentTable.get(UtilityTools.IMAGE_ID_HEADER).add(UtilityTools.NUMERIC_FIELD_ID + imageId);
-            // get table headers
-            List<String> tableHeaders = new ArrayList<>(parentTable.keySet());
-            // for each column
-            for (int i = 1; i < tableHeaders.size(); i++) {
-                String col = tableHeaders.get(i);
-                List<String> listedValues = parentTable.get(col);
-
-                if(listedValues == null){
-                    Dialogs.showErrorNotification("Parent Table - Compatibility issue","There is no columns named "+col);
-                    throw new RuntimeException();
-                }
-
-                if (col.contains(UtilityTools.NUMERIC_FIELD_ID)){
-                    parentTable.get(col).add(UtilityTools.NUMERIC_FIELD_ID +
-                            ob.getNumericValue(pathObject, col.replace(UtilityTools.NUMERIC_FIELD_ID,"")));
-                } else {
-                    parentTable.get(col).add(""+ob.getStringValue(pathObject, col)); // need to keep the empty space because of null values
-                }
-            }
-        }
+        // convert measurements to lists of strings to build the parent table
+        UtilityTools.buildListsOfStringsFromMeasurementTable(parentTable, ob, pathObjects, imageServer.getId());
     }
 
     /**

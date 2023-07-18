@@ -146,10 +146,9 @@ class UtilityTools {
      * @param ob
      * @param imageId
      * @param name file name
-     * @param path where to save the newly created CSV file.
      * @return CSV file of measurement table.
      */
-    protected static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, long imageId, String name, String path) {
+    protected static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, long imageId, String name) {
         StringBuilder tableString = new StringBuilder();
 
         // get the header
@@ -235,6 +234,62 @@ class UtilityTools {
     }
 
     /**
+     * Populate a map < header, list_of_values > with new measurements coming from a measurement table of new pathObjects.
+     *
+     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     * @param ob QuPath Measurements table for the current image
+     * @param pathObjects QuPath annotations or detections objects
+     * @param imageId OMERO ID of the current image
+     */
+    protected static void buildListsOfStringsFromMeasurementTable(LinkedHashMap<String, List<String>> parentTable,
+                                                                  ObservableMeasurementTableData ob,
+                                                                  Collection<PathObject> pathObjects,
+                                                                  long imageId){
+        int headersSize = parentTable.keySet().size();
+        if(headersSize == 0){
+            // building the first measurement
+            parentTable.put(IMAGE_ID_HEADER, new ArrayList<>());
+
+            for(String header : ob.getAllNames()){
+                if(ob.isNumericMeasurement(header))
+                    parentTable.put(NUMERIC_FIELD_ID + header, new ArrayList<>());
+                else
+                    parentTable.put(header, new ArrayList<>());
+            }
+        } else if(headersSize != (ob.getAllNames().size() + 1)){
+            Dialogs.showWarningNotification("Parent Table - Compatibility issue","Size of headers ("+ob.getAllNames().size()+
+                    ") is different from existing table size ("+headersSize+"). Parent table is not populated");
+            return;
+        }
+
+        // for all annotations = rows
+        for (PathObject pathObject : pathObjects) {
+            // add image id
+            parentTable.get(IMAGE_ID_HEADER).add(NUMERIC_FIELD_ID + imageId);
+            // get table headers
+            List<String> tableHeaders = new ArrayList<>(parentTable.keySet());
+            // for each column
+            for (int i = 1; i < tableHeaders.size(); i++) {
+                String col = tableHeaders.get(i);
+                List<String> listedValues = parentTable.get(col);
+
+                if(listedValues == null){
+                    Dialogs.showErrorNotification("Parent Table - Compatibility issue","There is no columns named "+col);
+                    throw new RuntimeException();
+                }
+
+                if (col.contains(NUMERIC_FIELD_ID)){
+                    parentTable.get(col).add(NUMERIC_FIELD_ID +
+                            ob.getNumericValue(pathObject, col.replace(NUMERIC_FIELD_ID,"")));
+                } else {
+                    parentTable.get(col).add(""+ob.getStringValue(pathObject, col)); // need to keep the empty space because of null values
+                }
+            }
+        }
+    }
+
+
+    /**
      * Create a file in the given path, with the given content, and save it
      *
      * @param path location + filename of the path
@@ -242,7 +297,6 @@ class UtilityTools {
      * @return the saved file
      */
     protected static File createAndSaveFile(String path, String content){
-
         // create the file locally
         File file = new File(path);
 
@@ -259,7 +313,6 @@ class UtilityTools {
             logger.error("" + e);
             logger.error(OmeroRawTools.getErrorStackTraceAsString(e));
         }
-
         return file;
     }
 }

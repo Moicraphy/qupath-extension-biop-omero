@@ -1365,7 +1365,7 @@ public final class OmeroRawTools {
      * @return CSV file of measurement table.
      */
     public static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, long imageId, String name, String path) {
-        return UtilityTools.buildCSVFileFromMeasurementTable(pathObjects, ob, imageId, name, path);
+        return UtilityTools.buildCSVFileFromMeasurementTable(pathObjects, ob, imageId, name);
     }
 
 
