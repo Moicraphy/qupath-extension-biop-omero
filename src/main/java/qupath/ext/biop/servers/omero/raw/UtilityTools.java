@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.dialogs.Dialogs;
+import qupath.lib.gui.measure.ObservableMeasurementTableData;
+import qupath.lib.objects.PathObject;
 import qupath.lib.scripting.QP;
 
 import java.io.BufferedWriter;
@@ -16,56 +18,70 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class UtilityTools {
     private final static Logger logger = LoggerFactory.getLogger(UtilityTools.class);
-    protected static final String numericValueIdentifier = "\\$";
-    protected static final String imageIDHeaderSummaryTable = numericValueIdentifier + "Image_ID";
+    protected static final String NUMERIC_FIELD_ID = "\\$";
+    protected static final String IMAGE_ID_HEADER = NUMERIC_FIELD_ID + "Image_ID";
     protected static final String MS_OMERO_TABLE = "OMERO.tables";
 
-    protected static File buildCSVFileFromListsOfStrings(List<List<String>> parentTable, List<String> headers, String name){
+    protected static File buildCSVFileFromListsOfStrings(LinkedHashMap<String, List<String>> parentTable, String name){
         StringBuilder csvContent = new StringBuilder();
-        int nRows = parentTable.get(0).size();
+        List<String> headers = new ArrayList<>(parentTable.keySet());
+        if(!headers.isEmpty()) {
+            int nRows = parentTable.get(headers.get(0)).size();
 
-        // add the headers
-        headers.forEach(item -> csvContent.append(item.replace(GeneralTools.micrometerSymbol(),"um").replace(UtilityTools.numericValueIdentifier,"")).append(","));
-        csvContent.delete(csvContent.lastIndexOf(","), csvContent.lastIndexOf(","));
-        csvContent.append("\n");
-
-        // add the table
-        for (int i = 0 ; i < nRows ; i++) {
-            for (List<String> strings : parentTable) {
-                String item = strings.get(i);
-                csvContent.append(item.replace(UtilityTools.numericValueIdentifier, "")).append(",");
-            }
-            csvContent.delete(csvContent.lastIndexOf(","),csvContent.lastIndexOf(","));
+            // add the headers
+            headers.forEach(item -> csvContent.append(item.replace(GeneralTools.micrometerSymbol(), "um").replace(NUMERIC_FIELD_ID, "")).append(","));
+            csvContent.delete(csvContent.lastIndexOf(","), csvContent.lastIndexOf(","));
             csvContent.append("\n");
+
+            // add the table
+            for (int i = 0; i < nRows; i++) {
+                for (String header : parentTable.keySet()) {
+                    String item = parentTable.get(header).get(i);
+                    csvContent.append(item.replace(NUMERIC_FIELD_ID, "")).append(",");
+                }
+                csvContent.delete(csvContent.lastIndexOf(","), csvContent.lastIndexOf(","));
+                csvContent.append("\n");
+            }
+
+        } else {
+            logger.warn("Build CSV file from list of string -- There is no measurement to add. Write an empty file");
         }
 
-        String path = QP.PROJECT_BASE_DIR + File.separator + name + ".csv";
+        String path = QP.buildFilePath(QP.PROJECT_BASE_DIR, name + ".csv");
         return createAndSaveFile(path, csvContent.toString());
     }
 
-    protected static TableData buildTableData(List<List<String>> tableString, List<String> headers, String name, OmeroRawClient client){
+
+    protected static TableData buildOmeroTableFromListsOfStrings(LinkedHashMap<String, List<String>> parentTable, OmeroRawClient client){
         List<TableDataColumn> columns = new ArrayList<>();
         List<List<Object>> measurements = new ArrayList<>();
+
+        List<String> headers = new ArrayList<>(parentTable.keySet());
+        if(headers.isEmpty()) {
+            new TableData(columns, measurements);
+        }
 
         int c = 0;
 
         // feature name ; here, the ImageData object is treated differently
         columns.add(new TableDataColumn("Image", c++, ImageData.class));
 
-        // add all ImageData in teh first column (read image from OMERO only once)
+        // add all ImageData in the first column (read image from OMERO only once)
         Map<String, ImageData> mapImages = new HashMap<>();
         List<Object> imageDataField = new ArrayList<>();
-        for (String item : tableString.get(0)) {
+        for (String item : parentTable.get(IMAGE_ID_HEADER)) {
             if(mapImages.containsKey(item)){
                 imageDataField.add(mapImages.get(item));
             }else {
-                ImageData imageData = OmeroRawTools.readOmeroImage(client, Long.parseLong(item.replace(UtilityTools.numericValueIdentifier, "")));
+                ImageData imageData = OmeroRawTools.readOmeroImage(client, Long.parseLong(item.replace(NUMERIC_FIELD_ID, "")));
                 imageDataField.add(imageData);
                 mapImages.put(item, imageData);
             }
@@ -73,20 +89,23 @@ public class UtilityTools {
         measurements.add(imageDataField);
 
         // get the table
-        for (int i = 1 ; i < tableString.size() ; i++) {
-            List<String> col = tableString.get(i);
+        for (String header : parentTable.keySet()) {
+            if(header.equals(IMAGE_ID_HEADER))
+                continue;
+
+            List<String> col = parentTable.get(header);
             // for OMERO.Table compatibility
-            String header = headers.get(i).replace("Image", "Label");
-            if (header.contains(UtilityTools.numericValueIdentifier)) {
+            header = header.replace("Image", "Label");
+            if (header.contains(NUMERIC_FIELD_ID)) {
                 // feature name
                 columns.add(new TableDataColumn(header.replace(GeneralTools.micrometerSymbol(),"um")
-                        .replace(UtilityTools.numericValueIdentifier,"")
+                        .replace(NUMERIC_FIELD_ID,"")
                         .replace("/","-"), c++, Double.class)); // OMERO table does not support "/" and remove "mu" character
 
                 //feature value => fill the entire column
                 List<Object> feature = new ArrayList<>();
                 for (String item : col) {
-                    feature.add(Double.parseDouble(item.replace(UtilityTools.numericValueIdentifier,"")));
+                    feature.add(Double.parseDouble(item.replace(NUMERIC_FIELD_ID,"")));
                 }
                 measurements.add(feature);
             } else {
@@ -101,6 +120,103 @@ public class UtilityTools {
         }
         return new TableData(columns, measurements);
     }
+
+    /**
+     * Convert a QuPath measurement table into a CSV file,
+     * including the OMERO image ID on which the measurements are referring to.
+     *
+     * @param pathObjects
+     * @param ob
+     * @param imageId
+     * @param name file name
+     * @param path where to save the newly created CSV file.
+     * @return CSV file of measurement table.
+     */
+    protected static File buildCSVFileFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, long imageId, String name, String path) {
+        StringBuilder tableString = new StringBuilder();
+
+        // get the header
+        tableString.append("Image_ID").append(",");
+        List<String> allColumnNames = ob.getAllNames();
+        for (String col : allColumnNames) {
+            col = col.replace(GeneralTools.micrometerSymbol(),"um"); // remove "mu" character
+            tableString.append(col).append(",");
+        }
+        tableString.delete(tableString.lastIndexOf(","),tableString.lastIndexOf(","));
+        tableString.append("\n");
+
+        // get the table
+        for (PathObject pathObject : pathObjects) {
+            // add image id
+            tableString.append(imageId).append(",");
+            for (String col : ob.getAllNames()) {
+                if (ob.isNumericMeasurement(col))
+                    tableString.append(ob.getNumericValue(pathObject, col)).append(",");
+                else
+                    tableString.append(ob.getStringValue(pathObject, col)).append(",");
+            }
+            tableString.delete(tableString.lastIndexOf(","),tableString.lastIndexOf(","));
+            tableString.append("\n");
+        }
+        String filename = QP.buildFilePath(QP.PROJECT_BASE_DIR, name + ".csv");
+        return createAndSaveFile(filename, tableString.toString());
+    }
+
+    /**
+     * Convert a QuPath measurement table to an OMERO table
+     *
+     * @param pathObjects
+     * @param ob
+     * @param client
+     * @param imageId
+     * @return The corresponding OMERO.Table
+     */
+    protected static TableData buildOmeroTableFromMeasurementTable(Collection<PathObject> pathObjects, ObservableMeasurementTableData ob, OmeroRawClient client, long imageId) {
+        List<TableDataColumn> columns = new ArrayList<>();
+        List<List<Object>> measurements = new ArrayList<>();
+        int i = 0;
+
+        // add the first column with the image data (linkable on OMERO)
+        columns.add(new TableDataColumn("Image ID",i++, ImageData.class));
+        ImageData image = OmeroRawTools.readOmeroImage(client, imageId);
+        List<Object> imageData = new ArrayList<>();
+
+        for (PathObject ignored : pathObjects) {
+            imageData.add(image);
+        }
+        measurements.add(imageData);
+
+        // create formatted Lists of measurements to be compatible with omero.tables
+        for (String col : ob.getAllNames()) {
+            if (ob.isNumericMeasurement(col)) {
+                // feature name
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, Double.class)); // OMERO table does not support "/" and remove "mu" character
+
+                //feature value for each pathObject
+                List<Object> feature = new ArrayList<>();
+                for (PathObject pathObject : pathObjects) {
+                    feature.add(ob.getNumericValue(pathObject, col));
+                }
+                measurements.add(feature);
+            }
+
+            if (ob.isStringMeasurement(col)) {
+                // feature name
+                columns.add(new TableDataColumn(col.replace("/","-"), i++, String.class)); // OMERO table does not support "/" and remove "mu" character
+
+                //feature value for each pathObject
+                List<Object> feature = new ArrayList<>();
+                for (PathObject pathObject : pathObjects) {
+                    feature.add(ob.getStringValue(pathObject, col));
+                }
+                measurements.add(feature);
+            }
+        }
+
+        // create omero Table
+        return new TableData(columns, measurements);
+    }
+
 
     protected static File createAndSaveFile(String path, String content){
 

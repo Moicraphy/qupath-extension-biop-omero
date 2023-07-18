@@ -876,11 +876,11 @@ public class OmeroRawScripting {
         int headersSize = parentTable.keySet().size();
         if(headersSize == 0){
             // building the first measurement
-            parentTable.put(UtilityTools.imageIDHeaderSummaryTable, new ArrayList<>());
+            parentTable.put(UtilityTools.IMAGE_ID_HEADER, new ArrayList<>());
 
             for(String header : ob.getAllNames()){
                 if(ob.isNumericMeasurement(header))
-                    parentTable.put(UtilityTools.numericValueIdentifier + header, new ArrayList<>());
+                    parentTable.put(UtilityTools.NUMERIC_FIELD_ID + header, new ArrayList<>());
                 else
                     parentTable.put(header, new ArrayList<>());
             }
@@ -895,7 +895,7 @@ public class OmeroRawScripting {
         // for all annotations = rows
         for (PathObject pathObject : pathObjects) {
             // add image id
-            parentTable.get(UtilityTools.imageIDHeaderSummaryTable).add(UtilityTools.numericValueIdentifier + imageId);
+            parentTable.get(UtilityTools.IMAGE_ID_HEADER).add(UtilityTools.NUMERIC_FIELD_ID + imageId);
             // get table headers
             List<String> tableHeaders = new ArrayList<>(parentTable.keySet());
             // for each column
@@ -908,9 +908,9 @@ public class OmeroRawScripting {
                     throw new RuntimeException();
                 }
 
-                if (col.contains(UtilityTools.numericValueIdentifier)){
-                    parentTable.get(col).add(UtilityTools.numericValueIdentifier +
-                            ob.getNumericValue(pathObject, col.replace(UtilityTools.numericValueIdentifier,"")));
+                if (col.contains(UtilityTools.NUMERIC_FIELD_ID)){
+                    parentTable.get(col).add(UtilityTools.NUMERIC_FIELD_ID +
+                            ob.getNumericValue(pathObject, col.replace(UtilityTools.NUMERIC_FIELD_ID,"")));
                 } else {
                     parentTable.get(col).add(""+ob.getStringValue(pathObject, col)); // need to keep the empty space because of null values
                 }
@@ -921,13 +921,12 @@ public class OmeroRawScripting {
     public static boolean sendParentMeasurementTableAsCSV(LinkedHashMap<String, List<String>> parentTable,
                                                           OmeroRawClient client, DataObject parent,
                                                           boolean deletePreviousTable){
-
         // set the file name
         String filename = summaryFileBaseName + "_" +
                 QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
                 OmeroRawTools.getCurrentDateAndHour();
 
-        File parentCSVFile = OmeroRawTools.buildCSVFileFromListsOfStrings(parentTable, filename);
+        File parentCSVFile = UtilityTools.buildCSVFileFromListsOfStrings(parentTable, filename);
 
         boolean hasBeenSent = false;
         if (parentCSVFile.exists()) {
@@ -936,7 +935,6 @@ public class OmeroRawScripting {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
                 deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
-
             } else
                 // add the csv file to OMERO
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
@@ -957,20 +955,17 @@ public class OmeroRawScripting {
                 QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
                 OmeroRawTools.getCurrentDateAndHour();
 
-        TableData omeroTable = OmeroRawTools.buildOmeroTableFromListsOfStrings(parentTable, client);
-
-        boolean hasBeenSent;
+        TableData omeroTable = UtilityTools.buildOmeroTableFromListsOfStrings(parentTable, client);
 
         if (deletePreviousTable) {
             Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
-            hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
+            boolean hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
             deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")), UtilityTools.MS_OMERO_TABLE);
 
+            return hasBeenSent;
         } else
             // add the csv file to OMERO
-            hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
-
-        return hasBeenSent;
+            return OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
     }
 
 
