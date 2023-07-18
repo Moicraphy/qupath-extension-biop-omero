@@ -24,9 +24,7 @@ public class UtilityTools {
     private final static Logger logger = LoggerFactory.getLogger(UtilityTools.class);
     protected static final String numericValueIdentifier = "\\$";
     protected static final String imageIDHeaderSummaryTable = numericValueIdentifier + "Image_ID";
-
-
-
+    protected static final String MS_OMERO_TABLE = "OMERO.tables";
 
     protected static File buildCSVFileFromListsOfStrings(List<List<String>> parentTable, List<String> headers, String name){
         StringBuilder csvContent = new StringBuilder();

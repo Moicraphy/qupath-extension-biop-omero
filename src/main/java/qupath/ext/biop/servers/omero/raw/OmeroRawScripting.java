@@ -677,7 +677,7 @@ public class OmeroRawScripting {
         if(deletePreviousTable){
             Collection<FileAnnotationData> tables = OmeroRawTools.readTables(client, imageId);
             boolean hasBeenSent = OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
-            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")));
+            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")), UtilityTools.MS_OMERO_TABLE);
 
             return hasBeenSent;
         } else
@@ -854,7 +854,7 @@ public class OmeroRawScripting {
             if (deletePreviousTable) {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, imageId);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(file, client, imageId);
-                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
+                deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
 
             } else
                 // add the csv file to OMERO
@@ -935,7 +935,7 @@ public class OmeroRawScripting {
             if (deletePreviousTable) {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
-                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
+                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
 
             } else
                 // add the csv file to OMERO
@@ -964,7 +964,7 @@ public class OmeroRawScripting {
         if (deletePreviousTable) {
             Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
             hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
-            deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")));
+            deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")), UtilityTools.MS_OMERO_TABLE);
 
         } else
             // add the csv file to OMERO
@@ -994,7 +994,8 @@ public class OmeroRawScripting {
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
     }
 
 
@@ -1007,7 +1008,8 @@ public class OmeroRawScripting {
      */
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
     }
 
 
@@ -1021,7 +1023,8 @@ public class OmeroRawScripting {
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
     }
 
     /**
@@ -1033,7 +1036,8 @@ public class OmeroRawScripting {
      */
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
     }
 
     /**
@@ -1045,8 +1049,9 @@ public class OmeroRawScripting {
      */
     public static void deleteFilesOnOmero(OmeroRawImageServer imageServer, String name){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
-        deletePreviousFileVersions(imageServer.getClient(), files, name);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, null);
     }
+
 
     /**
      * Delete all previous version of tables (OMERO and csv files) related to the current QuPath project.
@@ -1056,10 +1061,11 @@ public class OmeroRawScripting {
      * @param files List of files to browse
      * @param name Table name that files name must contain to be deleted (i.e. filtering item)
      */
-    private static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name){
+    private static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name, String format){
         if(!files.isEmpty()) {
             List<FileAnnotationData> previousTables = files.stream()
-                    .filter(e -> e.getFileName().contains(name))
+                    .filter(e -> e.getFileName().contains(name) &&
+                            (format == null || format.isEmpty() || e.getFileFormat().equals(format) || e.getOriginalMimetype().equals(format)))
                     .collect(Collectors.toList());
 
             if (!previousTables.isEmpty())
