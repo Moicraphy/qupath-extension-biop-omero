@@ -4,6 +4,7 @@ import fr.igred.omero.Client;
 import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
 
+import omero.gateway.facility.TablesFacility;
 import omero.gateway.model.ChannelData;
 import omero.gateway.model.DataObject;
 import omero.gateway.model.FileAnnotationData;
@@ -12,7 +13,10 @@ import omero.gateway.model.ROIData;
 import omero.gateway.model.TableData;
 import omero.gateway.model.TagAnnotationData;
 import omero.model.ChannelBinding;
+import omero.model.FileAnnotation;
+import omero.model.FileAnnotationI;
 import omero.model.NamedValue;
+import omero.model.OriginalFile;
 import omero.model.RenderingDef;
 import omero.rtypes;
 import org.slf4j.Logger;
@@ -677,7 +681,7 @@ public class OmeroRawScripting {
         if(deletePreviousTable){
             Collection<FileAnnotationData> tables = OmeroRawTools.readTables(client, imageId);
             boolean hasBeenSent = OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
-            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")), UtilityTools.MS_OMERO_TABLE);
+            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE);
 
             return hasBeenSent;
         } else
@@ -867,6 +871,14 @@ public class OmeroRawScripting {
     }
 
 
+    /**
+     * Populate a map < header, list_of_values > with new measurements coming from a measurement table of new pathObjects.
+     * 
+     * @param pathObjects QuPath annotations or detections objects
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param imageData QuPath image
+     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     */
     public static void addMeasurementsToParentTable(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
                                              ImageData<BufferedImage> imageData, LinkedHashMap<String, List<String>> parentTable){
         // get the measurement table
@@ -918,54 +930,136 @@ public class OmeroRawScripting {
         }
     }
 
+    /**
+     * Send the summary map < header, List_of_measurements > to OMERO as an CSV file attached to the parent containers.
+     * <p>
+     * <ul>
+     * <li> IMPORTANT : The attached file is uploaded ONCE on the OMERO database. The same file is then linked to
+     * the multiple parent containers. If one deletes the file, all the links will also be deleted</li>
+     * </ul>
+     * <p>
+     * 
+     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     * @param client OMERO Client Object to handle OMERO connection
+     * @param parents Collection of parent container on OMERO to link the file to
+     * @param deletePreviousTable True if you want to delete previous CSV files on the parent container, linked to the current QuPath project
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
+     */
     public static boolean sendParentMeasurementTableAsCSV(LinkedHashMap<String, List<String>> parentTable,
-                                                          OmeroRawClient client, DataObject parent,
+                                                          OmeroRawClient client, Collection<DataObject> parents,
                                                           boolean deletePreviousTable){
         // set the file name
         String filename = summaryFileBaseName + "_" +
                 QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
                 OmeroRawTools.getCurrentDateAndHour();
 
+        // build the CSV parent table
         File parentCSVFile = UtilityTools.buildCSVFileFromListsOfStrings(parentTable, filename);
 
-        boolean hasBeenSent = false;
+        FileAnnotationData attachedFile = null;
         if (parentCSVFile.exists()) {
+            // create an annotation file
+            attachedFile = new FileAnnotationData(parentCSVFile);
 
-            if (deletePreviousTable) {
-                Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
-                hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
-                deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
-            } else
-                // add the csv file to OMERO
-                hasBeenSent = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
+            // loop over all parents if images comes from more than one dataset
+            for(DataObject parent : parents) {
+                if(attachedFile != null) {
+                    if (deletePreviousTable) {
+                        // get all attachments before adding new ones
+                        Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
 
+                        // link the file if it has already been uploaded once. Upload it otherwise
+                        if (attachedFile.getFileID() > 0)
+                            attachedFile = linkFile(client, attachedFile, parent);
+                        else
+                            attachedFile = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
+
+                        // delete previous files
+                        if (attachedFile != null)
+                            deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
+                    } else {
+                        // link the file if it has already been uploaded once. Upload it otherwise
+                        if (attachedFile.getFileID() > 0)
+                            attachedFile = linkFile(client, attachedFile, parent);
+                        else
+                            attachedFile = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
+                    }
+                }
+            }
             // delete the temporary file
             parentCSVFile.delete();
         }
-        return hasBeenSent;
+        return attachedFile != null;
     }
 
 
-
+    /**
+     * Send the summary map < header, List_of_measurements > to OMERO as an OMERO.table attached to the parent container
+     * <p>
+     * <ul>
+     * <li> IMPORTANT : The attached file is uploaded ONCE on the OMERO database. The same file is then linked to
+     * the multiple parent containers. If one deletes the file, all the links will also be deleted</li>
+     * </ul>
+     * <p>
+     *
+     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     * @param client OMERO Client Object to handle OMERO connection
+     * @param parents Collection of parent containers on OMERO to link the file to
+     * @param deletePreviousTable True if you want to delete previous CSV files on the parent container, linked to the current QuPath project
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
+     */
     public static boolean sendParentMeasurementTableAsOmeroTable(LinkedHashMap<String, List<String>> parentTable,
-                                                                 OmeroRawClient client, DataObject parent,
+                                                                 OmeroRawClient client, Collection<DataObject> parents,
                                                                  boolean deletePreviousTable){
         // set the file name
         String filename = summaryFileBaseName + "_" +
                 QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
                 OmeroRawTools.getCurrentDateAndHour();
 
+        // build the OMERO.table parent table
         TableData omeroTable = UtilityTools.buildOmeroTableFromListsOfStrings(parentTable, client);
+        FileAnnotationData attachedFile = null;
 
-        if (deletePreviousTable) {
-            Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
-            boolean hasBeenSent = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
-            deletePreviousFileVersions(client, attachments, filename.substring(0,filename.lastIndexOf("_")), UtilityTools.MS_OMERO_TABLE);
+        // loop over all parents if images comes from more than one dataset
+        for(DataObject parent : parents) {
+            if (deletePreviousTable) {
+                // get all attachments before adding new ones
+                Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, parent);
 
-            return hasBeenSent;
-        } else
-            // add the csv file to OMERO
-            return OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
+                // link the file if it has already been uploaded once. Upload it otherwise
+                if (attachedFile != null && attachedFile.getFileID() > 0)
+                    attachedFile = linkFile(client, attachedFile, parent);
+                else {
+                    TableData tableData = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
+                    if (tableData != null) {
+                        // read the annotation file
+                        attachedFile = OmeroRawTools.readAttachments(client, parent).stream()
+                                .filter(e -> e.getFileID() == tableData.getOriginalFileId())
+                                .findFirst()
+                                .get();
+                    }
+                }
+
+                // delete previous files
+                if (attachedFile != null)
+                    deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE);
+
+            } else {
+                // link the file if it has already been uploaded once. Upload it otherwise
+                if (attachedFile != null && attachedFile.getFileID() > 0)
+                    attachedFile = linkFile(client, attachedFile, parent);
+                else {
+                    TableData tableData = OmeroRawTools.addTableToOmero(omeroTable, filename, client, parent);
+                    if (tableData != null) {
+                        attachedFile = OmeroRawTools.readAttachments(client, parent).stream()
+                                .filter(e -> e.getFileID() == tableData.getOriginalFileId())
+                                .findFirst()
+                                .get();
+                    }
+                }
+            }
+        }
+        return attachedFile != null;
     }
 
 
@@ -973,10 +1067,23 @@ public class OmeroRawScripting {
      * Return the files as FileAnnotationData attached to the current image from OMERO.
      *
      * @param imageServer ImageServer of an image loaded from OMERO
-     * @return
+     * @return a list of read FileAnnotationData
      */
     public static List<FileAnnotationData> readFilesAttachedToCurrentImageOnOmero(OmeroRawImageServer imageServer){
         return OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
+    }
+
+    /**
+     * Link a FileAnnotationData to an OMERO container
+     * The FileAnnotationData must already have a valid ID on OMERO (i.e. already existing in the OMERO database)
+     *
+     * @param client OmeroRawClient object to handle OMERO connection
+     * @param fileAnnotationData annotation to link
+     * @param container on OMERO
+     * @return the linked FileAnnotationData
+     */
+    protected static FileAnnotationData linkFile(OmeroRawClient client, FileAnnotationData fileAnnotationData, DataObject container){
+        return (FileAnnotationData) OmeroRawTools.linkAnnotationToOmero(client, fileAnnotationData, container);
     }
 
     /**
@@ -990,7 +1097,7 @@ public class OmeroRawScripting {
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
         deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
     }
 
 
@@ -1004,7 +1111,7 @@ public class OmeroRawScripting {
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
         deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
     }
 
 
@@ -1019,7 +1126,7 @@ public class OmeroRawScripting {
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
         deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
     }
 
     /**
@@ -1032,7 +1139,7 @@ public class OmeroRawScripting {
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
         deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, UtilityTools.MS_OMERO_TABLE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
     }
 
     /**
@@ -1042,7 +1149,7 @@ public class OmeroRawScripting {
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param name contained in the table/file name to delete (i.e. filtering item). It may be a part of the full table/file name
      */
-    public static void deleteFilesOnOmero(OmeroRawImageServer imageServer, String name){
+    public static void deleteFiles(OmeroRawImageServer imageServer, String name){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         deletePreviousFileVersions(imageServer.getClient(), files, name, null);
     }

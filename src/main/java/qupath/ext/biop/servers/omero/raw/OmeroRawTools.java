@@ -860,12 +860,58 @@ public final class OmeroRawTools {
             logger.error(getErrorStackTraceAsString(e));
             return "";
         } catch (DSAccessException e){
-            Dialogs.showErrorNotification("Reading OMERO annotations","You don't have the read annotations on OMERO for the image "+imageId);
+            Dialogs.showErrorNotification("Reading OMERO annotations","You don't have the right to read annotations on OMERO for the image "+imageId);
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
             return "";
         }
     }
+
+    /**
+     * Get any Pojo object from OMERO
+     * @param client
+     * @param objectClassData The object class must implement DataObject class
+     * @param id
+     * @return
+     */
+    private static DataObject readObject(OmeroRawClient client, String objectClassData, long id){
+        try {
+            return  client.getGateway().getFacility(BrowseFacility.class).findObject(client.getContext(), objectClassData, id, true);
+        } catch(ExecutionException | DSOutOfServiceException e) {
+            Dialogs.showErrorNotification("Reading OMERO object", "Cannot get "+objectClassData+" from OMERO with id "+id);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Reading OMERO object","You don't have the right to read "+objectClassData+" on OMERO with id "+id);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return null;
+    }
+
+
+    /**
+     * Get any Pojo object from OMERO
+     * @param client
+     * @param objectClass The object class must implement IObject class
+     * @param id
+     * @return
+     */
+    private static IObject readIObject(OmeroRawClient client, String objectClass, long id){
+        try {
+            return  client.getGateway().getFacility(BrowseFacility.class).findIObject(client.getContext(), objectClass, id, true);
+        } catch(ExecutionException | DSOutOfServiceException e) {
+            Dialogs.showErrorNotification("Reading OMERO object", "Cannot get "+objectClass+" from OMERO with id "+id);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        } catch (DSAccessException e){
+            Dialogs.showErrorNotification("Reading OMERO object","You don't have the right to read "+objectClass+" on OMERO with id "+id);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+        return null;
+    }
+
 
     /**
      * Convert a QuPath measurement table to an OMERO table
@@ -913,32 +959,30 @@ public final class OmeroRawTools {
     }
 
     /**
-     * Send an OMERO.table to OMERO server and attach it to the image specified by its ID.
+     * Send an OMERO.table to OMERO server and attach it to the specified container
      *
      * @param table OMERO.table
      * @param name table name
      * @param client
+     * @param container
      * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
-    public static boolean addTableToOmero(TableData table, String name, OmeroRawClient client, DataObject container) {
-        boolean wasAdded = true;
+    public static TableData addTableToOmero(TableData table, String name, OmeroRawClient client, DataObject container) {
         try{
             // attach the omero.table to the image
-            client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(), container, name, table);
+            return client.getGateway().getFacility(TablesFacility.class).addTable(client.getContext(), container, name, table);
 
         } catch (ExecutionException | DSOutOfServiceException e){
             Dialogs.showErrorNotification("Table Saving","Error during saving table on OMERO.");
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
-            wasAdded = false;
         } catch (DSAccessException e){
             Dialogs.showErrorNotification("Table Saving","You don't have the right to add a table on OMERO for "
                     + container.getClass().getName()+" id " +container.getId());
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
-            wasAdded = false;
         }
-        return wasAdded;
+        return null;
     }
 
     /**
@@ -1003,19 +1047,19 @@ public final class OmeroRawTools {
 
 
     /**
-     * Send an attachment to OMERO server and attached it to an image specified by its ID.
+     * Send an attachment to OMERO server and attached it in the specified container.
      *
      * @param file
      * @param client
      * @param obj
      * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
-    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj) {
+    public static FileAnnotationData addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj) {
         return addAttachmentToOmero(file, client, obj, null,"");
     }
 
     /**
-     *  Send an attachment to OMERO server and attached it to an image specified by its ID.
+     *  Send an attachment to OMERO server and attached it in the specified container.
      *  You can specify the mimetype of the file.
      *
      * @param file
@@ -1024,12 +1068,12 @@ public final class OmeroRawTools {
      * @param miemtype
      * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
-    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj, String miemtype) {
+    public static FileAnnotationData addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj, String miemtype) {
         return addAttachmentToOmero(file, client, obj, miemtype,"");
     }
 
     /**
-     * Send an attachment to OMERO server and attached it to an image specified by its ID, specifying the mimetype and
+     * Send an attachment to OMERO server and attached it in the specified container., specifying the mimetype and
      * a description of what the file is and how it works.
      *
      * @param file
@@ -1039,19 +1083,43 @@ public final class OmeroRawTools {
      * @param description
      * @return Sending status (True if sent and attached ; false with error message otherwise)
      */
-    public static boolean addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj, String miemtype, String description) {
-        boolean wasAdded = true;
+    public static FileAnnotationData addAttachmentToOmero(File file, OmeroRawClient client, DataObject obj, String miemtype, String description) {
         try{
             // attach the omero.table to the image
-            client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, miemtype, description, file.getName(), obj).get();
+            return client.getGateway().getFacility(DataManagerFacility.class).attachFile(client.getContext(), file, miemtype, description, file.getName(), obj).get();
 
         } catch (ExecutionException | InterruptedException e){
             Dialogs.showErrorNotification("File Saving","Error during saving file on OMERO.");
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));
-            wasAdded = false;
+            return null;
         }
-        return wasAdded;
+    }
+
+    /**
+     * Link an existing annotation of any type an OMERO object. The annotation should already
+     *
+     * @param client
+     * @param annotationData
+     * @param obj
+     * @return
+     */
+    static AnnotationData linkAnnotationToOmero(OmeroRawClient client, AnnotationData annotationData, DataObject obj) {
+        try{
+            // attach the omero.table to the image
+            return client.getGateway().getFacility(DataManagerFacility.class).attachAnnotation(client.getContext(), annotationData, obj);
+
+        } catch (ExecutionException | DSOutOfServiceException e){
+            Dialogs.showErrorNotification("Link Annotation","Error during linking the annotation on OMERO.");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return null;
+        } catch (DSAccessException e) {
+            Dialogs.showErrorNotification("Link Annotation","You don't have the right to link objects on OMERO ");
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+            return null;
+        }
     }
 
 

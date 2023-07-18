@@ -24,15 +24,26 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class UtilityTools {
+/**
+ * Private class regrouping all tools that are not restricted to OMERO.
+ */
+class UtilityTools {
     private final static Logger logger = LoggerFactory.getLogger(UtilityTools.class);
     protected static final String NUMERIC_FIELD_ID = "\\$";
     protected static final String IMAGE_ID_HEADER = NUMERIC_FIELD_ID + "Image_ID";
-    protected static final String MS_OMERO_TABLE = "OMERO.tables";
 
+
+    /**
+     * Convert a map < header, list_of_values > into a CSV file
+     *
+     * @param parentTable the map containing headers and values
+     * @param name file name without the extension.
+     * @return the saved CSV file
+     */
     protected static File buildCSVFileFromListsOfStrings(LinkedHashMap<String, List<String>> parentTable, String name){
         StringBuilder csvContent = new StringBuilder();
         List<String> headers = new ArrayList<>(parentTable.keySet());
+
         if(!headers.isEmpty()) {
             int nRows = parentTable.get(headers.get(0)).size();
 
@@ -59,7 +70,13 @@ public class UtilityTools {
         return createAndSaveFile(path, csvContent.toString());
     }
 
-
+    /**
+     * Convert a map < header, list_of_values > into an OMERO.table
+     *
+     * @param parentTable the map containing headers and values
+     * @param client
+     * @return the OMERO table
+     */
     protected static TableData buildOmeroTableFromListsOfStrings(LinkedHashMap<String, List<String>> parentTable, OmeroRawClient client){
         List<TableDataColumn> columns = new ArrayList<>();
         List<List<Object>> measurements = new ArrayList<>();
@@ -217,7 +234,13 @@ public class UtilityTools {
         return new TableData(columns, measurements);
     }
 
-
+    /**
+     * Create a file in the given path, with the given content, and save it
+     *
+     * @param path location + filename of the path
+     * @param content file content
+     * @return the saved file
+     */
     protected static File createAndSaveFile(String path, String content){
 
         // create the file locally
