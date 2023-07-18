@@ -872,9 +872,9 @@ public class OmeroRawScripting {
 
 
     /**
-     * Populate a map < header, list_of_values > with new measurements coming from a measurement table of new pathObjects.
+     * Populate a map "header, List_of_measurements" with new measurements coming from a measurement table of new pathObjects.
      *
-     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     * @param parentTable LinkedHashMap "header, List_of_measurements" to populate. Other type of maps will not work
      * @param pathObjects QuPath annotations or detections objects
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param imageData QuPath image
@@ -891,7 +891,7 @@ public class OmeroRawScripting {
     }
 
     /**
-     * Send the summary map < header, List_of_measurements > to OMERO as an CSV file attached to the parent containers.
+     * Send the summary map "header, List_of_measurements" to OMERO as an CSV file attached to the parent containers.
      * <p>
      * <ul>
      * <li> IMPORTANT : The attached file is uploaded ONCE on the OMERO database. The same file is then linked to
@@ -899,7 +899,7 @@ public class OmeroRawScripting {
      * </ul>
      * <p>
      * 
-     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     * @param parentTable LinkedHashMap "header, List_of_measurements" to populate. Other type of maps will not work
      * @param client OMERO Client Object to handle OMERO connection
      * @param parents Collection of parent container on OMERO to link the file to
      * @param deletePreviousTable True if you want to delete previous CSV files on the parent container, linked to the current QuPath project
@@ -954,7 +954,7 @@ public class OmeroRawScripting {
 
 
     /**
-     * Send the summary map < header, List_of_measurements > to OMERO as an OMERO.table attached to the parent container
+     * Send the summary map "header, List_of_measurements" to OMERO as an OMERO.table attached to the parent container
      * <p>
      * <ul>
      * <li> IMPORTANT : The attached file is uploaded ONCE on the OMERO database. The same file is then linked to
@@ -962,7 +962,7 @@ public class OmeroRawScripting {
      * </ul>
      * <p>
      *
-     * @param parentTable LinkedHashMap < header, List_of_measurements > to populate. Other type of maps will not work
+     * @param parentTable LinkedHashMap "header, List_of_measurements" to populate. Other type of maps will not work
      * @param client OMERO Client Object to handle OMERO connection
      * @param parents Collection of parent containers on OMERO to link the file to
      * @param deletePreviousTable True if you want to delete previous CSV files on the parent container, linked to the current QuPath project
