@@ -1983,6 +1983,27 @@ public final class OmeroRawTools {
                 .collect(Collectors.toList());
     }
 
+    protected static void unlinkTags(OmeroRawClient client, long imageId){
+        try{
+            List<TagAnnotationData> tags = readTags(client, imageId);
+            List<IObject> oss = new ArrayList<>();
+            for(TagAnnotationData tag : tags) {
+                oss.addAll(client.getGateway().getQueryService(client.getContext()).findAllByQuery("select link from ImageAnnotationLink" +
+                        " link where link.parent = " + imageId +
+                        " and link.child = " + tag.getId(), null));
+            }
+            client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), oss).getResponse();
+
+        }catch(ExecutionException | DSOutOfServiceException | ServerError e) {
+            Dialogs.showErrorNotification("Unlink tags", "Cannot unlink tags for the image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        }catch(DSAccessException e) {
+            Dialogs.showErrorNotification("Unlink tags", "You don't have the right to unlink tags for image "+imageId);
+            logger.error(""+e);
+            logger.error(getErrorStackTraceAsString(e));
+        }
+    }
 
     /**
      * Send key value pairs on OMERO and attach them to the specified image.

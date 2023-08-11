@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class OmeroRawScripting {
@@ -49,6 +50,7 @@ public class OmeroRawScripting {
     private static final String detectionFileBaseName = "QP detection table";
     private static final String annotationFileBaseName = "QP annotation table";
     private static final String summaryFileBaseName = "QP summary table";
+    private static final String DEFAULT_KVP_NAMESPACE = "openmicroscopy.org/omero/client/mapAnnotation";
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawScripting.class);
 
 
@@ -272,8 +274,19 @@ public class OmeroRawScripting {
         if(omeroKeyValuePairs == null)
             return false;
 
+        // Extract tags
+        List<String> qpMetadataTags = new ArrayList<>();
+        Map<String, String> qpMetadataKVP = new HashMap<>();
+        for(String key:qpMetadata.keySet()) {
+            if(key.equalsIgnoreCase(qpMetadata.get(key))){
+                qpMetadataTags.add(key);
+            }else{
+                qpMetadataKVP.put(key, qpMetadata.get(key));
+            }
+        };
+
         // split QuPath metadata into those that already exist on OMERO and those that need to be added
-        List<Map<String,String> > splitKeyValues = OmeroRawTools.splitNewAndExistingKeyValues(omeroKeyValuePairs, qpMetadata);
+        List<Map<String,String> > splitKeyValues = OmeroRawTools.splitNewAndExistingKeyValues(omeroKeyValuePairs, qpMetadataKVP);
         Map<String,String>  newKV = splitKeyValues.get(1);
 
         // convert key value pairs to omero-compatible object NamedValue
@@ -281,18 +294,23 @@ public class OmeroRawScripting {
         newKV.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
         // if all keys already exist, do not write an empty list
-        if(newNV.isEmpty()) {
+        boolean wasAdded = true;
+        if(!newNV.isEmpty()) {
+            // set annotation map
+            MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
+            newOmeroAnnotationMap.setContent(newNV);
+            newOmeroAnnotationMap.setNameSpace(DEFAULT_KVP_NAMESPACE);
+
+            // add key value on OMERO
+            wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+        }else{
             Dialogs.showInfoNotification("Save metadata on OMERO", "All metadata already exist on OMERO");
-            return false;
         }
 
-        // set annotation map
-        MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
-        newOmeroAnnotationMap.setContent(newNV);
-        newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+        // add tags on OMERO
+        wasAdded = wasAdded && sendTagsToOmero(qpMetadataTags, imageServer);
 
-        // add key value on OMERO
-        return OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+        return wasAdded;
     }
 
 
@@ -320,22 +338,45 @@ public class OmeroRawScripting {
         if(omeroKeyValuePairs == null)
             return false;
 
+        // Extract tags
+        List<String> qpMetadataTags = new ArrayList<>();
+        Map<String, String> qpMetadataKVP = new HashMap<>();
+        for(String key:qpMetadata.keySet()) {
+            if(key.equalsIgnoreCase(qpMetadata.get(key))){
+                qpMetadataTags.add(key);
+            }else{
+                qpMetadataKVP.put(key, qpMetadata.get(key));
+            }
+        };
+
         // convert key value pairs to omero-compatible object NamedValue
         List<NamedValue> newNV = new ArrayList<>();
-        qpMetadata.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
+        qpMetadataKVP.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
-        // set annotation map
-        MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
-        newOmeroAnnotationMap.setContent(newNV);
-        newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+        boolean wasAdded = true;
+        if(!newNV.isEmpty()) {
+            // set annotation map
+            MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
+            newOmeroAnnotationMap.setContent(newNV);
+            newOmeroAnnotationMap.setNameSpace(DEFAULT_KVP_NAMESPACE);
 
-        // add key value pairs On OMERO
-        boolean wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+            // add key value pairs On OMERO
+            wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+        }else{
+            Dialogs.showInfoNotification("Save metadata on OMERO", "No key values to send");
+        }
 
         // delete current keyValues
-        boolean wasDeleted = OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
+        wasAdded = wasAdded && OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
 
-        return (wasDeleted && wasAdded);
+        // unlink tags on OMERO
+        //TODO see if it ok to do this
+        OmeroRawTools.unlinkTags(imageServer.getClient(), imageServer.getId());
+
+        // add tags on OMERO
+        wasAdded = wasAdded && sendTagsToOmero(qpMetadataTags, imageServer);
+
+        return wasAdded;
     }
 
 
@@ -363,8 +404,19 @@ public class OmeroRawScripting {
         if(omeroKeyValuePairs == null)
             return false;
 
+        // Extract tags
+        List<String> qpMetadataTags = new ArrayList<>();
+        Map<String, String> qpMetadataKVP = new HashMap<>();
+        for(String key:qpMetadata.keySet()) {
+            if(key.equalsIgnoreCase(qpMetadata.get(key))){
+                qpMetadataTags.add(key);
+            }else{
+                qpMetadataKVP.put(key, qpMetadata.get(key));
+            }
+        };
+
         // split QuPath metadata into those that already exist on OMERO and those that need to be added
-        List<Map<String,String> > splitKeyValues = OmeroRawTools.splitNewAndExistingKeyValues(omeroKeyValuePairs, qpMetadata);
+        List<Map<String,String> > splitKeyValues = OmeroRawTools.splitNewAndExistingKeyValues(omeroKeyValuePairs, qpMetadataKVP);
         Map<String,String>  newKV = splitKeyValues.get(1);
         Map<String,String> existingKV = splitKeyValues.get(0);
 
@@ -379,18 +431,26 @@ public class OmeroRawScripting {
         omeroKeyValuePairs.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
         newKV.forEach((key,value)-> newNV.add(new NamedValue(key,value)));
 
-        // set annotation map
-        MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
-        newOmeroAnnotationMap.setContent(newNV);
-        newOmeroAnnotationMap.setNameSpace("openmicroscopy.org/omero/client/mapAnnotation");
+        boolean wasAdded = true;
+        if(!newNV.isEmpty()) {
+            // set annotation map
+            MapAnnotationData newOmeroAnnotationMap = new MapAnnotationData();
+            newOmeroAnnotationMap.setContent(newNV);
+            newOmeroAnnotationMap.setNameSpace(DEFAULT_KVP_NAMESPACE);
 
-        // add key value pairs On OMERO
-        boolean wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+            // add key value pairs On OMERO
+            wasAdded = OmeroRawTools.addKeyValuesOnOmero(newOmeroAnnotationMap, imageServer.getClient(), imageServer.getId());
+        }else{
+            Dialogs.showInfoNotification("Save metadata on OMERO", "No key values to send");
+        }
 
         // delete current keyValues
-        boolean wasDeleted = OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
+        wasAdded = wasAdded && OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
 
-        return (wasDeleted && wasAdded);
+        // add tags on OMERO
+        wasAdded = wasAdded && sendTagsToOmero(qpMetadataTags, imageServer);
+
+        return wasAdded;
     }
 
 
@@ -602,12 +662,36 @@ public class OmeroRawScripting {
      * @param imageServer ImageServer of an image loaded from OMERO
      * @return list of OMERO tags.
      */
+    @Deprecated
     public static List<String> importOmeroTags(OmeroRawImageServer imageServer) {
         // read tags
         List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
 
         // collect and convert to list
         return omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
+    }
+
+
+    /**
+     * Read, from OMERO, tags attached to the current image and add them as QuPath metadata fields
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return list of OMERO tags.
+     */
+    public static List<String> addOmeroTags(OmeroRawImageServer imageServer) {
+        // read tags
+        List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
+
+        // collect and convert to list
+        List<String> omeroTagValues = omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
+
+        // create a map with equals key and values
+        Map<String,String> omeroTagMap =  omeroTagValues.stream().collect(Collectors.toMap(e->e, e->e));
+
+        // add metadata
+        addMetadata(omeroTagMap);
+
+        return omeroTagValues;
     }
 
 
@@ -620,7 +704,8 @@ public class OmeroRawScripting {
      */
     public static boolean sendTagsToOmero(List<String> tags, OmeroRawImageServer imageServer){
         // get current OMERO tags
-        List<String> currentTags = importOmeroTags(imageServer);
+        List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
+        List<String> currentTags = omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
 
         // remove all existing tags
         tags.removeAll(currentTags);

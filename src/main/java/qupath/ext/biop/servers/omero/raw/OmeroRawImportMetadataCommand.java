@@ -74,6 +74,7 @@ public class OmeroRawImportMetadataCommand implements Runnable{
 
             // add new keyValues from omero
             OmeroRawScripting.addOmeroKeyValues((OmeroRawImageServer) imageServer);
+            OmeroRawScripting.addOmeroTags((OmeroRawImageServer) imageServer);
 
             // get the number of new key values
             int nQuPathKVAfterAdding = entry.getMetadataKeys().size();
@@ -90,6 +91,7 @@ public class OmeroRawImportMetadataCommand implements Runnable{
 
             // add new keyValues from omero
             OmeroRawScripting.addOmeroKeyValuesAndUpdateMetadata((OmeroRawImageServer) imageServer);
+            OmeroRawScripting.addOmeroTags((OmeroRawImageServer) imageServer);
 
             // get the number of new key values
             int nQuPathKVAfterAdding = entry.getMetadataKeys().size();
@@ -106,6 +108,7 @@ public class OmeroRawImportMetadataCommand implements Runnable{
 
             // add new keyValues from omero
             OmeroRawScripting.addOmeroKeyValuesAndDeleteMetadata((OmeroRawImageServer) imageServer);
+            OmeroRawScripting.addOmeroTags((OmeroRawImageServer) imageServer);
 
             // get the number of new key values
             int nNewKV = entry.getMetadataKeys().size();
