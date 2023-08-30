@@ -9,7 +9,7 @@ The extension is intended for QuPath v0.4 (at the time of writing).
 It is not compatible with earlier QuPath versions. However, the 0.2.0 version of this extension is the last compatible one with QuPath 0.3.2.
 
 ## Documentation
-You can find all the documentation on how to use this extension on our [wiki page](https://wiki-biop.epfl.ch/en/Image_Storage/OMERO/OmeroQuPath).
+You can find all the documentation on how to use this extension on our [wiki page](https://wiki-biop.epfl.ch/en/data-management/omero/qupath).
 
 ## Installing
 
