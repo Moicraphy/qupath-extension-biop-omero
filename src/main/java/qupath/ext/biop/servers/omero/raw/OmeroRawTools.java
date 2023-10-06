@@ -41,11 +41,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -144,6 +146,7 @@ import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.gui.tools.IconFactory;
 import qupath.lib.io.GsonTools;
 import qupath.lib.objects.PathObject;
+import qupath.lib.objects.classes.PathClass;
 import qupath.lib.roi.interfaces.ROI;
 import qupath.lib.scripting.QP;
 
@@ -1500,7 +1503,8 @@ public final class OmeroRawTools {
      */
     public static List<ROIData> createOmeroROIsFromPathObjects(Collection<PathObject> pathObjects){
         List<ROIData> omeroRois = new ArrayList<>();
-        Map<PathObject,String> idObjectMap = new HashMap<>();
+        Map<PathObject,String> idObjectMap = new LinkedHashMap<>();
+        Map<String,List<ROIData>> pathClassROIsMap = new TreeMap<>(Comparator.naturalOrder());
 
         // create unique ID for each object
         pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getID().toString()));
@@ -1509,18 +1513,30 @@ public final class OmeroRawTools {
             // computes OMERO-readable ROIs
             List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent() == null ? "NoParent" : idObjectMap.get(pathObject.getParent()));
             if (!(shapes == null) && !(shapes.isEmpty())) {
+                PathClass pathClass = pathObject.getPathClass();
                 // set the ROI color according to the class assigned to the corresponding PathObject
                 shapes.forEach(shape -> {
-                    shape.getShapeSettings().setStroke(pathObject.getPathClass() == null ? Color.YELLOW : new Color(pathObject.getPathClass().getColor()));
-                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathObject.getPathClass() == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathObject.getPathClass().getColor())));
+                    shape.getShapeSettings().setStroke(pathClass == null ? Color.YELLOW : new Color(pathClass.getColor()));
+                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathClass == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathClass.getColor())));
                 });
                 ROIData roiData = new ROIData();
                 shapes.forEach(roiData::addShapeData);
-                omeroRois.add(roiData);
+
+                List<ROIData> tmp;
+                String pathKey = pathClass == null ? "null" : pathClass.toString();
+                if(pathClassROIsMap.containsKey(pathKey)){
+                    tmp = pathClassROIsMap.get(pathKey);
+                }else{
+                    tmp = new ArrayList<>();
+                }
+                tmp.add(roiData);
+                pathClassROIsMap.put(pathKey, tmp);
             }
         });
 
-        return omeroRois;
+        pathClassROIsMap.values().forEach(omeroRois::addAll);
+
+        return omeroRois ;
     }
 
     /**

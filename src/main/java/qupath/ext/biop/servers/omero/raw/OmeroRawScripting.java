@@ -13,10 +13,7 @@ import omero.gateway.model.ROIData;
 import omero.gateway.model.TableData;
 import omero.gateway.model.TagAnnotationData;
 import omero.model.ChannelBinding;
-import omero.model.FileAnnotation;
-import omero.model.FileAnnotationI;
 import omero.model.NamedValue;
-import omero.model.OriginalFile;
 import omero.model.RenderingDef;
 import omero.rtypes;
 import org.slf4j.Logger;
@@ -42,7 +39,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 public class OmeroRawScripting {
