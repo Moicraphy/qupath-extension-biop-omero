@@ -223,7 +223,8 @@ class UtilityTools {
                 //feature value for each pathObject
                 List<Object> feature = new ArrayList<>();
                 for (PathObject pathObject : pathObjects) {
-                    feature.add(ob.getStringValue(pathObject, col));
+                    String strValue = ob.getStringValue(pathObject, col);
+                    feature.add(strValue == null ? "null" : strValue);
                 }
                 measurements.add(feature);
             }
