@@ -1999,6 +1999,12 @@ public final class OmeroRawTools {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Unlink tags from an image on OMERO
+     *
+     * @param client
+     * @param imageId
+     */
     protected static void unlinkTags(OmeroRawClient client, long imageId){
         try{
             List<TagAnnotationData> tags = readTags(client, imageId);
@@ -2008,9 +2014,9 @@ public final class OmeroRawTools {
                         " link where link.parent = " + imageId +
                         " and link.child = " + tag.getId(), null));
             }
-            client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), oss).getResponse();
+            client.getGateway().getFacility(DataManagerFacility.class).delete(client.getContext(), oss).block(500);
 
-        }catch(ExecutionException | DSOutOfServiceException | ServerError e) {
+        }catch(ExecutionException | DSOutOfServiceException | ServerError | InterruptedException e) {
             Dialogs.showErrorNotification("Unlink tags", "Cannot unlink tags for the image "+imageId);
             logger.error(""+e);
             logger.error(getErrorStackTraceAsString(e));

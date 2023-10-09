@@ -80,7 +80,7 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
 
         if (keyValues.keySet().size() > 0) {
             // Ask user if he/she wants to send all annotations
-            boolean confirm = Dialogs.showConfirmDialog(title, String.format("Do you want to send all metadata as key-values ? (%d %s)",
+            boolean confirm = Dialogs.showConfirmDialog(title, String.format("Do you want to send all metadata as key-values or tags ? (%d %s)",
                     keyValues.keySet().size(),
                     (keyValues.keySet().size() == 1 ? "object" : "objects")));
 
@@ -91,7 +91,7 @@ public class OmeroRawWriteMetadataCommand  implements Runnable{
             return;
         }
 
-        String objectString = "key-value" + (keyValues.keySet().size() == 1 ? "" : "s");
+        String objectString = "KVP" + (keyValues.keySet().size() == 1 ? "" : "s") + "/tag" + (keyValues.keySet().size() == 1 ? "" : "s");
         boolean wasSaved = true;
 
         // send metadata to OMERO

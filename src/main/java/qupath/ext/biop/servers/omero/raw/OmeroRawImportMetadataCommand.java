@@ -15,7 +15,7 @@ import java.awt.image.BufferedImage;
 
 public class OmeroRawImportMetadataCommand implements Runnable{
 
-    private final String title = "Import KeyValues from OMERO";
+    private final String title = "Import KeyValues / Tags from OMERO";
     private final QuPathGUI qupath;
     public OmeroRawImportMetadataCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
@@ -80,10 +80,9 @@ public class OmeroRawImportMetadataCommand implements Runnable{
             int nQuPathKVAfterAdding = entry.getMetadataKeys().size();
             int nNewKV = nQuPathKVAfterAdding - nExistingKV;
 
-            Dialogs.showInfoNotification(title, String.format("Keep %d %s and add %d new %s", nExistingKV,
-                    (nExistingKV <= 1 ? "key-value" : "key-values"),
+            Dialogs.showInfoNotification(title, String.format("Keep %d metadata and add %d new %s", nExistingKV,
                     nNewKV,
-                    (nNewKV <= 1 ? "key-value" : "key-values")));
+                    (nNewKV <= 1 ? "KVP/tag" : "KVPs/tags")));
         }
         if(replaceMetadata) {
             // get the initial number of key values
@@ -97,10 +96,9 @@ public class OmeroRawImportMetadataCommand implements Runnable{
             int nQuPathKVAfterAdding = entry.getMetadataKeys().size();
             int nNewKV = nQuPathKVAfterAdding - nExistingKV;
 
-            Dialogs.showInfoNotification(title, String.format("Update %d %s and add %d new %s", nExistingKV,
-                    (nExistingKV <= 1 ? "key-value" : "key-values"),
+            Dialogs.showInfoNotification(title, String.format("Update %d metadata and add %d new %s", nExistingKV,
                     nNewKV,
-                    (nNewKV <= 1 ? "key-value" : "key-values")));
+                    (nNewKV <= 1 ? "KVP/tag" : "KVPs/tags")));
         }
         if(deleteMetadata) {
             // get the number of new key values
@@ -113,8 +111,8 @@ public class OmeroRawImportMetadataCommand implements Runnable{
             // get the number of new key values
             int nNewKV = entry.getMetadataKeys().size();
 
-            Dialogs.showInfoNotification(title, String.format("Delete %d previous key-values and add %d new %s", nExistingKV, nNewKV,
-                    (nNewKV <= 1 ? "key-value" : "key-values")));
+            Dialogs.showInfoNotification(title, String.format("Delete %d previous metadata and add %d new %s", nExistingKV, nNewKV,
+                    (nNewKV <= 1 ? "KVP/tag" : "KVPs/tags")));
         }
     }
 

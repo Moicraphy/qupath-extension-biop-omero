@@ -366,7 +366,6 @@ public class OmeroRawScripting {
         wasAdded = wasAdded && OmeroRawTools.deleteKeyValuesOnOmero(omeroAnnotationMaps, imageServer.getClient());
 
         // unlink tags on OMERO
-        //TODO see if it ok to do this
         OmeroRawTools.unlinkTags(imageServer.getClient(), imageServer.getId());
 
         // add tags on OMERO
@@ -708,7 +707,7 @@ public class OmeroRawScripting {
 
         if(tags.isEmpty()) {
             Dialogs.showInfoNotification("Sending tags", "All tags are already existing on OMERO.");
-            return false;
+            return true;
         }
 
         boolean wasAdded = true;
