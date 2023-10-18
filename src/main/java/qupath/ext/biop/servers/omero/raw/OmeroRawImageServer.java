@@ -856,7 +856,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		if(roiData.isEmpty())
 			return new ArrayList<>();
 
-		return OmeroRawTools.createPathObjectsFromOmeroROIs(roiData);
+		return OmeroRawShapes.createPathObjectsFromOmeroROIs(roiData);
 	}
 
 

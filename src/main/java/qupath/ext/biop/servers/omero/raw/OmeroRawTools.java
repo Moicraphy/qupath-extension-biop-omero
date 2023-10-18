@@ -1502,41 +1502,7 @@ public final class OmeroRawTools {
      * @return List of OMERO ROIs
      */
     public static List<ROIData> createOmeroROIsFromPathObjects(Collection<PathObject> pathObjects){
-        List<ROIData> omeroRois = new ArrayList<>();
-        Map<PathObject,String> idObjectMap = new LinkedHashMap<>();
-        Map<String,List<ROIData>> pathClassROIsMap = new TreeMap<>(Comparator.naturalOrder());
-
-        // create unique ID for each object
-        pathObjects.forEach(pathObject -> idObjectMap.put(pathObject, pathObject.getID().toString()));
-
-        pathObjects.forEach(pathObject -> {
-            // computes OMERO-readable ROIs
-            List<ShapeData> shapes = OmeroRawShapes.convertQuPathRoiToOmeroRoi(pathObject, idObjectMap.get(pathObject), pathObject.getParent() == null ? "NoParent" : idObjectMap.get(pathObject.getParent()));
-            if (!(shapes == null) && !(shapes.isEmpty())) {
-                PathClass pathClass = pathObject.getPathClass();
-                // set the ROI color according to the class assigned to the corresponding PathObject
-                shapes.forEach(shape -> {
-                    shape.getShapeSettings().setStroke(pathClass == null ? Color.YELLOW : new Color(pathClass.getColor()));
-                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathClass == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathClass.getColor())));
-                });
-                ROIData roiData = new ROIData();
-                shapes.forEach(roiData::addShapeData);
-
-                List<ROIData> tmp;
-                String pathKey = pathClass == null ? "null" : pathClass.toString();
-                if(pathClassROIsMap.containsKey(pathKey)){
-                    tmp = pathClassROIsMap.get(pathKey);
-                }else{
-                    tmp = new ArrayList<>();
-                }
-                tmp.add(roiData);
-                pathClassROIsMap.put(pathKey, tmp);
-            }
-        });
-
-        pathClassROIsMap.values().forEach(omeroRois::addAll);
-
-        return omeroRois ;
+        return OmeroRawShapes.createOmeroROIsFromPathObjects(pathObjects);
     }
 
     /**
@@ -1546,56 +1512,7 @@ public final class OmeroRawTools {
      * @return List of QuPath pathObjects
      */
     public static Collection<PathObject> createPathObjectsFromOmeroROIs(List<ROIData> roiData){
-        Map<Double,Double> idParentIdMap = new HashMap<>();
-        Map<Double,PathObject> idObjectMap = new HashMap<>();
-
-        for (ROIData roiDatum : roiData) {
-            // get the comment attached to OMERO ROIs
-            List<String> roiCommentsList = getROIComment(roiDatum);
-
-            // check that all comments are identical for all the shapes attached to the same ROI.
-            // if there are different, a warning is thrown because they should be identical.
-            String roiComment = "";
-            if(!roiCommentsList.isEmpty()) {
-                roiComment = roiCommentsList.get(0);
-                for (int i = 0; i < roiCommentsList.size() - 1; i++) {
-                    if (!(roiCommentsList.get(i).equals(roiCommentsList.get(i + 1)))) {
-                        logger.warn("Different classes are set for two shapes link to the same parent");
-                        logger.warn("The following class will be assigned for all child object -> "+roiComment);
-                    }
-                }
-            }
-
-            // get the type, class, id and parent id of thu current ROI
-            String[] roiCommentParsed = parseROIComment(roiComment);
-            String roiType = roiCommentParsed[0];
-            String roiClass = roiCommentParsed[1];
-            double roiId = Double.parseDouble(roiCommentParsed[2]);
-            double parentId = Double.parseDouble(roiCommentParsed[3]);
-
-            // convert OMERO ROIs to QuPath ROIs
-            ROI qpROI = OmeroRawShapes.convertOmeroROIsToQuPathROIs(roiDatum);
-
-            // convert QuPath ROI to QuPath Annotation or detection Object (according to type).
-            idObjectMap.put(roiId, OmeroRawShapes.createPathObjectFromQuPathRoi(qpROI, roiType, roiClass));
-
-            // populate parent map with current_object/parent ids
-            idParentIdMap.put(roiId,parentId);
-        }
-
-        // set the parent/child hierarchy and add objects without any parent to the final list
-        List<PathObject> pathObjects = new ArrayList<>();
-
-        idParentIdMap.keySet().forEach(objID->{
-            // if the current object has a valid id and has a parent
-            if(objID > 0 && idParentIdMap.get(objID) > 0 && !(idObjectMap.get(idParentIdMap.get(objID)) == null))
-                idObjectMap.get(idParentIdMap.get(objID)).addChildObject(idObjectMap.get(objID));
-            else
-                // if no valid id for object or if the object has no parent
-                pathObjects.add(idObjectMap.get(objID));
-        });
-
-        return pathObjects;
+        return OmeroRawShapes.createPathObjectsFromOmeroROIs(roiData);
     }
 
     /**
@@ -1605,35 +1522,7 @@ public final class OmeroRawTools {
      * @return The shape comment
      */
     public static String getROIComment(Shape shape){
-        if(shape instanceof Rectangle){
-            RectangleData s = new RectangleData(shape);
-            return s.getText();
-        }else if(shape instanceof Ellipse){
-            EllipseData s = new EllipseData(shape);
-            return s.getText();
-        }else if(shape instanceof Point){
-            PointData s = new PointData(shape);
-            return s.getText();
-        }else if(shape instanceof Polyline){
-            PolylineData s = new PolylineData(shape);
-            return s.getText();
-        }else if(shape instanceof Polygon){
-            PolygonData s = new PolygonData(shape);
-            return s.getText();
-        }else if(shape instanceof Label){
-            logger.warn("No ROIs created (requested label shape is unsupported)");
-            //s=new TextData(shape);
-        }else if(shape instanceof Line){
-            LineData s = new LineData(shape);
-            return s.getText();
-        }else if(shape instanceof Mask){
-            logger.warn("No ROIs created (requested Mask shape is not supported yet)");
-            //s=new MaskData(shape);
-        }else{
-            logger.warn("Unsupported shape ");
-        }
-
-        return null;
+        return OmeroRawShapes.getROIComment(shape);
     }
 
     /**
@@ -1643,21 +1532,7 @@ public final class OmeroRawTools {
      * @return List of comments
      */
     public static List<String> getROIComment(ROIData roiData) {
-        // get the ROI
-        Roi omeROI = (Roi) roiData.asIObject();
-
-        // get the shapes contained in the ROI (i.e. holes or something else)
-        List<Shape> shapes = omeROI.copyShapes();
-        List<String> list = new ArrayList<>();
-
-        // Iterate on shapes, select the correct instance and get the comment attached to it.
-        for (Shape shape : shapes) {
-            String comment = getROIComment(shape);
-            if (comment != null)
-                list.add(comment);
-        }
-
-        return list;
+        return OmeroRawShapes.getROIComment(roiData);
     }
 
     /**
@@ -1667,46 +1542,7 @@ public final class OmeroRawTools {
      * @return The split comment
      */
     public static String[] parseROIComment(String comment) {
-        // default parsing
-        String roiClass = "NoClass";
-        String roiType = "annotation";
-        String roiParent =  "0";
-        String roiID =  "-"+System.nanoTime();
-
-        // split the string
-        String[] tokens = (comment.isBlank() || comment.isEmpty()) ? null : comment.split(":");
-        if(tokens == null)
-            return new String[]{roiType, roiClass, roiID, roiParent};
-
-        // get ROI type
-        if (tokens.length > 0)
-            roiType = tokens[0];
-
-        // get the class
-        if(tokens.length > 1)
-            roiClass = tokens[1];
-
-        // get the ROI id
-        if(tokens.length > 2) {
-            try {
-                Double.parseDouble(tokens[2]);
-                roiID = tokens[2];
-            } catch (NumberFormatException e) {
-                roiID = "-"+System.nanoTime();
-            }
-        }
-
-        // get the parent ROI id
-        if(tokens.length > 3) {
-            try {
-                Double.parseDouble(tokens[3]);
-                roiParent = tokens[3];
-            } catch (NumberFormatException e) {
-                roiParent = "0";
-            }
-        }
-
-        return new String[]{roiType, roiClass, roiID, roiParent};
+        return OmeroRawShapes.parseROIComment(comment);
     }
 
 

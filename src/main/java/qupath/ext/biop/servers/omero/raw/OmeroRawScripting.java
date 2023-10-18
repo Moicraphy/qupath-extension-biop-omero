@@ -227,7 +227,7 @@ public class OmeroRawScripting {
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects, boolean deleteROIsOnOMERO) {
         // convert pathObjects to OMERO ROIs
-        List<ROIData> omeroROIs = OmeroRawTools.createOmeroROIsFromPathObjects(pathObjects);
+        List<ROIData> omeroROIs = OmeroRawShapes.createOmeroROIsFromPathObjects(pathObjects);
 
         // get omero client and image id to send ROIs to the correct image
         OmeroRawClient client = imageServer.getClient();
