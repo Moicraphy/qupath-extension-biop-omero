@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 
 import javafx.scene.control.CheckBox;
+import javafx.scene.text.Font;
 import omero.gateway.model.FileAnnotationData;
 import omero.gateway.model.ROIData;
 import org.apache.commons.lang3.StringUtils;
@@ -49,7 +50,7 @@ import qupath.lib.objects.PathObject;
 public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
     private final String title = "Sending annotations";
-
+    private final double MAX_FONT_SIZE = 16.0;
     private final QuPathGUI qupath;
 
     OmeroRawWriteAnnotationObjectsCommand(QuPathGUI qupath) {
@@ -76,14 +77,29 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         CheckBox cbDetectionsMap = new CheckBox("Detection measurements");
         cbDetectionsMap.setSelected(false);
 
-        CheckBox cbDeleteRois = new CheckBox("Delete existing tables & annotations on OMERO");
+        CheckBox cbDeleteRois = new CheckBox("Delete existing tables & ROIs on OMERO");
         cbDeleteRois.setSelected(false);
 
+        CheckBox cbDeleteMyRois = new CheckBox("Delete only files / ROIs I own");
+        cbDeleteMyRois.setSelected(false);
+        cbDeleteMyRois.setDisable(true);
+
+        cbDeleteRois.selectedProperty().addListener((v, o, n) -> {
+            cbDeleteMyRois.setDisable(!cbDeleteRois.isSelected());
+            cbDeleteMyRois.setSelected(cbDeleteRois.isSelected());
+        });
+
+
+        Label frontMessageLb = new Label("Send all annotations with : ");
+        frontMessageLb.setFont(new Font(MAX_FONT_SIZE));
+
         int row = 0;
-        pane.add(new Label("Send all annotations with : "), 0, row++, 2, 1);
+        pane.add(frontMessageLb, 0, row++, 2, 1);
         pane.add(cbAnnotationsMap, 0, row++);
         pane.add(cbDetectionsMap, 0, row++);
-        pane.add(cbDeleteRois, 0, ++row);
+        pane.add(new Label("--------------------------------"), 0, row++);
+        pane.add(cbDeleteRois, 0, row++);
+        pane.add(cbDeleteMyRois, 0, row);
 
         pane.setHgap(5);
         pane.setVgap(5);
@@ -95,6 +111,7 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         boolean annotationMap = cbAnnotationsMap.isSelected();
         boolean deletePreviousExperiments = cbDeleteRois.isSelected();
         boolean detectionMap = cbDetectionsMap.isSelected();
+        boolean deleteOnlyFilesIOwn = cbDeleteMyRois.isSelected();
 
         Collection<PathObject> objs = viewer.getHierarchy().getAnnotationObjects();
 
@@ -161,17 +178,23 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
 
         // delete all previous ROIs and related tables (detection and annotations)
         if(deletePreviousExperiments) {
-            OmeroRawScripting.deleteAnnotationFiles(omeroServer, tmpFileList);
-            OmeroRawScripting.deleteDetectionFiles(omeroServer, tmpFileList);
+            String currentLoggedInUser = omeroServer.getClient().getLoggedInUser().getOmeName().getValue();
+
+            if(!deleteOnlyFilesIOwn)
+                currentLoggedInUser = null;
+
+            OmeroRawScripting.deleteAnnotationFiles(omeroServer, tmpFileList, currentLoggedInUser);
+            OmeroRawScripting.deleteDetectionFiles(omeroServer, tmpFileList, currentLoggedInUser);
 
             // remove only ROIs owned by the logged in user
-            List<ROIData> filteredTmpRois = OmeroRawShapes.filterByOwner(omeroServer.getClient(), tmpRoiList,
-                    omeroServer.getClient().getLoggedInUser().getOmeName().getValue());
+            List<ROIData> filteredTmpRois = OmeroRawShapes.filterByOwner(omeroServer.getClient(), tmpRoiList, currentLoggedInUser);
             OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), filteredTmpRois);
 
-            // remove all ROIs that are don't own by the logged in user
-            tmpRoiList.removeAll(filteredTmpRois);
-            OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), tmpRoiList);
+            if(!deleteOnlyFilesIOwn) {
+                // remove all ROIs that are don't own by the logged in user
+                tmpRoiList.removeAll(filteredTmpRois);
+                OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), tmpRoiList);
+            }
         }
 
         if(detectionMap || annotationMap)

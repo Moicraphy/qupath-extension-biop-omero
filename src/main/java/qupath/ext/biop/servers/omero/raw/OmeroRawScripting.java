@@ -13,6 +13,7 @@ import omero.gateway.model.ROIData;
 import omero.gateway.model.TableData;
 import omero.gateway.model.TagAnnotationData;
 import omero.model.ChannelBinding;
+import omero.model.Experimenter;
 import omero.model.NamedValue;
 import omero.model.RenderingDef;
 import omero.rtypes;
@@ -1136,8 +1137,8 @@ public class OmeroRawScripting {
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL, null);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE, null);
     }
 
 
@@ -1149,9 +1150,21 @@ public class OmeroRawScripting {
      * @param files List of files to browse
      */
     public static void deleteAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
+        deleteAnnotationFiles(imageServer, files, null);
+    }
+
+    /**
+     * Delete all previous version of annotation tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the current QuPath project.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param files List of files to browse
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
+     */
+    public static void deleteAnnotationFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files, String owner){
         String name = annotationFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL, owner);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE, owner);
     }
 
 
@@ -1165,8 +1178,8 @@ public class OmeroRawScripting {
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL, null);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE, null);
     }
 
     /**
@@ -1177,10 +1190,24 @@ public class OmeroRawScripting {
      * @param files List of files to browse
      */
     public static void deleteDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files){
-        String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
-        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL);
-        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE);
+        deleteDetectionFiles(imageServer, files, null);
     }
+
+
+    /**
+     * Delete all previous version of detection tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the current QuPath project.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param files List of files to browse
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
+     */
+    public static void deleteDetectionFiles(OmeroRawImageServer imageServer, Collection<FileAnnotationData> files, String owner){
+        String name = detectionFileBaseName + "_" + QPEx.getQuPath().getProject().getName().split("/")[0];
+        deletePreviousFileVersions(imageServer.getClient(), files, name, FileAnnotationData.MS_EXCEL, owner);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, TablesFacility.TABLES_MIMETYPE, owner);
+    }
+
 
     /**
      * Delete all previous version of a file, identified by the name given in parameters. This name may or may not be the
@@ -1191,7 +1218,7 @@ public class OmeroRawScripting {
      */
     public static void deleteFiles(OmeroRawImageServer imageServer, String name){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
-        deletePreviousFileVersions(imageServer.getClient(), files, name, null);
+        deletePreviousFileVersions(imageServer.getClient(), files, name, null, null);
     }
 
 
@@ -1202,16 +1229,56 @@ public class OmeroRawScripting {
      * @param client Omero client
      * @param files List of files to browse
      * @param name Table name that files name must contain to be deleted (i.e. filtering item)
+     * @param format file format to look for
      */
     private static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name, String format){
+        deletePreviousFileVersions(client, files, name, format, null);
+    }
+
+    /**
+     * Delete all previous version of tables (OMERO and csv files) related to the current QuPath project.
+     * Files to delete are filtered according to the given table name in the list of files.
+     *
+     * @param client Omero client
+     * @param files List of files to browse
+     * @param name Table name that files name must contain to be deleted (i.e. filtering item)
+     * @param format file format to look for
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
+     */
+    private static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name, String format, String owner){
         if(!files.isEmpty()) {
             List<FileAnnotationData> previousTables = files.stream()
                     .filter(e -> e.getFileName().contains(name) &&
                             (format == null || format.isEmpty() || e.getFileFormat().equals(format) || e.getOriginalMimetype().equals(format)))
                     .collect(Collectors.toList());
 
-            if (!previousTables.isEmpty())
-                OmeroRawTools.deleteFiles(client, previousTables);
+            List<FileAnnotationData> filteredTables = new ArrayList<>();
+            Map<Long, String> ownerMap = new HashMap<>();
+
+            if(owner != null && !owner.isEmpty()) {
+                for (FileAnnotationData previousTable : previousTables) {
+                    // get the ROI's owner ID
+                    long ownerId = previousTable.getOwner().getId();
+                    String tableOwner;
+
+                    // get the ROI's owner
+                    if (ownerMap.containsKey(ownerId)) {
+                        tableOwner = ownerMap.get(ownerId);
+                    } else {
+                        Experimenter ownerObj = OmeroRawTools.getOmeroUser(client, ownerId, "");
+                        tableOwner = ownerObj.getOmeName().getValue();
+                        ownerMap.put(ownerId, tableOwner);
+                    }
+
+                    if (tableOwner.equals(owner))
+                        filteredTables.add(previousTable);
+                }
+            }else{
+                filteredTables = previousTables;
+            }
+
+            if (!filteredTables.isEmpty())
+                OmeroRawTools.deleteFiles(client, filteredTables);
             else logger.warn("Sending tables : No previous table attached to the image");
         }
     }

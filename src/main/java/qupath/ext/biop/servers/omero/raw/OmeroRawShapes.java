@@ -38,7 +38,6 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import omero.gateway.model.EllipseData;
-import omero.gateway.model.ExperimenterData;
 import omero.gateway.model.LineData;
 import omero.gateway.model.PointData;
 import omero.gateway.model.PolygonData;
@@ -510,7 +509,7 @@ class OmeroRawShapes {
      * @param pathObjects
      * @return List of OMERO ROIs
      */
-    public static List<ROIData> createOmeroROIsFromPathObjects(Collection<PathObject> pathObjects){
+    protected static List<ROIData> createOmeroROIsFromPathObjects(Collection<PathObject> pathObjects){
         List<ROIData> omeroRois = new ArrayList<>();
         Map<PathObject,String> idObjectMap = new LinkedHashMap<>();
         Map<String,List<ROIData>> pathClassROIsMap = new TreeMap<>(Comparator.naturalOrder());
@@ -554,7 +553,7 @@ class OmeroRawShapes {
      * @param roiData
      * @return List of QuPath pathObjects
      */
-    public static Collection<PathObject> createPathObjectsFromOmeroROIs(List<ROIData> roiData){
+    protected static Collection<PathObject> createPathObjectsFromOmeroROIs(List<ROIData> roiData){
         Map<Double,Double> idParentIdMap = new HashMap<>();
         Map<Double,PathObject> idObjectMap = new HashMap<>();
 
@@ -613,7 +612,7 @@ class OmeroRawShapes {
      * @param roiData
      * @return List of comments
      */
-    public static List<String> getROIComment(ROIData roiData) {
+    protected static List<String> getROIComment(ROIData roiData) {
         // get the ROI
         Roi omeROI = (Roi) roiData.asIObject();
 
@@ -637,7 +636,7 @@ class OmeroRawShapes {
      * @param shape
      * @return The shape comment
      */
-    public static String getROIComment(Shape shape){
+    protected static String getROIComment(Shape shape){
         if(shape instanceof Rectangle){
             RectangleData s = new RectangleData(shape);
             return s.getText();
@@ -675,7 +674,7 @@ class OmeroRawShapes {
      * @param comment
      * @return The split comment
      */
-    public static String[] parseROIComment(String comment) {
+    protected static String[] parseROIComment(String comment) {
         // default parsing
         String roiClass = "NoClass";
         String roiType = "annotation";
@@ -776,14 +775,22 @@ class OmeroRawShapes {
     }
 
 
+    /**
+     * @param client
+     * @param roiData
+     * @param owner
+     * @return the list of all ROIs created by the specified owner
+     */
     protected static List<ROIData> filterByOwner(OmeroRawClient client, List<ROIData> roiData, String owner){
         List<ROIData> filteredROI = new ArrayList<>();
         Map<Long, String> ownerMap = new HashMap<>();
 
         for(ROIData roi : roiData){
+            // get the ROI's owner ID
             long ownerId = roi.getOwner().getId();
             String roiOwner;
 
+            // get the ROI's owner
             if(ownerMap.containsKey(ownerId)){
                 roiOwner = ownerMap.get(ownerId);
             }else{

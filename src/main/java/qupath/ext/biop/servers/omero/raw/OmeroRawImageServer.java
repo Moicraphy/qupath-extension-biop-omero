@@ -837,15 +837,7 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	}
 
 	/**
-	 * Retrieve any ROIs stored with this image as annotation objects.
-	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
-	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
-	 * <br>
-	 * ***********************BE CAREFUL****************************<br>
-	 * For the z and t in the ImagePlane, if z &lt; 0 and t &lt; 0 (meaning that roi should be present on all the slices/frames),
-	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)<br>
-	 * ****************************************************************
-	 *
+	 * See below
 	 * @return list of path objects
 	 */
 	@Override
@@ -854,7 +846,8 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	}
 
 	/**
-	 * Retrieve any ROIs stored with this image as annotation objects.
+	 * Retrieve any ROIs created by a certain user stored with this image as annotation objects.
+	 * If the user is null, then all ROIs are imported, independently of who creates the ROIs.
 	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
 	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
 	 * <br>
@@ -863,16 +856,17 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)<br>
 	 * ****************************************************************
 	 *
+	 * @param omeroRoiOwner
 	 * @return list of path objects
 	 */
-	public Collection<PathObject> readPathObjects(String owner) {
+	public Collection<PathObject> readPathObjects(String omeroRoiOwner) {
 		List<ROIData> roiData = OmeroRawTools.readOmeroROIs(this.getClient(), this.imageID);
 
 		if(roiData.isEmpty())
 			return new ArrayList<>();
 
-		if(owner != null && !owner.isEmpty())
-			roiData = OmeroRawShapes.filterByOwner(getClient(), roiData, owner);
+		if(omeroRoiOwner != null && !omeroRoiOwner.isEmpty())
+			roiData = OmeroRawShapes.filterByOwner(getClient(), roiData, omeroRoiOwner);
 
 		return OmeroRawShapes.createPathObjectsFromOmeroROIs(roiData);
 	}
