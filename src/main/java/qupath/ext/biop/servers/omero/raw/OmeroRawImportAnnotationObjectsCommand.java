@@ -1,18 +1,24 @@
 package qupath.ext.biop.servers.omero.raw;
 
+import javafx.collections.FXCollections;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
+import javafx.scene.text.Font;
+import omero.RString;
+import omero.model.Experimenter;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
-import qupath.lib.objects.PathObjectReader;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Command to import ROIs from OMERO server where the
@@ -25,6 +31,8 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
 
     private final String title = "Import objects from OMERO";
     private final QuPathGUI qupath;
+    private final double MAX_FONT_SIZE = 16.0;
+    private final String ALL_USER_CHOICE = "All";
     public OmeroRawImportAnnotationObjectsCommand(QuPathGUI qupath)  {
         this.qupath = qupath;
     }
@@ -41,35 +49,66 @@ public class OmeroRawImportAnnotationObjectsCommand implements Runnable{
             return;
         }
 
-        // build the GUI for import options
-        GridPane pane = new GridPane();
+        // get the list of available user for the current group (i.e. the one of the current image)
+        OmeroRawImageServer omeroServer = ((OmeroRawImageServer) imageServer);
+        long groupID = OmeroRawTools.getGroupIdFromImageId(omeroServer.getClient(), omeroServer.getId());
+        List<String> userList = OmeroRawTools.getOmeroUsersInGroup(omeroServer.getClient(), groupID)
+                .stream()
+                .map(Experimenter::getOmeName)
+                .map(RString::getValue)
+                .collect(Collectors.toList());
 
-        CheckBox cbRemoveAnnotations = new CheckBox("Delete current annotations");
+        userList.add(0, ALL_USER_CHOICE);
+
+        // build the GUI for import options
+        GridPane generalPane = new GridPane();
+
+        ComboBox<String> comboBox = new ComboBox<>(FXCollections.observableArrayList(userList));
+        comboBox.getSelectionModel().selectFirst();
+
+        CheckBox cbRemoveAnnotations = new CheckBox("Delete current QuPath annotations");
         cbRemoveAnnotations.setSelected(true);
 
-        CheckBox cbRemoveDetections = new CheckBox("Delete current detections");
+        CheckBox cbRemoveDetections = new CheckBox("Delete current QuPath detections");
         cbRemoveDetections.setSelected(true);
 
+        Label importOptLb = new Label("Select import options");
+        importOptLb.setFont(new Font(MAX_FONT_SIZE));
+
+        Label userLb = new Label("User");
+        userLb.setTooltip(new Tooltip("Import ROIs created by a certain user"));
+
+        GridPane userPane = new GridPane();
+        userPane.add(userLb, 0, 0);
+        userPane.add(comboBox,1,0);
+        userPane.setHgap(5);
+        userPane.setVgap(5);
+
         int row = 0;
-        pane.add(new Label("Select import options"), 0, row++, 2, 1);
-        pane.add(cbRemoveAnnotations, 0, row++);
-        pane.add(cbRemoveDetections, 0, row);
+        generalPane.add(importOptLb, 0, row++, 2, 1);
+        generalPane.add(userPane,0, row++);
+        generalPane.add(new Label("--------------------------------"), 0, row++);
+        generalPane.add(cbRemoveAnnotations, 0, row++, 4, 1);
+        generalPane.add(cbRemoveDetections, 0, row,4, 1);
 
-        pane.setHgap(5);
-        pane.setVgap(5);
+        generalPane.setHgap(5);
+        generalPane.setVgap(5);
 
-        if (!Dialogs.showConfirmDialog(title, pane))
+        if (!Dialogs.showConfirmDialog(title, generalPane))
             return;
 
         // get user choice
         boolean removeDetections = cbRemoveDetections.isSelected();
         boolean removeAnnotations = cbRemoveAnnotations.isSelected();
+        String user = comboBox.getSelectionModel().getSelectedItem();
+        if(user.equals(ALL_USER_CHOICE))
+            user = null;
 
         // read ROIs from OMERO
         Collection<PathObject> roiFromOmero;
         try {
-            roiFromOmero = ((PathObjectReader) imageServer).readPathObjects();
-        } catch (IOException e) {
+            roiFromOmero = ((OmeroRawImageServer) imageServer).readPathObjects(user);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 

@@ -38,6 +38,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import omero.gateway.model.EllipseData;
+import omero.gateway.model.ExperimenterData;
 import omero.gateway.model.LineData;
 import omero.gateway.model.PointData;
 import omero.gateway.model.PolygonData;
@@ -47,6 +48,7 @@ import omero.gateway.model.RectangleData;
 import omero.gateway.model.ShapeData;
 
 import omero.model.Ellipse;
+import omero.model.Experimenter;
 import omero.model.Label;
 import omero.model.Line;
 import omero.model.Mask;
@@ -771,5 +773,28 @@ class OmeroRawShapes {
             else*/
                 return ROIs.createPolygonROI(polygonROICoordinates, roi.getImagePlane());
         }
+    }
+
+
+    protected static List<ROIData> filterByOwner(OmeroRawClient client, List<ROIData> roiData, String owner){
+        List<ROIData> filteredROI = new ArrayList<>();
+        Map<Long, String> ownerMap = new HashMap<>();
+
+        for(ROIData roi : roiData){
+            long ownerId = roi.getOwner().getId();
+            String roiOwner;
+
+            if(ownerMap.containsKey(ownerId)){
+                roiOwner = ownerMap.get(ownerId);
+            }else{
+                Experimenter ownerObj = OmeroRawTools.getOmeroUser(client, ownerId, "");
+                roiOwner = ownerObj.getOmeName().getValue();
+                ownerMap.put(ownerId, roiOwner);
+            }
+
+            if(roiOwner.equals(owner))
+                filteredROI.add(roi);
+        }
+        return filteredROI;
     }
 }

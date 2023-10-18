@@ -163,6 +163,14 @@ public class OmeroRawWriteAnnotationObjectsCommand implements Runnable {
         if(deletePreviousExperiments) {
             OmeroRawScripting.deleteAnnotationFiles(omeroServer, tmpFileList);
             OmeroRawScripting.deleteDetectionFiles(omeroServer, tmpFileList);
+
+            // remove only ROIs owned by the logged in user
+            List<ROIData> filteredTmpRois = OmeroRawShapes.filterByOwner(omeroServer.getClient(), tmpRoiList,
+                    omeroServer.getClient().getLoggedInUser().getOmeName().getValue());
+            OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), filteredTmpRois);
+
+            // remove all ROIs that are don't own by the logged in user
+            tmpRoiList.removeAll(filteredTmpRois);
             OmeroRawTools.deleteOmeroROIs(omeroServer.getClient(), tmpRoiList);
         }
 

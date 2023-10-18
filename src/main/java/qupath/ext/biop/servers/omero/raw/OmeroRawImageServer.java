@@ -850,11 +850,29 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 	 */
 	@Override
 	public Collection<PathObject> readPathObjects() {
+		return readPathObjects(null);
+	}
 
+	/**
+	 * Retrieve any ROIs stored with this image as annotation objects.
+	 * ROIs can be made of single or multiple rois. rois can be contained inside ROIs (ex. holes) but should not intersect.
+	 * It is also possible to import a set of physically separated ROIs as one geometry ROI.
+	 * <br>
+	 * ***********************BE CAREFUL****************************<br>
+	 * For the z and t in the ImagePlane, if z &lt; 0 and t &lt; 0 (meaning that roi should be present on all the slices/frames),
+	 * only the first slice/frame is taken into account (meaning that roi are only visible on the first slice/frame)<br>
+	 * ****************************************************************
+	 *
+	 * @return list of path objects
+	 */
+	public Collection<PathObject> readPathObjects(String owner) {
 		List<ROIData> roiData = OmeroRawTools.readOmeroROIs(this.getClient(), this.imageID);
 
 		if(roiData.isEmpty())
 			return new ArrayList<>();
+
+		if(owner != null && !owner.isEmpty())
+			roiData = OmeroRawShapes.filterByOwner(getClient(), roiData, owner);
 
 		return OmeroRawShapes.createPathObjectsFromOmeroROIs(roiData);
 	}
