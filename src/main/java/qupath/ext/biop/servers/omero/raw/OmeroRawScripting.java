@@ -3,7 +3,6 @@ package qupath.ext.biop.servers.omero.raw;
 import fr.igred.omero.Client;
 import omero.gateway.exception.DSOutOfServiceException;
 import javafx.collections.ObservableList;
-
 import omero.gateway.facility.TablesFacility;
 import omero.gateway.model.ChannelData;
 import omero.gateway.model.DataObject;
@@ -28,12 +27,10 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.projects.ProjectImageEntry;
 import qupath.lib.scripting.QP;
-
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -72,19 +69,7 @@ public class OmeroRawScripting {
 
 
     /**
-     * Import ROIs from OMERO to QuPath and remove all current annotations/detections in QuPath.
-     * See {@link #importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removePathObjects)}
-     *
-     * @param imageServer : ImageServer of an image loaded from OMERO
-     * @return The list of OMERO rois converted into pathObjects.
-     */
-    public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer) {
-        return importOmeroROIsToQuPath(imageServer, true);
-    }
-
-
-    /**
-     * Import ROIs from OMERO to QuPath
+     * Import all ROIs linked to the current image from OMERO to QuPath.
      * <p>
      * <ul>
      * <li> Read ROIs from OMERO </li>
@@ -99,8 +84,28 @@ public class OmeroRawScripting {
      * @return The list of OMERO rois converted into pathObjects
      */
     public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removePathObjects) {
+        return importOmeroROIsToQuPath(imageServer, removePathObjects, null);
+    }
+
+    /**
+     * Import ROIs owned by the specified owner and linked to the current image from OMERO to QuPath
+     * <p>
+     * <ul>
+     * <li> Read ROIs from OMERO </li>
+     * <li> Check if current annotations/detection have to be deleted or not </li>
+     * <li> Add new pathObjects to the current image </li>
+     * </ul>
+     * <p>
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param removePathObjects Boolean to delete or keep pathObjects (annotations, detections) on the current image.
+     *
+     * @return The list of OMERO rois converted into pathObjects
+     */
+    public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer,
+                                                                 boolean removePathObjects, String owner) {
         // read OMERO ROIs
-        Collection<PathObject> pathObjects = imageServer.readPathObjects();
+        Collection<PathObject> pathObjects = imageServer.readPathObjects(owner);
 
         // get the current hierarchy
         PathObjectHierarchy hierarchy = QP.getCurrentHierarchy();
@@ -130,22 +135,6 @@ public class OmeroRawScripting {
         return sendPathObjectsToOmero(imageServer, true, null);
     }
 
-
-    /**
-     * Send all QuPath objects (annotations and detections) to OMERO.
-     * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
-     *
-     * @param imageServer ImageServer of an image loaded from OMERO
-     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
-     *
-     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
-     * @deprecated use {@link OmeroRawScripting#sendPathObjectsToOmero(OmeroRawImageServer, boolean, String)} instead.
-     */
-    @Deprecated
-    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
-        return sendPathObjectsToOmero(imageServer, deleteROIsOnOMERO, null);
-    }
-
     /**
      * Send all QuPath objects (annotations and detections) to OMERO.
      * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
@@ -170,21 +159,6 @@ public class OmeroRawScripting {
      */
     public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer) {
         return sendAnnotationsToOmero(imageServer, false, null);
-    }
-
-
-    /**
-     * Send all QuPath annotation objects to OMERO.
-     *
-     * @param imageServer ImageServer of an image loaded from OMERO
-     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
-     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
-     *
-     * @deprecated use {@link OmeroRawScripting#sendAnnotationsToOmero(OmeroRawImageServer, boolean, String)} instead.
-     */
-    @Deprecated
-    public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
-        return sendAnnotationsToOmero(imageServer, deleteROIsOnOMERO, null);
     }
 
 
@@ -220,20 +194,6 @@ public class OmeroRawScripting {
      *
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
-     *
-     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
-     * @deprecated use {@link OmeroRawScripting#sendDetectionsToOmero(OmeroRawImageServer, boolean, String)} instead.
-     */
-    @Deprecated
-    public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
-        return sendDetectionsToOmero(imageServer, deleteROIsOnOMERO, null);
-    }
-
-    /**
-     * Send all QuPath detections to OMERO and delete existing ROIs is specified.
-     *
-     * @param imageServer ImageServer of an image loaded from OMERO
-     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
      * @param owner the owner of the ROIs to delete. If null, then all ROIs are deleted whatever the owner
      *
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
@@ -256,29 +216,6 @@ public class OmeroRawScripting {
         return sendPathObjectsToOmero(imageServer, pathObjects, false, null);
     }
 
-
-    /**
-     * Send a collection of pathObjects to OMERO.
-     *
-     * <p>
-     * <ul>
-     * <li> Convert pathObjects to OMERO ROIs </li>
-     * <li> Delete all current ROIs on OMERO if explicitly asked </li>
-     * <li> Send ROIs to the current image on OMERO </li>
-     * </ul>
-     * <p>
-     *
-     * @param imageServer ImageServer of an image loaded from OMERO
-     * @param pathObjects QuPath annotations or detections objects
-     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
-     *
-     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
-     * @deprecated use {@link OmeroRawScripting#sendPathObjectsToOmero(OmeroRawImageServer, Collection, boolean, String)} instead.
-     */
-    @Deprecated
-    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects, boolean deleteROIsOnOMERO) {
-        return sendPathObjectsToOmero(imageServer, pathObjects, deleteROIsOnOMERO, null);
-    }
 
     /**
      * Send a collection of pathObjects to OMERO.
@@ -726,22 +663,6 @@ public class OmeroRawScripting {
         }
 
         return currentOmeroKeyValues.stream().collect(Collectors.toMap(e->e.name, e->e.value));
-    }
-
-
-    /**
-     * Read, from OMERO, tags attached to the current image.
-     *
-     * @param imageServer ImageServer of an image loaded from OMERO
-     * @return list of OMERO tags.
-     */
-    @Deprecated
-    public static List<String> importOmeroTags(OmeroRawImageServer imageServer) {
-        // read tags
-        List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
-
-        // collect and convert to list
-        return omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
     }
 
 
@@ -1732,5 +1653,107 @@ public class OmeroRawScripting {
         return false;
     }
 
+
+    /**
+     * -----------------------------------------------------------------------------------------------------
+     * Deprecated methods
+     * -----------------------------------------------------------------------------------------------------
+     */
+
+    /**
+     * Import ROIs from OMERO to QuPath and remove all current annotations/detections in QuPath.
+     * See {@link #importOmeroROIsToQuPath(OmeroRawImageServer imageServer, boolean removePathObjects)}
+     *
+     * @param imageServer : ImageServer of an image loaded from OMERO
+     *
+     * @return The list of OMERO rois converted into pathObjects.
+     * @deprecated use {@link OmeroRawScripting#importOmeroROIsToQuPath(OmeroRawImageServer, boolean)} instead
+     */
+    @Deprecated
+    public static Collection<PathObject> importOmeroROIsToQuPath(OmeroRawImageServer imageServer) {
+        return importOmeroROIsToQuPath(imageServer, true);
+    }
+
+    /**
+     * Read, from OMERO, tags attached to the current image.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @return list of OMERO tags.
+     */
+    @Deprecated
+    public static List<String> importOmeroTags(OmeroRawImageServer imageServer) {
+        // read tags
+        List<TagAnnotationData> omeroTagAnnotations = OmeroRawTools.readTags(imageServer.getClient(), imageServer.getId());
+
+        // collect and convert to list
+        return omeroTagAnnotations.stream().map(TagAnnotationData::getTagValue).collect(Collectors.toList());
+    }
+
+    /**
+     * Send a collection of pathObjects to OMERO.
+     *
+     * <p>
+     * <ul>
+     * <li> Convert pathObjects to OMERO ROIs </li>
+     * <li> Delete all current ROIs on OMERO if explicitly asked </li>
+     * <li> Send ROIs to the current image on OMERO </li>
+     * </ul>
+     * <p>
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param pathObjects QuPath annotations or detections objects
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     * @deprecated use {@link OmeroRawScripting#sendPathObjectsToOmero(OmeroRawImageServer, Collection, boolean, String)} instead.
+     */
+    @Deprecated
+    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects, boolean deleteROIsOnOMERO) {
+        return sendPathObjectsToOmero(imageServer, pathObjects, deleteROIsOnOMERO, null);
+    }
+
+
+    /**
+     * Send all QuPath detections to OMERO and delete existing ROIs is specified.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     * @deprecated use {@link OmeroRawScripting#sendDetectionsToOmero(OmeroRawImageServer, boolean, String)} instead.
+     */
+    @Deprecated
+    public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
+        return sendDetectionsToOmero(imageServer, deleteROIsOnOMERO, null);
+    }
+
+    /**
+     * Send all QuPath annotation objects to OMERO.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     *
+     * @deprecated use {@link OmeroRawScripting#sendAnnotationsToOmero(OmeroRawImageServer, boolean, String)} instead.
+     */
+    @Deprecated
+    public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
+        return sendAnnotationsToOmero(imageServer, deleteROIsOnOMERO, null);
+    }
+
+    /**
+     * Send all QuPath objects (annotations and detections) to OMERO.
+     * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     * @deprecated use {@link OmeroRawScripting#sendPathObjectsToOmero(OmeroRawImageServer, boolean, String)} instead.
+     */
+    @Deprecated
+    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
+        return sendPathObjectsToOmero(imageServer, deleteROIsOnOMERO, null);
+    }
 
 }
