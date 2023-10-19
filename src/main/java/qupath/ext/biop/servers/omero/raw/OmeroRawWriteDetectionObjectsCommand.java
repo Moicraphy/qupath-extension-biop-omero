@@ -153,7 +153,7 @@ public class OmeroRawWriteDetectionObjectsCommand implements Runnable {
         objs.forEach(pathObject -> pathObject.setName(""+ (new Date()).getTime() + pathObject.hashCode()));
 
         // send detections to OMERO
-        boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois);
+        boolean hasBeenSaved = OmeroRawScripting.sendPathObjectsToOmero(omeroServer, objs, deleteRois, null);
 
         if(!onlyDetections) {
             // get detection measurements

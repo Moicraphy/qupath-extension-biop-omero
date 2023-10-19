@@ -127,7 +127,7 @@ public class OmeroRawScripting {
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer) {
-        return sendPathObjectsToOmero(imageServer, true);
+        return sendPathObjectsToOmero(imageServer, true, null);
     }
 
 
@@ -137,14 +137,30 @@ public class OmeroRawScripting {
      *
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     *
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     * @deprecated use {@link OmeroRawScripting#sendPathObjectsToOmero(OmeroRawImageServer, boolean, String)} instead.
      */
+    @Deprecated
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
-        Collection<PathObject> pathObjects = QP.getAnnotationObjects();
-        pathObjects.addAll(QP.getDetectionObjects());
-        return sendPathObjectsToOmero(imageServer, pathObjects, deleteROIsOnOMERO);
+        return sendPathObjectsToOmero(imageServer, deleteROIsOnOMERO, null);
     }
 
+    /**
+     * Send all QuPath objects (annotations and detections) to OMERO.
+     * Be careful : the number of ROIs that can be displayed at the same time on OMERO is 500.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @param owner the owner of the ROIs to delete. If null, then all ROIs are deleted whatever the owner
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     */
+    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO, String owner) {
+        Collection<PathObject> pathObjects = QP.getAnnotationObjects();
+        pathObjects.addAll(QP.getDetectionObjects());
+        return sendPathObjectsToOmero(imageServer, pathObjects, deleteROIsOnOMERO, owner);
+    }
 
     /**
      * Send all QuPath annotation objects to OMERO, without deleting current ROIs on OMERO.
@@ -153,7 +169,7 @@ public class OmeroRawScripting {
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer) {
-        return sendAnnotationsToOmero(imageServer, false);
+        return sendAnnotationsToOmero(imageServer, false, null);
     }
 
 
@@ -163,10 +179,27 @@ public class OmeroRawScripting {
      * @param imageServer ImageServer of an image loaded from OMERO
      * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     *
+     * @deprecated use {@link OmeroRawScripting#sendAnnotationsToOmero(OmeroRawImageServer, boolean, String)} instead.
      */
+    @Deprecated
     public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
+        return sendAnnotationsToOmero(imageServer, deleteROIsOnOMERO, null);
+    }
+
+
+    /**
+     * Send all QuPath annotation objects to OMERO.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @param owner the owner of the ROIs to delete. If null, then all ROIs are deleted whatever the owner
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     */
+    public static boolean sendAnnotationsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO, String owner) {
         Collection<PathObject> annotations = QP.getAnnotationObjects();
-        return sendPathObjectsToOmero(imageServer, annotations, deleteROIsOnOMERO);
+        return sendPathObjectsToOmero(imageServer, annotations, deleteROIsOnOMERO, owner);
     }
 
 
@@ -178,7 +211,7 @@ public class OmeroRawScripting {
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer) {
-        return sendDetectionsToOmero(imageServer, false);
+        return sendDetectionsToOmero(imageServer, false, null);
     }
 
 
@@ -189,10 +222,25 @@ public class OmeroRawScripting {
      * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
      *
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     * @deprecated use {@link OmeroRawScripting#sendDetectionsToOmero(OmeroRawImageServer, boolean, String)} instead.
      */
+    @Deprecated
     public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO) {
+        return sendDetectionsToOmero(imageServer, deleteROIsOnOMERO, null);
+    }
+
+    /**
+     * Send all QuPath detections to OMERO and delete existing ROIs is specified.
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @param owner the owner of the ROIs to delete. If null, then all ROIs are deleted whatever the owner
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     */
+    public static boolean sendDetectionsToOmero(OmeroRawImageServer imageServer, boolean deleteROIsOnOMERO, String owner) {
         Collection<PathObject> detections = QP.getDetectionObjects();
-        return sendPathObjectsToOmero(imageServer, detections, deleteROIsOnOMERO);
+        return sendPathObjectsToOmero(imageServer, detections, deleteROIsOnOMERO, owner);
     }
 
 
@@ -205,7 +253,7 @@ public class OmeroRawScripting {
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects) {
-        return sendPathObjectsToOmero(imageServer, pathObjects, false);
+        return sendPathObjectsToOmero(imageServer, pathObjects, false, null);
     }
 
 
@@ -225,8 +273,33 @@ public class OmeroRawScripting {
      * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
      *
      * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     * @deprecated use {@link OmeroRawScripting#sendPathObjectsToOmero(OmeroRawImageServer, Collection, boolean, String)} instead.
      */
+    @Deprecated
     public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects, boolean deleteROIsOnOMERO) {
+        return sendPathObjectsToOmero(imageServer, pathObjects, deleteROIsOnOMERO, null);
+    }
+
+    /**
+     * Send a collection of pathObjects to OMERO.
+     *
+     * <p>
+     * <ul>
+     * <li> Convert pathObjects to OMERO ROIs </li>
+     * <li> Delete all current ROIs on OMERO if explicitly asked </li>
+     * <li> Send ROIs to the current image on OMERO </li>
+     * </ul>
+     * <p>
+     *
+     * @param imageServer ImageServer of an image loaded from OMERO
+     * @param pathObjects QuPath annotations or detections objects
+     * @param deleteROIsOnOMERO Boolean to keep or delete ROIs on the current image on OMERO
+     * @param owner the owner of the ROIs to delete. If null, then all ROIs are deleted whatever the owner
+     *
+     * @return Sending status (true if ROIs have been sent ; false if there were troubles during the sending process)
+     */
+    public static boolean sendPathObjectsToOmero(OmeroRawImageServer imageServer, Collection<PathObject> pathObjects,
+                                                 boolean deleteROIsOnOMERO, String owner) {
         // convert pathObjects to OMERO ROIs
         List<ROIData> omeroROIs = OmeroRawShapes.createOmeroROIsFromPathObjects(pathObjects);
 
@@ -240,8 +313,12 @@ public class OmeroRawScripting {
             List<ROIData> existingROIs = OmeroRawTools.readOmeroROIs(client, imageId);
             // write new ROIs
             boolean hasBeenWritten = OmeroRawTools.writeOmeroROIs(client, imageId, omeroROIs);
+
+            // filter only owner's ROIs
+            List<ROIData> filteredROIs = OmeroRawShapes.filterByOwner(client, existingROIs, owner);
+
             // delete previous ROIs
-            OmeroRawTools.deleteOmeroROIs(client, existingROIs);
+            OmeroRawTools.deleteOmeroROIs(client, filteredROIs);
 
             return hasBeenWritten;
         } else {

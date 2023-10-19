@@ -865,10 +865,9 @@ public class OmeroRawImageServer extends AbstractTileableImageServer implements 
 		if(roiData.isEmpty())
 			return new ArrayList<>();
 
-		if(omeroRoiOwner != null && !omeroRoiOwner.isEmpty())
-			roiData = OmeroRawShapes.filterByOwner(getClient(), roiData, omeroRoiOwner);
+		List<ROIData> filteredROIs = OmeroRawShapes.filterByOwner(getClient(), roiData, omeroRoiOwner);
 
-		return OmeroRawShapes.createPathObjectsFromOmeroROIs(roiData);
+		return OmeroRawShapes.createPathObjectsFromOmeroROIs(filteredROIs);
 	}
 
 

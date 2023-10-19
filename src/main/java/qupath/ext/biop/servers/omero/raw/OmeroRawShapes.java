@@ -785,6 +785,9 @@ class OmeroRawShapes {
         List<ROIData> filteredROI = new ArrayList<>();
         Map<Long, String> ownerMap = new HashMap<>();
 
+        if(owner == null || owner.isEmpty())
+            return roiData;
+
         for(ROIData roi : roiData){
             // get the ROI's owner ID
             long ownerId = roi.getOwner().getId();
