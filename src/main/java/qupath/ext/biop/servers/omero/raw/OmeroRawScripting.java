@@ -746,9 +746,12 @@ public class OmeroRawScripting {
      * @param imageData QuPath image
      * @param tableName Name of the OMERO.table
      * @param deletePreviousTable Delete of not all previous OMERO measurement tables
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
      * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
-    private static boolean sendMeasurementTableToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName, boolean deletePreviousTable){
+    private static boolean sendMeasurementTableToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
+                                                       ImageData<BufferedImage> imageData, String tableName,
+                                                       boolean deletePreviousTable, String owner){
         // get the measurement table
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
         ob.setImageData(imageData, pathObjects);
@@ -762,7 +765,7 @@ public class OmeroRawScripting {
         if(deletePreviousTable){
             Collection<FileAnnotationData> tables = OmeroRawTools.readTables(client, imageId);
             boolean hasBeenSent = OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
-            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE);
+            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE, owner);
 
             return hasBeenSent;
         } else
@@ -780,7 +783,7 @@ public class OmeroRawScripting {
      * @return Sending status (true if the OMERO.table has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMeasurementTableToOmero(Collection<PathObject> annotationObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String tableName){
-        return sendMeasurementTableToOmero(annotationObjects, imageServer, imageData, tableName, false);
+        return sendMeasurementTableToOmero(annotationObjects, imageServer, imageData, tableName, false, null);
     }
 
     /**
@@ -906,7 +909,7 @@ public class OmeroRawScripting {
      * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     public static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer, ImageData<BufferedImage> imageData, String filename){
-        return sendMeasurementTableAsCSVToOmero(pathObjects, imageServer, imageData, filename, false);
+        return sendMeasurementTableAsCSVToOmero(pathObjects, imageServer, imageData, filename, false, null);
     }
 
     /**
@@ -917,10 +920,12 @@ public class OmeroRawScripting {
      * @param imageData QuPath image
      * @param filename Name of the CSV file
      * @param deletePreviousTable Delete or not all previous versions of csv measurements tables
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
      * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
      */
     private static boolean sendMeasurementTableAsCSVToOmero(Collection<PathObject> pathObjects, OmeroRawImageServer imageServer,
-                                                            ImageData<BufferedImage> imageData, String filename, boolean deletePreviousTable){
+                                                            ImageData<BufferedImage> imageData, String filename,
+                                                            boolean deletePreviousTable, String owner){
         // get the measurement table
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
         ob.setImageData(imageData, pathObjects);
@@ -939,7 +944,7 @@ public class OmeroRawScripting {
             if (deletePreviousTable) {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, imageId);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(file, client, imageId);
-                deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
+                deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL, owner);
 
             } else
                 // add the csv file to OMERO
@@ -979,7 +984,7 @@ public class OmeroRawScripting {
      * the multiple parent containers. If one deletes the file, all the links will also be deleted</li>
      * </ul>
      * <p>
-     * 
+     *
      * @param parentTable LinkedHashMap "header, List_of_measurements" to populate. Other type of maps will not work
      * @param client OMERO Client Object to handle OMERO connection
      * @param parents Collection of parent container on OMERO to link the file to
@@ -989,6 +994,29 @@ public class OmeroRawScripting {
     public static boolean sendParentMeasurementTableAsCSV(LinkedHashMap<String, List<String>> parentTable,
                                                           OmeroRawClient client, Collection<DataObject> parents,
                                                           boolean deletePreviousTable){
+        return sendParentMeasurementTableAsCSV(parentTable, client, parents, deletePreviousTable, null);
+    }
+
+
+    /**
+     * Send the summary map "header, List_of_measurements" to OMERO as an CSV file attached to the parent containers.
+     * <p>
+     * <ul>
+     * <li> IMPORTANT : The attached file is uploaded ONCE on the OMERO database. The same file is then linked to
+     * the multiple parent containers. If one deletes the file, all the links will also be deleted</li>
+     * </ul>
+     * <p>
+     * 
+     * @param parentTable LinkedHashMap "header, List_of_measurements" to populate. Other type of maps will not work
+     * @param client OMERO Client Object to handle OMERO connection
+     * @param parents Collection of parent container on OMERO to link the file to
+     * @param deletePreviousTable True if you want to delete previous CSV files on the parent container, linked to the current QuPath project
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
+     */
+    public static boolean sendParentMeasurementTableAsCSV(LinkedHashMap<String, List<String>> parentTable,
+                                                          OmeroRawClient client, Collection<DataObject> parents,
+                                                          boolean deletePreviousTable, String owner){
         // set the file name
         String filename = summaryFileBaseName + "_" +
                 QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
@@ -1017,7 +1045,7 @@ public class OmeroRawScripting {
 
                         // delete previous files
                         if (attachedFile != null)
-                            deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL);
+                            deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL, owner);
                     } else {
                         // link the file if it has already been uploaded once. Upload it otherwise
                         if (attachedFile.getFileID() > 0)
@@ -1052,6 +1080,29 @@ public class OmeroRawScripting {
     public static boolean sendParentMeasurementTableAsOmeroTable(LinkedHashMap<String, List<String>> parentTable,
                                                                  OmeroRawClient client, Collection<DataObject> parents,
                                                                  boolean deletePreviousTable){
+        return sendParentMeasurementTableAsOmeroTable(parentTable, client, parents, deletePreviousTable, null);
+    }
+
+
+    /**
+     * Send the summary map "header, List_of_measurements" to OMERO as an OMERO.table attached to the parent container
+     * <p>
+     * <ul>
+     * <li> IMPORTANT : The attached file is uploaded ONCE on the OMERO database. The same file is then linked to
+     * the multiple parent containers. If one deletes the file, all the links will also be deleted</li>
+     * </ul>
+     * <p>
+     *
+     * @param parentTable LinkedHashMap "header, List_of_measurements" to populate. Other type of maps will not work
+     * @param client OMERO Client Object to handle OMERO connection
+     * @param parents Collection of parent containers on OMERO to link the file to
+     * @param deletePreviousTable True if you want to delete previous CSV files on the parent container, linked to the current QuPath project
+     * @param owner the owner of the files to delete. If null, then all tables are deleted whatever the owner
+     * @return Sending status (true if the CSV file has been sent ; false if there were troubles during the sending process)
+     */
+    public static boolean sendParentMeasurementTableAsOmeroTable(LinkedHashMap<String, List<String>> parentTable,
+                                                                 OmeroRawClient client, Collection<DataObject> parents,
+                                                                 boolean deletePreviousTable, String owner){
         // set the file name
         String filename = summaryFileBaseName + "_" +
                 QPEx.getQuPath().getProject().getName().split("/")[0] + "_"+
@@ -1083,7 +1134,7 @@ public class OmeroRawScripting {
 
                 // delete previous files
                 if (attachedFile != null)
-                    deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE);
+                    deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE, owner);
 
             } else {
                 // link the file if it has already been uploaded once. Upload it otherwise
@@ -1219,20 +1270,6 @@ public class OmeroRawScripting {
     public static void deleteFiles(OmeroRawImageServer imageServer, String name){
         List<FileAnnotationData> files = OmeroRawTools.readAttachments(imageServer.getClient(), imageServer.getId());
         deletePreviousFileVersions(imageServer.getClient(), files, name, null, null);
-    }
-
-
-    /**
-     * Delete all previous version of tables (OMERO and csv files) related to the current QuPath project.
-     * Files to delete are filtered according to the given table name in the list of files.
-     *
-     * @param client Omero client
-     * @param files List of files to browse
-     * @param name Table name that files name must contain to be deleted (i.e. filtering item)
-     * @param format file format to look for
-     */
-    private static void deletePreviousFileVersions(OmeroRawClient client, Collection<FileAnnotationData> files, String name, String format){
-        deletePreviousFileVersions(client, files, name, format, null);
     }
 
     /**
