@@ -479,7 +479,7 @@ public class OmeroRawScripting {
      */
     public static void addMetadata(Map<String,String> keyValues) {
         // get project entry
-        ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
+        ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
 
         // get qupath metadata
         Map<String, String> qpMetadata = entry.getMetadataMap();
@@ -532,7 +532,7 @@ public class OmeroRawScripting {
      */
     public static void addAndUpdateMetadata(Map<String,String> keyValues) {
         // get project entry
-        ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
+        ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
 
         // get qupath metadata
         Map<String, String> qpMetadata = entry.getMetadataMap();
@@ -629,7 +629,7 @@ public class OmeroRawScripting {
      */
     public static void addAndDeleteMetadata(Map<String,String> keyValues) {
         // get project entry
-        ProjectImageEntry<BufferedImage> entry = QPEx.getQuPath().getProject().getEntry(QPEx.getQuPath().getImageData());
+        ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
 
         // delete metadata
         entry.clearMetadata();
