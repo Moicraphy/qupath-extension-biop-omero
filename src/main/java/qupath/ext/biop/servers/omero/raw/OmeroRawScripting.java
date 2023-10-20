@@ -46,6 +46,7 @@ public class OmeroRawScripting {
     private static final String summaryFileBaseName = "QP summary table";
     private static final String DEFAULT_KVP_NAMESPACE = "openmicroscopy.org/omero/client/mapAnnotation";
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawScripting.class);
+    private final static String FILE_NAME_SPLIT_REGEX = "_([\\d]*-[\\d]*h[\\d].m[\\d].*)";
 
 
     /**
@@ -763,7 +764,14 @@ public class OmeroRawScripting {
         if(deletePreviousTable){
             Collection<FileAnnotationData> tables = OmeroRawTools.readTables(client, imageId);
             boolean hasBeenSent = OmeroRawTools.addTableToOmero(table, tableName, client, imageId);
-            deletePreviousFileVersions(client, tables, tableName.substring(0, tableName.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE, owner);
+            String[] groups = tableName.split(FILE_NAME_SPLIT_REGEX);
+            String matchedTableName;
+            if(groups.length == 0){
+                matchedTableName = tableName.substring(0, tableName.lastIndexOf("_"));
+            }else{
+                matchedTableName = groups[0];
+            }
+            deletePreviousFileVersions(client, tables, matchedTableName, TablesFacility.TABLES_MIMETYPE, owner);
 
             return hasBeenSent;
         } else
@@ -942,7 +950,14 @@ public class OmeroRawScripting {
             if (deletePreviousTable) {
                 Collection<FileAnnotationData> attachments = OmeroRawTools.readAttachments(client, imageId);
                 hasBeenSent = OmeroRawTools.addAttachmentToOmero(file, client, imageId);
-                deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL, owner);
+                String[] groups = filename.split(FILE_NAME_SPLIT_REGEX);
+                String matchedFileName;
+                if(groups.length == 0){
+                    matchedFileName = filename.substring(0, filename.lastIndexOf("_"));
+                }else{
+                    matchedFileName = groups[0];
+                }
+                deletePreviousFileVersions(client, attachments, matchedFileName, FileAnnotationData.MS_EXCEL, owner);
 
             } else
                 // add the csv file to OMERO
@@ -1042,8 +1057,16 @@ public class OmeroRawScripting {
                             attachedFile = OmeroRawTools.addAttachmentToOmero(parentCSVFile, client, parent);
 
                         // delete previous files
-                        if (attachedFile != null)
-                            deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), FileAnnotationData.MS_EXCEL, owner);
+                        if (attachedFile != null){
+                            String[] groups = filename.split(FILE_NAME_SPLIT_REGEX);
+                            String matchedFileName;
+                            if(groups.length == 0){
+                                matchedFileName = filename.substring(0, filename.lastIndexOf("_"));
+                            }else{
+                                matchedFileName = groups[0];
+                            }
+                            deletePreviousFileVersions(client, attachments, matchedFileName, FileAnnotationData.MS_EXCEL, owner);
+                        }
                     } else {
                         // link the file if it has already been uploaded once. Upload it otherwise
                         if (attachedFile.getFileID() > 0)
@@ -1131,8 +1154,16 @@ public class OmeroRawScripting {
                 }
 
                 // delete previous files
-                if (attachedFile != null)
-                    deletePreviousFileVersions(client, attachments, filename.substring(0, filename.lastIndexOf("_")), TablesFacility.TABLES_MIMETYPE, owner);
+                if (attachedFile != null) {
+                    String[] groups = filename.split(FILE_NAME_SPLIT_REGEX);
+                    String matchedFileName;
+                    if(groups.length == 0){
+                        matchedFileName = filename.substring(0, filename.lastIndexOf("_"));
+                    }else{
+                        matchedFileName = groups[0];
+                    }
+                    deletePreviousFileVersions(client, attachments, matchedFileName, TablesFacility.TABLES_MIMETYPE, owner);
+                }
 
             } else {
                 // link the file if it has already been uploaded once. Upload it otherwise
