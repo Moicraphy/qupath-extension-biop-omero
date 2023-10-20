@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import javafx.collections.ObservableList;
 import omero.gateway.model.EllipseData;
 import omero.gateway.model.LineData;
 import omero.gateway.model.PointData;
@@ -145,22 +146,20 @@ class OmeroRawShapes {
         if(isValidClass)
             classes.addAll(Arrays.stream(roiClass.split("&")).collect(Collectors.toList()));
 
-        // code breaks all the current project
-        // do not use
-        // and wait for the version TODO
+        // create new PathClasses if they are not already created
+        ObservableList<PathClass> availablePathClasses = QPEx.getQuPath().getAvailablePathClasses();
+        boolean updateAvailablePathClasses = false;
 
-       /* // create new PathClasses if they are not already created
-        List<PathClass> availablePathClasses = QPEx.getQuPath().getProject().getPathClasses();
-        List<PathClass> newPathClasses = new ArrayList<>();
-
-        for (PathClass pathClass : availablePathClasses) {
-            newPathClasses.add(pathClass);
-            for (String pathClassName : classes)
-                if (pathClass.getName() != null && !pathClass.getName().equals(pathClassName))
-                    newPathClasses.add(PathClassFactory.getPathClass(pathClassName));
+        for (String pathClassName : classes) {
+            PathClass newPathClass = PathClass.fromString(pathClassName);
+            if (!availablePathClasses.contains(newPathClass)) {
+                updateAvailablePathClasses = true;
+                availablePathClasses.add(newPathClass);
+            }
         }
-        QPEx.getQuPath().getProject().setPathClasses(newPathClasses);*/
 
+        if(updateAvailablePathClasses)
+            QPEx.getQuPath().getProject().setPathClasses(availablePathClasses);
 
         switch(roiType.toLowerCase()){
             case "cell": roiType = "detection";
