@@ -164,7 +164,6 @@ class OmeroRawShapes {
                     pathObject = PathObjects.createAnnotationObject(roi);
                 else
                     pathObject = PathObjects.createAnnotationObject(roi, PathClass.fromCollection(classes));
-                break;
         if(!isValidClass)
             pathObject.setColor(Color.RED.getRGB());
 
