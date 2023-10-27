@@ -346,7 +346,7 @@ class OmeroRawShapes {
             // Build the OMERO object
             RectangleData rectangle = new RectangleData(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight());
             // Write in comments the type of PathObject as well as the assigned class if there is one
-            rectangle.setText(roi.getRoiName());
+            rectangle.setText(setRoiComment(src));
 
             // set the ROI position in the image
             rectangle.setC(roi.getC());
@@ -356,7 +356,7 @@ class OmeroRawShapes {
 
         } else if (roi instanceof EllipseROI) {
             EllipseData ellipse = new EllipseData(roi.getCentroidX(), roi.getCentroidY(), roi.getBoundsWidth()/2, roi.getBoundsHeight()/2);
-            ellipse.setText(roi.getRoiName());
+            ellipse.setText(setRoiComment(src));
             ellipse.setC(roi.getC());
             ellipse.setT(roi.getT());
             ellipse.setZ(roi.getZ());
@@ -365,7 +365,7 @@ class OmeroRawShapes {
         } else if (roi instanceof LineROI) {
             LineROI lineRoi = (LineROI)roi;
             LineData line = new LineData(lineRoi.getX1(), lineRoi.getY1(), lineRoi.getX2(), lineRoi.getY2());
-            line.setText(roi.getRoiName());
+            line.setText(setRoiComment(src));
             line.setC(roi.getC());
             line.setT(roi.getT());
             line.setZ(roi.getZ());
@@ -375,7 +375,7 @@ class OmeroRawShapes {
             List<Point2D.Double> points = new ArrayList<>();
             roi.getAllPoints().forEach(point2->points.add(new Point2D.Double(point2.getX(), point2.getY())));
             PolylineData polyline = new PolylineData(points);
-            polyline.setText(roi.getRoiName());
+            polyline.setText(setRoiComment(src));
             polyline.setC(roi.getC());
             polyline.setT(roi.getT());
             polyline.setZ(roi.getZ());
@@ -385,7 +385,7 @@ class OmeroRawShapes {
             List<Point2D.Double> points = new ArrayList<>();
             roi.getAllPoints().forEach(point2->points.add(new Point2D.Double(point2.getX(), point2.getY())));
             PolygonData polygon = new PolygonData(points);
-            polygon.setText(roi.getRoiName());
+            polygon.setText(setRoiComment(src));
             polygon.setC(roi.getC());
             polygon.setT(roi.getT());
             polygon.setZ(roi.getZ());
@@ -396,7 +396,7 @@ class OmeroRawShapes {
 
             for (Point2 roiPoint : roiPoints) {
                 PointData point = new PointData(roiPoint.getX(), roiPoint.getY());
-                point.setText(setRoiComment(roi.getRoiName()));
+                point.setText(setRoiComment(src));
                 point.setC(roi.getC());
                 point.setT(roi.getT());
                 point.setZ(roi.getZ());
@@ -440,7 +440,7 @@ class OmeroRawShapes {
         String pathClass = src.getPathClass() == null ? "NoClass" : src.getPathClass().toString().replaceAll(" ","&");
 
         return pathClass;
-        }
+        
     }
 
 
