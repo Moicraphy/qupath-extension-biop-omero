@@ -439,10 +439,7 @@ class OmeroRawShapes {
         // format classes to OMERO-compatible string
         String pathClass = src.getPathClass() == null ? "NoClass" : src.getPathClass().toString().replaceAll(":","&");
 
-        if (src.isDetection()) {
-             return "Detection:"+pathClass+":"+objectID+":"+parentID;
-        } else {
-            return "Annotation:"+pathClass+":"+objectID+":"+parentID;
+        return pathClass+" "+objectID+" "+parentID;
         }
     }
 
