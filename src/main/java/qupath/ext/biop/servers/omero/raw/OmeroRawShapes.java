@@ -91,29 +91,29 @@ class OmeroRawShapes {
     /**
      * Create a PathObject of type annotation or detection from a QuPath ROI object
      * without any class and with the default red color.
-     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass)} for the full documentation.
+     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiClass, String roiScore)} for the full documentation.
      *
      * @param roi roi to convert
      * @param roiType annotation or detection type
      * @return a new pathObject
      */
-    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType){
-        return createPathObjectFromQuPathRoi(roi, roiType,"");
+    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiClass){
+        return createPathObjectFromQuPathRoi(roi, roiClass,"");
     }
 
     /**
      * Create a PathObject of type annotation or detection from a QuPath ROI object, with a certain color. If the
      * color is yellow (i.e. default color on OMERO), it is automatically converted to QuPath default red color.
      * No class is assigned to the new PathObject.
-     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass)} for the full documentation.
+     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiClass, String roiScore)} for the full documentation.
      *
      * @param roi roi to convert
      * @param roiType annotation or detection type
      * @param color color to assign to the pathObject
      * @return a new pathObject
      */
-    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, Color color){
-        PathObject pathObject = createPathObjectFromQuPathRoi(roi, roiType, "");
+    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiClass, Color color){
+        PathObject pathObject = createPathObjectFromQuPathRoi(roi, roiClass, "");
 
         // check if the color is not the default color (yellow) for selected objects
         if(color == null || color.equals(Color.YELLOW))
@@ -137,7 +137,7 @@ class OmeroRawShapes {
      * @param roiClass pathClasses assigned to the roi
      * @return a new pathObject
      */
-    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiType, String roiClass){
+    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiClass, String roiScore){
         PathObject pathObject;
         boolean isValidClass = !(roiClass == null || roiClass.isEmpty() || roiClass.equalsIgnoreCase("noclass"));
 
@@ -160,17 +160,6 @@ class OmeroRawShapes {
 
         if(updateAvailablePathClasses)
             QPEx.getQuPath().getProject().setPathClasses(availablePathClasses);
-
-        switch(roiType.toLowerCase()){
-            case "cell": roiType = "detection";
-            case "detection":
-                if (!isValidClass)
-                    pathObject = PathObjects.createDetectionObject(roi);
-                else
-                    pathObject = PathObjects.createDetectionObject(roi, PathClass.fromCollection(classes));
-                break;
-            case "annotation":
-            default:
                 if (!isValidClass)
                     pathObject = PathObjects.createAnnotationObject(roi);
                 else
@@ -575,8 +564,8 @@ class OmeroRawShapes {
 
             // get the type, class, id and parent id of thu current ROI
             String[] roiCommentParsed = parseROIComment(roiComment);
-            String roiType = roiCommentParsed[0];
-            String roiClass = roiCommentParsed[1];
+            String roiClass = roiCommentParsed[0];
+            String roiScore = roiCommentParsed[1];
             double roiId = Double.parseDouble(roiCommentParsed[2]);
             double parentId = Double.parseDouble(roiCommentParsed[3]);
 
@@ -584,7 +573,7 @@ class OmeroRawShapes {
             ROI qpROI = OmeroRawShapes.convertOmeroROIsToQuPathROIs(roiDatum);
 
             // convert QuPath ROI to QuPath Annotation or detection Object (according to type).
-            idObjectMap.put(roiId, OmeroRawShapes.createPathObjectFromQuPathRoi(qpROI, roiType, roiClass));
+            idObjectMap.put(roiId, OmeroRawShapes.createPathObjectFromQuPathRoi(qpROI, roiClass, roiScore));
 
             // populate parent map with current_object/parent ids
             idParentIdMap.put(roiId,parentId);
@@ -676,44 +665,23 @@ class OmeroRawShapes {
     protected static String[] parseROIComment(String comment) {
         // default parsing
         String roiClass = "NoClass";
-        String roiType = "annotation";
+        String roiScore = "NoScore";
         String roiParent =  "0";
         String roiID =  "-"+System.nanoTime();
-
         // split the string
-        String[] tokens = (comment.isBlank() || comment.isEmpty()) ? null : comment.split(":");
+        String[] tokens = (comment.isBlank() || comment.isEmpty()) ? null : comment.split(" ");
         if(tokens == null)
-            return new String[]{roiType, roiClass, roiID, roiParent};
+            return new String[]{roiClass, roiScore};
 
         // get ROI type
         if (tokens.length > 0)
-            roiType = tokens[0];
+            roiClass = tokens[0];
 
         // get the class
         if(tokens.length > 1)
-            roiClass = tokens[1];
+            roiScore = tokens[1];
 
-        // get the ROI id
-        if(tokens.length > 2) {
-            try {
-                Double.parseDouble(tokens[2]);
-                roiID = tokens[2];
-            } catch (NumberFormatException e) {
-                roiID = "-"+System.nanoTime();
-            }
-        }
-
-        // get the parent ROI id
-        if(tokens.length > 3) {
-            try {
-                Double.parseDouble(tokens[3]);
-                roiParent = tokens[3];
-            } catch (NumberFormatException e) {
-                roiParent = "0";
-            }
-        }
-
-        return new String[]{roiType, roiClass, roiID, roiParent};
+        return new String[]{roiClass, roiScore, roiID, roiParent};
     }
 
     /**
