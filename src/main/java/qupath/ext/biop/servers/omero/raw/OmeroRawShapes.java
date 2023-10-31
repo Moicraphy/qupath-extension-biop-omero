@@ -87,43 +87,6 @@ class OmeroRawShapes {
 
     private final static Logger logger = LoggerFactory.getLogger(OmeroRawShapes.class);
 
-
-    /**
-     * Create a PathObject of type annotation or detection from a QuPath ROI object
-     * without any class and with the default red color.
-     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiClass, String roiScore)} for the full documentation.
-     *
-     * @param roi roi to convert
-     * @param roiType annotation or detection type
-     * @return a new pathObject
-     */
-    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiClass){
-        return createPathObjectFromQuPathRoi(roi, roiClass,"");
-    }
-
-    /**
-     * Create a PathObject of type annotation or detection from a QuPath ROI object, with a certain color. If the
-     * color is yellow (i.e. default color on OMERO), it is automatically converted to QuPath default red color.
-     * No class is assigned to the new PathObject.
-     * See {@link #createPathObjectFromQuPathRoi(ROI roi, String roiClass, String roiScore)} for the full documentation.
-     *
-     * @param roi roi to convert
-     * @param roiType annotation or detection type
-     * @param color color to assign to the pathObject
-     * @return a new pathObject
-     */
-    public static PathObject createPathObjectFromQuPathRoi(ROI roi, String roiClass, Color color){
-        PathObject pathObject = createPathObjectFromQuPathRoi(roi, roiClass, "");
-
-        // check if the color is not the default color (yellow) for selected objects
-        if(color == null || color.equals(Color.YELLOW))
-            pathObject.setColor(Color.RED.getRGB());
-        else pathObject.setColor(color.getRGB());
-
-        return pathObject;
-    }
-
-
     /**
      * Create a PathObject of type annotation or detection from a QuPath ROI object.
      * with the specified class. If the class is not a valid class, no class is assigned to the pathObject and
@@ -166,7 +129,7 @@ class OmeroRawShapes {
                     pathObject = PathObjects.createAnnotationObject(roi, PathClass.fromCollection(classes));
         if(!isValidClass)
             pathObject.setColor(Color.RED.getRGB());
-
+        pathObject.setName(roiClass +" "+roiScore);
         return pathObject;
     }
 
@@ -346,8 +309,7 @@ class OmeroRawShapes {
             // Build the OMERO object
             RectangleData rectangle = new RectangleData(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight());
             // Write in comments the type of PathObject as well as the assigned class if there is one
-            rectangle.setText(setRoiComment(src, objectID, parentID));
-
+            rectangle.setText(src.getName());
             // set the ROI position in the image
             rectangle.setC(roi.getC());
             rectangle.setT(roi.getT());
@@ -356,7 +318,7 @@ class OmeroRawShapes {
 
         } else if (roi instanceof EllipseROI) {
             EllipseData ellipse = new EllipseData(roi.getCentroidX(), roi.getCentroidY(), roi.getBoundsWidth()/2, roi.getBoundsHeight()/2);
-            ellipse.setText(setRoiComment(src, objectID, parentID));
+            ellipse.setText(src.getName());
             ellipse.setC(roi.getC());
             ellipse.setT(roi.getT());
             ellipse.setZ(roi.getZ());
@@ -365,7 +327,7 @@ class OmeroRawShapes {
         } else if (roi instanceof LineROI) {
             LineROI lineRoi = (LineROI)roi;
             LineData line = new LineData(lineRoi.getX1(), lineRoi.getY1(), lineRoi.getX2(), lineRoi.getY2());
-            line.setText(setRoiComment(src, objectID, parentID));
+            line.setText(src.getName());
             line.setC(roi.getC());
             line.setT(roi.getT());
             line.setZ(roi.getZ());
@@ -375,7 +337,7 @@ class OmeroRawShapes {
             List<Point2D.Double> points = new ArrayList<>();
             roi.getAllPoints().forEach(point2->points.add(new Point2D.Double(point2.getX(), point2.getY())));
             PolylineData polyline = new PolylineData(points);
-            polyline.setText(setRoiComment(src, objectID, parentID));
+            polyline.setText(src.getName());
             polyline.setC(roi.getC());
             polyline.setT(roi.getT());
             polyline.setZ(roi.getZ());
@@ -385,7 +347,7 @@ class OmeroRawShapes {
             List<Point2D.Double> points = new ArrayList<>();
             roi.getAllPoints().forEach(point2->points.add(new Point2D.Double(point2.getX(), point2.getY())));
             PolygonData polygon = new PolygonData(points);
-            polygon.setText(setRoiComment(src, objectID, parentID));
+            polygon.setText(src.getName());
             polygon.setC(roi.getC());
             polygon.setT(roi.getT());
             polygon.setZ(roi.getZ());
@@ -396,7 +358,7 @@ class OmeroRawShapes {
 
             for (Point2 roiPoint : roiPoints) {
                 PointData point = new PointData(roiPoint.getX(), roiPoint.getY());
-                point.setText(setRoiComment(src, objectID, parentID));
+                point.setText(src.getName());
                 point.setC(roi.getC());
                 point.setT(roi.getT());
                 point.setZ(roi.getZ());
@@ -507,7 +469,7 @@ class OmeroRawShapes {
                 // set the ROI color according to the class assigned to the corresponding PathObject
                 shapes.forEach(shape -> {
                     shape.getShapeSettings().setStroke(pathClass == null ? Color.YELLOW : new Color(pathClass.getColor()));
-                    shape.getShapeSettings().setFill(!QPEx.getQuPath().getOverlayOptions().getFillAnnotations() ? null : pathClass == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathClass.getColor())));
+                    shape.getShapeSettings().setFill(pathClass == null ? ColorToolsAwt.getMoreTranslucentColor(Color.YELLOW) : ColorToolsAwt.getMoreTranslucentColor(new Color(pathClass.getColor())));
                 });
                 ROIData roiData = new ROIData();
                 shapes.forEach(roiData::addShapeData);
@@ -659,7 +621,7 @@ class OmeroRawShapes {
     protected static String[] parseROIComment(String comment) {
         // default parsing
         String roiClass = "NoClass";
-        String roiScore = "NoScore";
+        String roiScore = "";
         String roiParent =  "0";
         String roiID =  "-"+System.nanoTime();
         // split the string
