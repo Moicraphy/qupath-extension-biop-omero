@@ -625,7 +625,7 @@ class OmeroRawShapes {
         String roiParent =  "0";
         String roiID =  "-"+System.nanoTime();
         // split the string
-        String[] tokens = (comment.isBlank() || comment.isEmpty()) ? null : comment.split(" ");
+        String[] tokens = (comment.isBlank() || comment.isEmpty()) ? null : comment.split(" ", 1);
         if(tokens == null)
             return new String[]{roiClass, roiScore};
 
